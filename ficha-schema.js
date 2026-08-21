@@ -27,8 +27,10 @@
  *   detalles: {...}   - al marcar esa opción se abre un campo para escribir cuál.
  *                       Ej: marcar "Otro" abre "¿Cuál material?"
  *
- * Propiedad opcional de una sección:
+ * Propiedades opcionales de una sección:
  *   noAplica: {...}   - agrega un interruptor para saltarse la sección completa
+ *   soloSi: {...}     - la sección solo aplica si otro campo tiene cierto valor.
+ *                       Ej: las secciones 2 a 8 solo aplican si hay movimiento en masa.
  */
 
 const FICHA_SCHEMA = {
@@ -53,7 +55,21 @@ const FICHA_SCHEMA = {
         { id: 'barrio_vereda', etiqueta: 'Barrio / Vereda', tipo: 'texto', requerido: true, ancho: 'medio' },
         { id: 'direccion_referencia', etiqueta: 'Dirección o referencia', tipo: 'texto', requerido: true, ancho: 'medio' },
         { id: 'coordenadas', etiqueta: 'Coordenadas / Altitud (grados decimales)', tipo: 'gps', requerido: true, ancho: 'completo' },
-        { id: 'evaluadores', etiqueta: 'Evaluador(es)', tipo: 'texto', requerido: true, ancho: 'completo' }
+        { id: 'evaluadores', etiqueta: 'Evaluador(es)', tipo: 'texto', requerido: true, ancho: 'completo' },
+        {
+          id: 'hay_movimiento',
+          etiqueta: '¿Hay un movimiento en masa?',
+          tipo: 'radio',
+          requerido: true,
+          destacado: true,
+          esFiltro: true,
+          opciones: ['Sí', 'No'],
+          descripciones: {
+            'Sí': 'Se continúa con la caracterización completa (secciones 2 a 8)',
+            'No': 'Se pasa directo a registro y soporte; lo demás no aplica'
+          },
+          ancho: 'completo'
+        }
       ]
     },
 
@@ -62,6 +78,7 @@ const FICHA_SCHEMA = {
       id: 's2',
       numero: '2',
       titulo: 'CARACTERIZACIÓN',
+      soloSi: { campo: 'hay_movimiento', valor: 'Sí' },
       campos: [
         {
           id: 'cambios_post_sismo',
@@ -116,6 +133,7 @@ const FICHA_SCHEMA = {
       id: 's3',
       numero: '3',
       titulo: 'EVIDENCIAS DE INESTABILIDAD',
+      soloSi: { campo: 'hay_movimiento', valor: 'Sí' },
       campos: [
         {
           id: 'evidencias',
@@ -146,13 +164,8 @@ const FICHA_SCHEMA = {
     {
       id: 's4',
       numero: '4',
-      titulo: 'CARACTERIZACIÓN DEL MOVIMIENTO (SI APLICA)',
-      // El formato dice "si aplica": si no hay movimiento, se salta la sección
-      // completa en vez de obligar a marcar "No determinado" campo por campo.
-      noAplica: {
-        id: 's4_no_aplica',
-        etiqueta: 'No se identifica movimiento en masa en el sitio'
-      },
+      titulo: 'CARACTERIZACIÓN DEL MOVIMIENTO',
+      soloSi: { campo: 'hay_movimiento', valor: 'Sí' },
       campos: [
         {
           id: 'tipo_movimiento',
@@ -216,6 +229,7 @@ const FICHA_SCHEMA = {
       id: 's5',
       numero: '5',
       titulo: 'ELEMENTOS EXPUESTOS Y AFECTACIÓN',
+      soloSi: { campo: 'hay_movimiento', valor: 'Sí' },
       campos: [
         { id: 'personas_n', etiqueta: 'Personas (No.)', tipo: 'numero', ancho: 'medio' },
         { id: 'viviendas_n', etiqueta: 'Viviendas (No.)', tipo: 'numero', ancho: 'medio' },
@@ -243,6 +257,7 @@ const FICHA_SCHEMA = {
       id: 's6',
       numero: '6',
       titulo: 'VALORACIÓN RÁPIDA DE LA CONDICIÓN',
+      soloSi: { campo: 'hay_movimiento', valor: 'Sí' },
       ayuda: 'Califique cada criterio y agregue una observación si aplica.',
       campos: [
         { id: 'val_evidencia', etiqueta: 'Evidencia de movimiento / deformación', tipo: 'valoracion', requerido: true },
@@ -257,6 +272,7 @@ const FICHA_SCHEMA = {
       id: 's7',
       numero: '7',
       titulo: 'CLASIFICACIÓN DE PRIORIDAD',
+      soloSi: { campo: 'hay_movimiento', valor: 'Sí' },
       campos: [
         {
           id: 'prioridad',
@@ -281,6 +297,7 @@ const FICHA_SCHEMA = {
       id: 's8',
       numero: '8',
       titulo: 'ACCIONES / RECOMENDACIONES INMEDIATAS',
+      soloSi: { campo: 'hay_movimiento', valor: 'Sí' },
       campos: [
         {
           id: 'acciones',

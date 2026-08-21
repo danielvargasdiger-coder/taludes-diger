@@ -190,6 +190,7 @@ textarea { min-height: 96px; resize: vertical; }
 .seccion-faltan.pendiente { background: #fff3cd; color: #8a5a00; }
 .seccion-faltan.lista     { background: #e3f4e4; color: var(--baja); }
 .seccion-faltan.omitida   { background: #e9edf0; color: var(--texto-suave); }
+.seccion-faltan.espera    { background: var(--azul-claro); color: var(--azul); }
 .seccion-faltan:empty     { display: none; }
 
 /* Interruptor "no aplica" de la sección 4. */

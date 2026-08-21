@@ -624,16 +624,13 @@ function dibujarFormulario() {
       pintar();
     }
 
-    // Pasar a la siguiente sección sin tener que buscarla y cerrarla a mano.
+    // Pasar a la siguiente sección que SÍ aplique, saltándose las apagadas.
     bloque.querySelector('.btn-siguiente').addEventListener('click', () => {
       bloque.classList.add('cerrada');
-      const siguiente = bloque.nextElementSibling;
-      if (siguiente && siguiente.classList.contains('seccion')) {
-        siguiente.classList.remove('cerrada');
-        siguiente.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      } else {
-        $('#btn-enviar-ficha').scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
+      const desde = FICHA_SCHEMA.secciones.findIndex((x) => x.id === sec.id);
+      const siguiente = FICHA_SCHEMA.secciones.slice(desde + 1).find((x) => !seccionOmitida(x));
+      if (siguiente) abrirSeccion(siguiente.id);
+      else $('#btn-enviar-ficha').scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
 
     form.appendChild(bloque);
@@ -896,8 +893,40 @@ function dibujarCampo(campo) {
 function setValor(id, valor) {
   APP.datos[id] = valor;
   actualizarProgreso();
+
+  // Si la respuesta decide qué secciones aplican, se avisa y se lleva al
+  // geólogo a la primera sección que sí tiene que llenar.
+  if (esCampoFiltro(id)) reaccionarAFiltro(id);
+
   clearTimeout(setValor._temp);
   setValor._temp = setTimeout(() => guardarBorrador(true), 1200); // autoguardado
+}
+
+function reaccionarAFiltro(id) {
+  const apagadas = FICHA_SCHEMA.secciones.filter(
+    (s) => s.soloSi && s.soloSi.campo === id && seccionOmitida(s)
+  );
+
+  if (apagadas.length) {
+    toast('Secciones ' + apagadas[0].numero + ' a ' +
+      apagadas[apagadas.length - 1].numero + ' no aplican. Pasa a registro y soporte.');
+    // Lleva a la primera sección que sí queda por llenar.
+    const siguiente = FICHA_SCHEMA.secciones.find(
+      (s) => !seccionOmitida(s) && s.numero > apagadas[apagadas.length - 1].numero
+    );
+    if (siguiente) abrirSeccion(siguiente.id);
+  } else {
+    // Volvió a activarse: se abre la primera para que continúe.
+    const primera = FICHA_SCHEMA.secciones.find((s) => s.soloSi && s.soloSi.campo === id);
+    if (primera) abrirSeccion(primera.id);
+  }
+}
+
+function abrirSeccion(idSeccion) {
+  const bloque = $('#form-ficha .seccion[data-seccion="' + idSeccion + '"]');
+  if (!bloque) return;
+  bloque.classList.remove('cerrada');
+  setTimeout(() => bloque.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120);
 }
 
 // ---------------------------------------------------------------- FOTOS
@@ -932,9 +961,20 @@ function comprimirImagen(archivo, anchoMax, calidad) {
 }
 
 // ---------------------------------------------------------------- PROGRESO Y VALIDACIÓN
-/** Una sección marcada "no aplica" deja de exigirse por completo. */
+/**
+ * Una sección deja de exigirse cuando el geólogo la marcó "no aplica",
+ * o cuando depende de otra respuesta que no se cumple (por ejemplo, las
+ * secciones 2 a 8 solo aplican si hay movimiento en masa).
+ */
 function seccionOmitida(sec) {
-  return !!(sec.noAplica && APP.datos[sec.noAplica.id]);
+  if (sec.noAplica && APP.datos[sec.noAplica.id]) return true;
+  if (sec.soloSi && APP.datos[sec.soloSi.campo] !== sec.soloSi.valor) return true;
+  return false;
+}
+
+/** Campos de los que depende alguna sección. Al cambiarlos se repinta todo. */
+function esCampoFiltro(id) {
+  return FICHA_SCHEMA.secciones.some((s) => s.soloSi && s.soloSi.campo === id);
 }
 
 /** Opciones marcadas de un campo, sea de una o de varias respuestas. */
@@ -1009,13 +1049,27 @@ function actualizarProgreso() {
   faltan.forEach((f) => { porSeccion[f.seccion.id] = (porSeccion[f.seccion.id] || 0) + 1; });
 
   $$('#form-ficha .seccion[data-seccion]').forEach((bloque) => {
+    const sec = FICHA_SCHEMA.secciones.find((x) => x.id === bloque.dataset.seccion);
+    if (!sec) return;
+    const omitida = seccionOmitida(sec);
+
+    // La sección se apaga o se enciende según las respuestas del momento.
+    bloque.classList.toggle('omitida', omitida);
+    if (omitida) bloque.classList.add('cerrada');
+
     const chip = bloque.querySelector('.seccion-faltan');
     if (!chip) return;
-    const sec = FICHA_SCHEMA.secciones.find((x) => x.id === bloque.dataset.seccion);
     const n = porSeccion[bloque.dataset.seccion] || 0;
-    const omitida = sec && seccionOmitida(sec);
-    chip.textContent = omitida ? 'No aplica' : (n ? 'Faltan ' + n : 'Completa');
-    chip.className = 'seccion-faltan ' + (omitida ? 'omitida' : n ? 'pendiente' : 'lista');
+
+    // Mientras no se responda la pregunta que la gobierna, la sección no está
+    // descartada: está a la espera. Decir "No aplica" antes de tiempo confunde.
+    const sinDecidir = sec.soloSi && !APP.datos[sec.soloSi.campo];
+
+    chip.textContent = sinDecidir ? 'Según la pregunta 1'
+      : omitida ? 'No aplica'
+      : n ? 'Faltan ' + n : 'Completa';
+    chip.className = 'seccion-faltan ' + (sinDecidir ? 'espera'
+      : omitida ? 'omitida' : n ? 'pendiente' : 'lista');
   });
 
   const btn = $('#btn-enviar-ficha');
