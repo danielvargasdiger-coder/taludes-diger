@@ -385,11 +385,14 @@ function pintarPendientes() {
         '<div class="tarjeta-sub">' + esc(s.barrio || '') + (s.comuna ? ' · ' + esc(s.comuna) : '') + '</div></div>' +
         (p ? '<span class="chip ' + normalizar(p) + '">' + esc(p) + '</span>' : '<span class="chip gris">SIN PRIORIDAD</span>') +
       '</div>' +
-      (s.edificacion ? '<div class="tarjeta-sub">' + esc(s.edificacion) + '</div>' : '') +
-      (s.recomendaciones ? '<div class="tarjeta-desc">' + esc(s.recomendaciones.slice(0, 150)) + (s.recomendaciones.length > 150 ? '…' : '') + '</div>' : '') +
+      (s.edificacion ? '<div class="tarjeta-linea"><b>Edificación:</b> ' + esc(s.edificacion) + '</div>' : '') +
+      (s.contacto ? '<div class="tarjeta-linea"><b>Contacto:</b> ' + esc(s.contacto) + '</div>' : '') +
+      (s.telefono ? '<div class="tarjeta-linea"><b>Teléfono:</b> ' +
+        '<a href="tel:' + esc(s.telefono) + '" class="tel" onclick="event.stopPropagation()">' + esc(s.telefono) + '</a></div>' : '') +
+      (s.recomendaciones ? '<div class="tarjeta-desc">' + esc(s.recomendaciones) + '</div>' : '') +
       '<div class="tarjeta-pie">' + borrador +
         (s.responsable ? '<span>Asignada a ' + esc(s.responsable) + '</span>' : '') +
-        (!s.latitud ? '<span style="color:var(--alta);font-weight:700">Sin coordenadas — capturar GPS</span>' : '') +
+        (!s.latitud ? '<span class="aviso-sin-gps">Sin coordenadas — capturar GPS</span>' : '') +
       '</div>' +
     '</div>';
   }).join('');
@@ -521,9 +524,69 @@ async function guardarBorrador(silencioso) {
 }
 
 // ---------------------------------------------------------------- FICHA: DIBUJAR
+/**
+ * Panel de solo lectura con TODOS los datos que trae la solicitud desde el
+ * Sheet. El geólogo necesita verlos completos en sitio (a quién llamar,
+ * qué reportó el ciudadano) sin salir de la ficha.
+ */
+function panelSolicitud(s) {
+  if (!s || s.noProgramada) return null;
+
+  const filas = [
+    ['N.º de solicitud', s.idSolicitud],
+    ['Prioridad asignada', s.prioridad || 'Sin asignar'],
+    ['Responsable', s.responsable],
+    ['Entidad', s.entidad],
+    ['Barrio / Vereda', s.barrio],
+    ['Comuna / Corregimiento', s.comuna],
+    ['Dirección', s.direccion],
+    ['Nombre de la edificación', s.edificacion],
+    ['Persona de contacto', s.contacto],
+    ['Teléfono', s.telefono, 'tel'],
+    ['Coordenadas de la base', s.latitud ? s.latitud + ', ' + s.longitud : '', 'mapa'],
+    ['Recomendaciones / comentarios', s.recomendaciones, 'largo']
+  ].filter((f) => String(f[1] || '').trim() !== '');
+
+  const bloque = document.createElement('section');
+  bloque.className = 'seccion panel-solicitud';
+  bloque.innerHTML =
+    '<div class="seccion-cabeza">' +
+      '<span class="seccion-num">i</span>' +
+      '<span class="seccion-titulo">DATOS DE LA SOLICITUD</span>' +
+      '<span class="seccion-flecha">&#9660;</span>' +
+    '</div>' +
+    '<div class="seccion-cuerpo"><table class="tabla-solicitud">' +
+      filas.map(([etiqueta, valor, tipo]) => {
+        let celda;
+        if (tipo === 'tel') {
+          celda = '<a href="tel:' + esc(valor) + '" class="tel">' + esc(valor) + '</a>' +
+                  '<span class="pista">toca para llamar</span>';
+        } else if (tipo === 'mapa') {
+          celda = esc(valor) + '<br><a class="tel" target="_blank" rel="noopener" ' +
+                  'href="https://www.google.com/maps/search/?api=1&query=' + esc(valor) + '">Ver en el mapa</a>';
+        } else if (tipo === 'largo') {
+          celda = '<div class="texto-largo">' + esc(valor) + '</div>';
+        } else {
+          celda = esc(valor);
+        }
+        return '<tr><th>' + esc(etiqueta) + '</th><td>' + celda + '</td></tr>';
+      }).join('') +
+    '</table>' +
+    (!s.latitud ? '<p class="aviso-panel">Esta solicitud no trae coordenadas. ' +
+      'Captúralas con el GPS en la sección 1.</p>' : '') +
+    '</div>';
+
+  bloque.querySelector('.seccion-cabeza')
+    .addEventListener('click', () => bloque.classList.toggle('cerrada'));
+  return bloque;
+}
+
 function dibujarFormulario() {
   const form = $('#form-ficha');
   form.innerHTML = '';
+
+  const panel = panelSolicitud(APP.solicitudActual);
+  if (panel) form.appendChild(panel);
 
   FICHA_SCHEMA.secciones.forEach((sec, i) => {
     const bloque = document.createElement('section');
