@@ -180,6 +180,56 @@ textarea { min-height: 96px; resize: vertical; }
   margin-top: 9px; font-size: .74rem; color: var(--texto-suave);
 }
 
+/* ---------- Ayudas para llenar la ficha ---------- */
+
+/* Chip en el encabezado de cada sección: cuánto le falta. */
+.seccion-faltan {
+  font-size: .64rem; font-weight: 800; letter-spacing: .03em;
+  padding: 3px 8px; border-radius: 999px; white-space: nowrap;
+}
+.seccion-faltan.pendiente { background: #fff3cd; color: #8a5a00; }
+.seccion-faltan.lista     { background: #e3f4e4; color: var(--baja); }
+.seccion-faltan.omitida   { background: #e9edf0; color: var(--texto-suave); }
+.seccion-faltan:empty     { display: none; }
+
+/* Interruptor "no aplica" de la sección 4. */
+.no-aplica {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 12px; margin-bottom: 12px;
+  background: var(--azul-claro); border-radius: 8px;
+  font-size: .86rem; font-weight: 600; cursor: pointer;
+}
+.no-aplica input { width: 20px; height: 20px; accent-color: var(--azul); flex: none; }
+
+/* Al marcar "no aplica" la sección se apaga y deja de exigirse. */
+.seccion.omitida .rejilla { opacity: .35; pointer-events: none; }
+
+.btn-siguiente {
+  display: block; width: 100%; margin-top: 14px; padding: 12px;
+  border: 1px dashed var(--azul); border-radius: 8px;
+  background: transparent; color: var(--azul);
+  font-size: .86rem; font-weight: 700; cursor: pointer;
+}
+.btn-siguiente:active { background: var(--azul-claro); }
+.seccion.omitida .btn-siguiente { margin-top: 0; }
+
+/* Campo que se abre al marcar "Otro". */
+.detalles:empty { display: none; }
+.detalle {
+  margin-top: 10px; padding: 10px 12px;
+  background: var(--azul-claro); border-radius: 8px;
+  border-left: 3px solid var(--azul);
+}
+.detalle .campo-etiqueta { margin-bottom: 6px; }
+.detalle input { background: var(--blanco); }
+.detalle.faltante { border-left-color: var(--error); background: #fdecea; }
+.detalle.faltante input { border-color: var(--error); }
+
+/* Lista de lo que falta, agrupada por sección. */
+.falta-seccion { display: block; margin-top: 4px; font-weight: 400; }
+
+.btn-principal.incompleto { background: var(--texto-suave); }
+
 /* Datos de la solicitud mostrados en la tarjeta de la lista. */
 .tarjeta-linea { font-size: .84rem; margin-top: 4px; color: var(--texto); }
 .tarjeta-linea b { color: var(--texto-suave); font-weight: 700; }

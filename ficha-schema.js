@@ -21,6 +21,14 @@
  *   fotos        - fotografías / croquis
  *   valoracion   - Baja/Media/Alta + observación (sección 6)
  *   responsables - hasta 3 responsables con nombre, TP y entidad
+ *
+ * Propiedades opcionales de un campo:
+ *   requerido: true   - no deja enviar la ficha sin llenarlo
+ *   detalles: {...}   - al marcar esa opción se abre un campo para escribir cuál.
+ *                       Ej: marcar "Otro" abre "¿Cuál material?"
+ *
+ * Propiedad opcional de una sección:
+ *   noAplica: {...}   - agrega un interruptor para saltarse la sección completa
  */
 
 const FICHA_SCHEMA = {
@@ -59,6 +67,7 @@ const FICHA_SCHEMA = {
           id: 'cambios_post_sismo',
           etiqueta: '¿Cambios posteriores al sismo?',
           tipo: 'radio',
+          requerido: true,
           opciones: ['Sí', 'No', 'No determinado'],
           ancho: 'medio'
         },
@@ -66,6 +75,7 @@ const FICHA_SCHEMA = {
           id: 'movimiento_previo',
           etiqueta: '¿Movimiento previo?',
           tipo: 'radio',
+          requerido: true,
           opciones: ['Sí', 'No', 'Reactivación'],
           ancho: 'medio'
         },
@@ -73,7 +83,11 @@ const FICHA_SCHEMA = {
           id: 'material_geologia',
           etiqueta: 'Material / geología',
           tipo: 'checkbox',
+          requerido: true,
           opciones: ['Suelo', 'Roca', 'Relleno', 'Depósito', 'Otro'],
+          detalles: {
+            'Otro': { id: 'material_otro', etiqueta: '¿Cuál material?', requerido: true }
+          },
           ancho: 'completo'
         },
         { id: 'pendiente_pct', etiqueta: 'Pendiente (%)', tipo: 'numero', ancho: 'medio' },
@@ -82,6 +96,7 @@ const FICHA_SCHEMA = {
           id: 'condiciones_agua',
           etiqueta: 'Condiciones de agua',
           tipo: 'checkbox',
+          requerido: true,
           opciones: ['Seco', 'Húmedo', 'Saturado', 'Surgencias', 'Filtraciones'],
           ancho: 'completo'
         },
@@ -89,6 +104,7 @@ const FICHA_SCHEMA = {
           id: 'cobertura_uso',
           etiqueta: 'Cobertura / uso',
           tipo: 'checkbox',
+          requerido: true,
           opciones: ['Vegetación', 'Cultivo', 'Urbano', 'Corte', 'Relleno'],
           ancho: 'completo'
         }
@@ -114,11 +130,15 @@ const FICHA_SCHEMA = {
             'Inclinación de árboles/postes',
             'Daños en estructuras',
             'Surgencias/filtraciones',
-            'Erosión'
+            'Erosión',
+            'Otra'
           ],
+          requerido: true,
+          detalles: {
+            'Otra': { id: 'evidencias_otra', etiqueta: '¿Cuál otra evidencia?', requerido: true }
+          },
           ancho: 'completo'
-        },
-        { id: 'evidencias_otra', etiqueta: 'Otra evidencia, ¿cuál?', tipo: 'texto', ancho: 'completo' }
+        }
       ]
     },
 
@@ -127,11 +147,18 @@ const FICHA_SCHEMA = {
       id: 's4',
       numero: '4',
       titulo: 'CARACTERIZACIÓN DEL MOVIMIENTO (SI APLICA)',
+      // El formato dice "si aplica": si no hay movimiento, se salta la sección
+      // completa en vez de obligar a marcar "No determinado" campo por campo.
+      noAplica: {
+        id: 's4_no_aplica',
+        etiqueta: 'No se identifica movimiento en masa en el sitio'
+      },
       campos: [
         {
           id: 'tipo_movimiento',
           etiqueta: 'Tipo de movimiento',
           tipo: 'checkbox',
+          requerido: true,
           opciones: [
             'Rotacional',
             'Traslacional',
@@ -148,6 +175,7 @@ const FICHA_SCHEMA = {
           id: 'estado_movimiento',
           etiqueta: 'Estado',
           tipo: 'radio',
+          requerido: true,
           opciones: [
             'Inactivo',
             'Potencialmente inestable',
@@ -174,10 +202,12 @@ const FICHA_SCHEMA = {
           id: 'factores_observables',
           etiqueta: 'Factores observables',
           tipo: 'checkbox',
-          opciones: ['Sismo', 'Lluvia', 'Agua', 'Corte', 'Sobrecarga', 'Erosión'],
+          opciones: ['Sismo', 'Lluvia', 'Agua', 'Corte', 'Sobrecarga', 'Erosión', 'Otro'],
+          detalles: {
+            'Otro': { id: 'factores_otro', etiqueta: '¿Cuál otro factor?', requerido: true }
+          },
           ancho: 'completo'
-        },
-        { id: 'factores_otro', etiqueta: 'Otro factor, ¿cuál?', tipo: 'texto', ancho: 'completo' }
+        }
       ]
     },
 
@@ -200,6 +230,7 @@ const FICHA_SCHEMA = {
           id: 'afectacion',
           etiqueta: 'Afectación',
           tipo: 'radio',
+          requerido: true,
           opciones: ['Ninguna', 'Leve', 'Moderada', 'Severa', 'Colapso/pérdida'],
           ancho: 'completo'
         },
@@ -214,10 +245,10 @@ const FICHA_SCHEMA = {
       titulo: 'VALORACIÓN RÁPIDA DE LA CONDICIÓN',
       ayuda: 'Califique cada criterio y agregue una observación si aplica.',
       campos: [
-        { id: 'val_evidencia', etiqueta: 'Evidencia de movimiento / deformación', tipo: 'valoracion' },
-        { id: 'val_evolucion', etiqueta: 'Evolución / posibilidad de progresión', tipo: 'valoracion' },
-        { id: 'val_agua', etiqueta: 'Presencia de agua / saturación', tipo: 'valoracion' },
-        { id: 'val_expuestos', etiqueta: 'Elementos expuestos / consecuencias', tipo: 'valoracion' }
+        { id: 'val_evidencia', etiqueta: 'Evidencia de movimiento / deformación', tipo: 'valoracion', requerido: true },
+        { id: 'val_evolucion', etiqueta: 'Evolución / posibilidad de progresión', tipo: 'valoracion', requerido: true },
+        { id: 'val_agua', etiqueta: 'Presencia de agua / saturación', tipo: 'valoracion', requerido: true },
+        { id: 'val_expuestos', etiqueta: 'Elementos expuestos / consecuencias', tipo: 'valoracion', requerido: true }
       ]
     },
 
@@ -267,12 +298,19 @@ const FICHA_SCHEMA = {
             'Estudio detallado',
             'Informe técnico adicional',
             'Instrumentación',
-            'Árboles en riesgo'
+            'Árboles en riesgo',
+            'Redes de servicio público',
+            'Otro'
           ],
+          requerido: true,
+          detalles: {
+            'Redes de servicio público': {
+              id: 'redes_servicio_publico', etiqueta: '¿Cuáles redes?', requerido: true
+            },
+            'Otro': { id: 'acciones_otro', etiqueta: '¿Cuál otra acción?', requerido: true }
+          },
           ancho: 'completo'
         },
-        { id: 'redes_servicio_publico', etiqueta: 'Redes de servicio público, ¿cuáles?', tipo: 'texto', ancho: 'completo' },
-        { id: 'acciones_otro', etiqueta: 'Otra acción, ¿cuál?', tipo: 'texto', ancho: 'completo' },
         { id: 'concepto_campo', etiqueta: 'Concepto de campo', tipo: 'textarea', requerido: true, ancho: 'completo' }
       ]
     },
@@ -283,7 +321,15 @@ const FICHA_SCHEMA = {
       numero: '9',
       titulo: 'REGISTRO Y SOPORTE',
       campos: [
-        { id: 'fotos', etiqueta: 'Fotografías del sitio', tipo: 'fotos', maxArchivos: 8, ancho: 'completo' },
+        {
+          id: 'fotos',
+          etiqueta: 'Fotografías del sitio',
+          tipo: 'fotos',
+          requerido: true,
+          maxArchivos: 8,
+          ayuda: 'Al menos una foto. Es el soporte de la evaluación.',
+          ancho: 'completo'
+        },
         {
           id: 'croquis',
           etiqueta: 'Croquis (planta y perfil)',

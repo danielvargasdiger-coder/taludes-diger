@@ -5,7 +5,7 @@
  * Si publicas una versión nueva de la app, sube el número de VERSION
  * para que los celulares descarten la copia vieja.
  */
-const VERSION = 'taludes-v2';
+const VERSION = 'taludes-v3';
 
 const ARCHIVOS = [
   './',

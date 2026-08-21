@@ -591,20 +591,51 @@ function dibujarFormulario() {
   FICHA_SCHEMA.secciones.forEach((sec, i) => {
     const bloque = document.createElement('section');
     bloque.className = 'seccion' + (i > 0 ? ' cerrada' : '');
+    bloque.dataset.seccion = sec.id;
     bloque.innerHTML =
       '<div class="seccion-cabeza">' +
         '<span class="seccion-num">' + sec.numero + '</span>' +
         '<span class="seccion-titulo">' + esc(sec.titulo) + '</span>' +
+        '<span class="seccion-faltan"></span>' +
         '<span class="seccion-flecha">&#9660;</span>' +
       '</div>' +
       '<div class="seccion-cuerpo">' +
+        (sec.noAplica ? '<label class="no-aplica">' +
+          '<input type="checkbox"' + (APP.datos[sec.noAplica.id] ? ' checked' : '') + '>' +
+          '<span>' + esc(sec.noAplica.etiqueta) + '</span></label>' : '') +
         (sec.ayuda ? '<p class="seccion-ayuda">' + esc(sec.ayuda) + '</p>' : '') +
         '<div class="rejilla"></div>' +
+        '<button type="button" class="btn-siguiente">Siguiente sección &rarr;</button>' +
       '</div>';
 
     bloque.querySelector('.seccion-cabeza').addEventListener('click', () => bloque.classList.toggle('cerrada'));
+
     const rejilla = bloque.querySelector('.rejilla');
     sec.campos.forEach((campo) => rejilla.appendChild(dibujarCampo(campo)));
+
+    // Interruptor "no aplica": apaga la sección entera y deja de exigirla.
+    if (sec.noAplica) {
+      const sw = bloque.querySelector('.no-aplica input');
+      const pintar = () => bloque.classList.toggle('omitida', !!APP.datos[sec.noAplica.id]);
+      sw.addEventListener('change', () => {
+        setValor(sec.noAplica.id, sw.checked);
+        pintar();
+      });
+      pintar();
+    }
+
+    // Pasar a la siguiente sección sin tener que buscarla y cerrarla a mano.
+    bloque.querySelector('.btn-siguiente').addEventListener('click', () => {
+      bloque.classList.add('cerrada');
+      const siguiente = bloque.nextElementSibling;
+      if (siguiente && siguiente.classList.contains('seccion')) {
+        siguiente.classList.remove('cerrada');
+        siguiente.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        $('#btn-enviar-ficha').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    });
+
     form.appendChild(bloque);
   });
 
@@ -655,15 +686,47 @@ function dibujarCampo(campo) {
           '<input type="' + (multiple ? 'checkbox' : 'radio') + '" name="' + campo.id + '" value="' + esc(op) + '"' +
           (marcado ? ' checked' : '') + '>' +
           '<span>' + esc(op) + desc + '</span></label>';
-      }).join('') + '</div>';
+      }).join('') + '</div>' +
+      (campo.detalles ? '<div class="detalles"></div>' : '');
 
-      div.querySelectorAll('input').forEach((inp) => inp.addEventListener('change', () => {
+      // Campos que se abren al marcar su opción ("Otro" → ¿cuál?).
+      const caja = div.querySelector('.detalles');
+      const pintarDetalles = () => {
+        if (!caja) return;
+        const activos = Array.from(div.querySelectorAll('.opciones input:checked')).map((x) => x.value);
+        caja.innerHTML = Object.keys(campo.detalles)
+          .filter((op) => activos.includes(op))
+          .map((op) => {
+            const d = campo.detalles[op];
+            return '<div class="detalle" data-detalle="' + esc(d.id) + '">' +
+              '<label class="campo-etiqueta">' + esc(d.etiqueta) +
+                (d.requerido ? ' <span class="req">*</span>' : '') + '</label>' +
+              '<input type="text" data-id="' + esc(d.id) + '" value="' + esc(APP.datos[d.id] || '') + '" ' +
+                'placeholder="Escribe aquí">' +
+            '</div>';
+          }).join('');
+        caja.querySelectorAll('input').forEach((inp) => {
+          inp.addEventListener('input', () => setValor(inp.dataset.id, inp.value));
+        });
+      };
+
+      div.querySelectorAll('.opciones input').forEach((inp) => inp.addEventListener('change', () => {
         if (multiple) {
-          setValor(campo.id, Array.from(div.querySelectorAll('input:checked')).map((x) => x.value));
+          setValor(campo.id, Array.from(div.querySelectorAll('.opciones input:checked')).map((x) => x.value));
         } else {
           setValor(campo.id, inp.value);
         }
+        // Al desmarcar la opción se borra su detalle, para no dejar datos huérfanos.
+        if (campo.detalles) {
+          const activos = Array.from(div.querySelectorAll('.opciones input:checked')).map((x) => x.value);
+          Object.keys(campo.detalles).forEach((op) => {
+            if (!activos.includes(op)) delete APP.datos[campo.detalles[op].id];
+          });
+          pintarDetalles();
+        }
       }));
+
+      pintarDetalles();
       break;
     }
 
@@ -848,10 +911,57 @@ function comprimirImagen(archivo) {
 }
 
 // ---------------------------------------------------------------- PROGRESO Y VALIDACIÓN
-function camposRequeridos() {
-  const lista = [];
-  FICHA_SCHEMA.secciones.forEach((s) => s.campos.forEach((c) => { if (c.requerido) lista.push(c); }));
-  return lista;
+/** Una sección marcada "no aplica" deja de exigirse por completo. */
+function seccionOmitida(sec) {
+  return !!(sec.noAplica && APP.datos[sec.noAplica.id]);
+}
+
+/** Opciones marcadas de un campo, sea de una o de varias respuestas. */
+function seleccionadas(campo) {
+  const v = APP.datos[campo.id];
+  return Array.isArray(v) ? v : (v ? [v] : []);
+}
+
+/**
+ * Todo lo que falta por llenar, con la sección a la que pertenece.
+ * Incluye los campos que se abrieron al marcar "Otro".
+ */
+function camposPendientes() {
+  const faltan = [];
+  FICHA_SCHEMA.secciones.forEach((sec) => {
+    if (seccionOmitida(sec)) return;
+    sec.campos.forEach((campo) => {
+      if (campo.requerido && !estaLleno(campo)) {
+        faltan.push({ seccion: sec, id: campo.id, etiqueta: campo.etiqueta });
+      }
+      if (!campo.detalles) return;
+      const activos = seleccionadas(campo);
+      Object.keys(campo.detalles).forEach((op) => {
+        const d = campo.detalles[op];
+        if (activos.indexOf(op) !== -1 && d.requerido && !String(APP.datos[d.id] || '').trim()) {
+          faltan.push({ seccion: sec, id: campo.id, detalle: d.id, etiqueta: d.etiqueta });
+        }
+      });
+    });
+  });
+  return faltan;
+}
+
+/** Cuántos campos exige la ficha en total, según cómo esté llena ahora. */
+function totalRequeridos() {
+  let n = 0;
+  FICHA_SCHEMA.secciones.forEach((sec) => {
+    if (seccionOmitida(sec)) return;
+    sec.campos.forEach((campo) => {
+      if (campo.requerido) n++;
+      if (!campo.detalles) return;
+      const activos = seleccionadas(campo);
+      Object.keys(campo.detalles).forEach((op) => {
+        if (activos.indexOf(op) !== -1 && campo.detalles[op].requerido) n++;
+      });
+    });
+  });
+  return n;
 }
 
 function estaLleno(campo) {
@@ -867,25 +977,63 @@ function estaLleno(campo) {
 }
 
 function actualizarProgreso() {
-  const req = camposRequeridos();
-  const listos = req.filter(estaLleno).length;
-  $('#barra-progreso-relleno').style.width = Math.round((listos / req.length) * 100) + '%';
+  const total = totalRequeridos();
+  const faltan = camposPendientes();
+  const listos = total - faltan.length;
+  $('#barra-progreso-relleno').style.width =
+    (total ? Math.round((listos / total) * 100) : 100) + '%';
+
+  // Cada sección muestra cuánto le falta, para no tener que abrirlas todas.
+  const porSeccion = {};
+  faltan.forEach((f) => { porSeccion[f.seccion.id] = (porSeccion[f.seccion.id] || 0) + 1; });
+
+  $$('#form-ficha .seccion[data-seccion]').forEach((bloque) => {
+    const chip = bloque.querySelector('.seccion-faltan');
+    if (!chip) return;
+    const sec = FICHA_SCHEMA.secciones.find((x) => x.id === bloque.dataset.seccion);
+    const n = porSeccion[bloque.dataset.seccion] || 0;
+    const omitida = sec && seccionOmitida(sec);
+    chip.textContent = omitida ? 'No aplica' : (n ? 'Faltan ' + n : 'Completa');
+    chip.className = 'seccion-faltan ' + (omitida ? 'omitida' : n ? 'pendiente' : 'lista');
+  });
+
+  const btn = $('#btn-enviar-ficha');
+  if (btn) {
+    btn.textContent = faltan.length
+      ? 'Finalizar y enviar · faltan ' + faltan.length
+      : 'Finalizar y enviar';
+    btn.classList.toggle('incompleto', faltan.length > 0);
+  }
 }
 
 $('#btn-enviar-ficha').addEventListener('click', async () => {
-  $$('#form-ficha .campo').forEach((c) => c.classList.remove('faltante'));
-  const faltan = camposRequeridos().filter((c) => !estaLleno(c));
+  $$('#form-ficha .campo, #form-ficha .detalle').forEach((c) => c.classList.remove('faltante'));
+  const faltan = camposPendientes();
 
   if (faltan.length) {
-    faltan.forEach((c) => {
-      const el = $('#form-ficha .campo[data-campo="' + c.id + '"]');
-      if (el) {
-        el.classList.add('faltante');
-        el.closest('.seccion').classList.remove('cerrada');
-      }
+    faltan.forEach((f) => {
+      const campo = $('#form-ficha .campo[data-campo="' + f.id + '"]');
+      if (!campo) return;
+      campo.closest('.seccion').classList.remove('cerrada');
+      const objetivo = f.detalle
+        ? campo.querySelector('.detalle[data-detalle="' + f.detalle + '"]')
+        : campo;
+      if (objetivo) objetivo.classList.add('faltante');
     });
-    $('#msg-validacion').textContent = 'Falta completar: ' + faltan.map((c) => c.etiqueta).join(', ');
-    const primero = $('#form-ficha .campo.faltante');
+
+    // Agrupado por sección: es más fácil de leer que una lista corrida.
+    const porSeccion = {};
+    faltan.forEach((f) => {
+      const k = f.seccion.numero + '. ' + f.seccion.titulo;
+      (porSeccion[k] = porSeccion[k] || []).push(f.etiqueta);
+    });
+    $('#msg-validacion').innerHTML =
+      '<b>Faltan ' + faltan.length + ' campo(s):</b>' +
+      Object.keys(porSeccion).map((k) =>
+        '<span class="falta-seccion">' + esc(k) + ': ' + esc(porSeccion[k].join(', ')) + '</span>'
+      ).join('');
+
+    const primero = $('#form-ficha .faltante');
     if (primero) primero.scrollIntoView({ behavior: 'smooth', block: 'center' });
     return;
   }
