@@ -284,7 +284,7 @@ async function enviarCola(silencioso) {
         if (!silencioso) cargando(true, 'Subiendo foto ' + (item.fotosSubidas + 1) + ' de ' + fotos.length + '…');
         await api('subir_foto', {
           idVisita: item.idServidor, campo: f.campo, indice: f.indice,
-          nombre: f.nombre, contenido: f.dataUrl
+          nombre: f.nombre, contenido: f.dataUrl, miniatura: f.mini
         }, 90000);
         item.fotosSubidas++;
         await DB.guardar('cola', item);
@@ -311,7 +311,7 @@ function recolectarFotos(datos) {
   FICHA_SCHEMA.secciones.forEach((sec) => sec.campos.forEach((campo) => {
     if (campo.tipo !== 'fotos') return;
     (datos[campo.id] || []).forEach((f, i) => {
-      lista.push({ campo: campo.id, indice: i, nombre: f.nombre, dataUrl: f.dataUrl });
+      lista.push({ campo: campo.id, indice: i, nombre: f.nombre, dataUrl: f.dataUrl, mini: f.mini || '' });
     });
   }));
   return lista;
@@ -805,11 +805,18 @@ function dibujarCampo(campo) {
     }
 
     case 'fotos': {
+      // Dos botones separados: con "capture" el celular abre la cámara y no
+      // deja llegar a la galería. Sin él, se pueden subir fotos ya tomadas.
       div.innerHTML = etiqueta +
         '<div class="fotos-caja">' +
-          '<label class="fotos-btn">&#128247; Tomar o elegir foto' +
-            '<input type="file" accept="image/*" capture="environment" multiple hidden>' +
-          '</label>' +
+          '<div class="fotos-acciones">' +
+            '<label class="fotos-btn">&#128247; Tomar foto' +
+              '<input type="file" accept="image/*" capture="environment" hidden>' +
+            '</label>' +
+            '<label class="fotos-btn alterno">&#128194; Elegir de la galería' +
+              '<input type="file" accept="image/*" multiple hidden>' +
+            '</label>' +
+          '</div>' +
           '<div class="fotos-grid"></div>' +
           '<p class="fotos-conteo"></p>' +
         '</div>';
@@ -831,22 +838,32 @@ function dibujarCampo(campo) {
         }));
       };
 
-      div.querySelector('input[type=file]').addEventListener('change', async (e) => {
-        const archivos = Array.from(e.target.files || []);
-        e.target.value = '';
-        const actuales = (APP.datos[campo.id] || []).slice();
-        for (const arch of archivos) {
-          if (actuales.length >= campo.maxArchivos) { toast('Máximo ' + campo.maxArchivos + ' fotos', 'error'); break; }
-          cargando(true, 'Procesando foto…');
-          try {
-            actuales.push({ nombre: arch.name || 'foto.jpg', dataUrl: await comprimirImagen(arch) });
-          } catch (err) {
-            toast('No se pudo procesar la foto', 'error');
+      div.querySelectorAll('input[type=file]').forEach((entrada) => {
+        entrada.addEventListener('change', async (e) => {
+          const archivos = Array.from(e.target.files || []);
+          e.target.value = '';
+          const actuales = (APP.datos[campo.id] || []).slice();
+          for (const arch of archivos) {
+            if (actuales.length >= campo.maxArchivos) {
+              toast('Máximo ' + campo.maxArchivos + ' fotos', 'error');
+              break;
+            }
+            cargando(true, 'Procesando foto…');
+            try {
+              // Dos versiones: la de archivo (Drive) y una liviana para el PDF.
+              actuales.push({
+                nombre: arch.name || 'foto.jpg',
+                dataUrl: await comprimirImagen(arch, CONFIG.ANCHO_MAX_FOTO, CONFIG.CALIDAD_FOTO),
+                mini: await comprimirImagen(arch, CONFIG.ANCHO_MINIATURA, CONFIG.CALIDAD_MINIATURA)
+              });
+            } catch (err) {
+              toast('No se pudo procesar la foto', 'error');
+            }
+            cargando(false);
           }
-          cargando(false);
-        }
-        setValor(campo.id, actuales);
-        repintar();
+          setValor(campo.id, actuales);
+          repintar();
+        });
       });
 
       repintar();
@@ -884,8 +901,12 @@ function setValor(id, valor) {
 }
 
 // ---------------------------------------------------------------- FOTOS
-/** Reduce la foto antes de guardarla: menos datos, envíos más rápidos en campo. */
-function comprimirImagen(archivo) {
+/**
+ * Reduce la foto antes de guardarla. Se usa dos veces por foto:
+ * una versión de archivo (la que queda en Drive) y una miniatura
+ * liviana que es la que se incrusta en el PDF.
+ */
+function comprimirImagen(archivo, anchoMax, calidad) {
   return new Promise((ok, fallo) => {
     const lector = new FileReader();
     lector.onerror = () => fallo(lector.error);
@@ -893,7 +914,7 @@ function comprimirImagen(archivo) {
       const img = new Image();
       img.onerror = () => fallo(new Error('imagen ilegible'));
       img.onload = () => {
-        const max = CONFIG.ANCHO_MAX_FOTO;
+        const max = anchoMax;
         let { width: w, height: h } = img;
         if (Math.max(w, h) > max) {
           const f = max / Math.max(w, h);
@@ -902,7 +923,7 @@ function comprimirImagen(archivo) {
         const lienzo = document.createElement('canvas');
         lienzo.width = w; lienzo.height = h;
         lienzo.getContext('2d').drawImage(img, 0, 0, w, h);
-        ok(lienzo.toDataURL('image/jpeg', CONFIG.CALIDAD_FOTO));
+        ok(lienzo.toDataURL('image/jpeg', calidad));
       };
       img.src = lector.result;
     };

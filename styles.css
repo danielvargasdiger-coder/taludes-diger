@@ -433,9 +433,22 @@ textarea { min-height: 96px; resize: vertical; }
 
 /* Fotos */
 .fotos-caja { border: 1.5px dashed var(--borde); border-radius: var(--radio); padding: 12px; background: #fbfdfe; text-align: center; }
+/* Dos botones: tomar con la cámara, o subir una foto ya tomada. */
+.fotos-acciones { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .fotos-btn {
-  display: inline-block; padding: 11px 18px; border-radius: var(--radio);
-  background: var(--azul); color: #fff; font-weight: 700; font-size: .9rem; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  padding: 13px 10px; border-radius: var(--radio);
+  background: var(--azul); color: #fff; font-weight: 700; font-size: .85rem;
+  line-height: 1.2; cursor: pointer;
+}
+.fotos-btn:active { background: var(--azul-oscuro); }
+.fotos-btn.alterno {
+  background: var(--blanco); color: var(--azul); border: 2px solid var(--azul);
+}
+.fotos-btn.alterno:active { background: var(--azul-claro); }
+
+@media (max-width: 360px) {
+  .fotos-acciones { grid-template-columns: 1fr; }
 }
 .fotos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 8px; margin-top: 11px; }
 .foto-item { position: relative; aspect-ratio: 1; border-radius: 8px; overflow: hidden; background: #dde6ec; }
