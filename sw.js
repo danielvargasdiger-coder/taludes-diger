@@ -5,7 +5,7 @@
  * Si publicas una versión nueva de la app, sube el número de VERSION
  * para que los celulares descarten la copia vieja.
  */
-const VERSION = 'taludes-v8';
+const VERSION = 'taludes-v9';
 
 const ARCHIVOS = [
   './',
@@ -48,19 +48,29 @@ self.addEventListener('fetch', (ev) => {
     return;
   }
   if (ev.request.method !== 'GET') return;
+  if (url.origin !== self.location.origin) return;
 
-  // Los archivos de la app se sirven primero desde el celular (rápido y sin señal),
-  // y en segundo plano se refresca la copia guardada.
+  /**
+   * Todo sale de la caché de ESTA versión, y esa caché NO se toca.
+   *
+   * Antes se refrescaba cada archivo por separado en segundo plano, y eso
+   * mezclaba versiones: quedaba el index.html viejo con el app.js nuevo.
+   * Manteniendo cada caché inmutable, la app siempre corre con archivos
+   * de una sola versión; los cambios entran únicamente al activarse un
+   * service worker nuevo, que trae su propia caché completa.
+   */
   ev.respondWith(
-    caches.match(ev.request).then((guardado) => {
-      const red = fetch(ev.request).then((res) => {
-        if (res && res.ok && url.origin === self.location.origin) {
-          const copia = res.clone();
-          caches.open(VERSION).then((c) => c.put(ev.request, copia));
-        }
-        return res;
-      }).catch(() => guardado);
-      return guardado || red;
-    })
+    caches.open(VERSION).then((cache) =>
+      cache.match(ev.request, { ignoreSearch: true }).then((guardado) => {
+        if (guardado) return guardado;
+        // No estaba precargado: se busca en la red y se guarda para la próxima.
+        return fetch(ev.request)
+          .then((res) => {
+            if (res && res.ok) cache.put(ev.request, res.clone());
+            return res;
+          })
+          .catch(() => cache.match('./index.html'));   // sin señal: al menos abre la app
+      })
+    )
   );
 });
