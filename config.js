@@ -39,5 +39,8 @@ const CONFIG = {
   CALIDAD_MINIATURA: 0.50,
 
   /** Cada cuántos minutos intenta sincronizar sola la app. */
-  MINUTOS_AUTOSYNC: 10
+  MINUTOS_AUTOSYNC: 10,
+
+  /** Cada cuántos minutos revisa si hay una versión nueva de la app. */
+  MINUTOS_BUSCAR_ACTUALIZACION: 15
 };

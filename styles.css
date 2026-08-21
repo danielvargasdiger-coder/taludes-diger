@@ -226,6 +226,28 @@ textarea { min-height: 96px; resize: vertical; }
 .detalle.faltante { border-left-color: var(--error); background: #fdecea; }
 .detalle.faltante input { border-color: var(--error); }
 
+/* Aviso de versión nueva. Va arriba del todo para que no se pase por alto,
+   pero no bloquea: el geólogo decide cuándo actualizar. */
+#aviso-version {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 90;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: calc(env(safe-area-inset-top) + 10px) 14px 10px;
+  background: var(--baja); color: #fff;
+  font-size: .86rem; font-weight: 600;
+  box-shadow: 0 2px 10px rgba(0,0,0,.25);
+}
+#btn-actualizar {
+  flex: none; padding: 8px 16px; border: 0; border-radius: 8px;
+  background: #fff; color: var(--baja);
+  font-size: .84rem; font-weight: 800; cursor: pointer; font-family: inherit;
+}
+#btn-actualizar:disabled { opacity: .6; }
+
+/* Con el aviso arriba, todo baja para no quedar tapado. La altura la mide
+   la app, porque cambia según el celular y si el texto se parte en dos líneas. */
+body.con-aviso #topbar { top: var(--alto-aviso, 52px); }
+body.con-aviso { padding-top: var(--alto-aviso, 52px); }
+
 /* Eliminar una ficha de la cola: acción destructiva, se ve como tal. */
 .btn-eliminar-cola {
   display: block; width: 100%; margin-top: 11px; padding: 10px;

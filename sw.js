@@ -5,7 +5,7 @@
  * Si publicas una versión nueva de la app, sube el número de VERSION
  * para que los celulares descarten la copia vieja.
  */
-const VERSION = 'taludes-v7';
+const VERSION = 'taludes-v8';
 
 const ARCHIVOS = [
   './',
@@ -20,11 +20,15 @@ const ARCHIVOS = [
 ];
 
 self.addEventListener('install', (ev) => {
-  ev.waitUntil(
-    caches.open(VERSION)
-      .then((c) => c.addAll(ARCHIVOS))
-      .then(() => self.skipWaiting())
-  );
+  // Se descarga la versión nueva pero NO se activa todavía: se queda
+  // esperando a que el geólogo acepte el aviso. Así nunca se le cambia
+  // la app debajo de los pies mientras está llenando una ficha.
+  ev.waitUntil(caches.open(VERSION).then((c) => c.addAll(ARCHIVOS)));
+});
+
+// La app pide activarla cuando el geólogo toca "Actualizar".
+self.addEventListener('message', (ev) => {
+  if (ev.data === 'SALTAR_ESPERA') self.skipWaiting();
 });
 
 self.addEventListener('activate', (ev) => {

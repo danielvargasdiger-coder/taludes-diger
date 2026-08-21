@@ -1319,11 +1319,68 @@ function formatearValor(campo, v) {
 }
 
 // ---------------------------------------------------------------- SERVICE WORKER
+/**
+ * Registra el modo sin conexión y vigila si sale una versión nueva.
+ *
+ * El service worker descarga la versión nueva pero se queda esperando;
+ * aquí se le avisa al geólogo y solo se activa cuando él lo acepta.
+ * Sin esto habría que cerrar y abrir la app dos veces tras cada cambio.
+ */
 function registrarSW() {
   if (!('serviceWorker' in navigator)) return;
-  navigator.serviceWorker.register('sw.js').catch(() => {
+
+  // Al tomar el control la versión nueva, la pantalla se refresca una sola vez.
+  let recargando = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (recargando) return;
+    recargando = true;
+    location.reload();
+  });
+
+  navigator.serviceWorker.register('sw.js').then((reg) => {
+    // Puede haber quedado una versión esperando desde la vez pasada.
+    if (reg.waiting && navigator.serviceWorker.controller) avisarVersionNueva(reg.waiting);
+
+    reg.addEventListener('updatefound', () => {
+      const nuevo = reg.installing;
+      if (!nuevo) return;
+      nuevo.addEventListener('statechange', () => {
+        // Si no había controlador es la primera instalación, no un cambio.
+        if (nuevo.state === 'installed' && navigator.serviceWorker.controller) {
+          avisarVersionNueva(nuevo);
+        }
+      });
+    });
+
+    // Busca versiones nuevas cada tanto y al volver a la app.
+    const revisar = () => { if (navigator.onLine) reg.update().catch(() => {}); };
+    setInterval(revisar, CONFIG.MINUTOS_BUSCAR_ACTUALIZACION * 60000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) revisar(); });
+  }).catch(() => {
     console.warn('El modo sin conexión no quedó activo (requiere https o localhost).');
   });
+}
+
+function avisarVersionNueva(worker) {
+  const barra = $('#aviso-version');
+  const btn = $('#btn-actualizar');
+  if (!barra || !btn) return;
+  barra.hidden = false;
+  document.body.classList.add('con-aviso');
+
+  // Se mide el alto real para que el aviso no tape la barra superior.
+  // getBoundingClientRect fuerza el cálculo ahí mismo, sin esperar a que
+  // el celular pinte: si la app estaba en segundo plano igual queda bien.
+  document.documentElement.style.setProperty(
+    '--alto-aviso', Math.ceil(barra.getBoundingClientRect().height) + 'px');
+
+  btn.onclick = async () => {
+    btn.disabled = true;
+    btn.textContent = 'Actualizando…';
+    // Se guarda lo que esté escrito para que la recarga no se lleve nada.
+    if (!$('#vista-ficha').hidden) await guardarBorrador(true);
+    worker.postMessage('SALTAR_ESPERA');
+  };
 }
 
 // ---------------------------------------------------------------- ARRANQUE
