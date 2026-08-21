@@ -17,8 +17,8 @@
  *   fecha_hora   - fecha y hora
  *   radio        - una sola opción
  *   checkbox     - varias opciones
- *   gps          - captura coordenadas del celular
- *   fotos        - fotografías / croquis
+ *   gps          - captura latitud, longitud y altitud del celular
+ *   fotos        - fotografías del sitio
  *   valoracion   - Baja/Media/Alta + observación (sección 6)
  *   responsables - hasta 3 responsables con nombre, TP y entidad
  *
@@ -328,14 +328,6 @@ const FICHA_SCHEMA = {
           requerido: true,
           maxArchivos: 8,
           ayuda: 'Al menos una foto. Es el soporte de la evaluación.',
-          ancho: 'completo'
-        },
-        {
-          id: 'croquis',
-          etiqueta: 'Croquis (planta y perfil)',
-          tipo: 'fotos',
-          maxArchivos: 2,
-          ayuda: 'Dibuja el croquis en papel y tómale una foto.',
           ancho: 'completo'
         },
         { id: 'observaciones_adicionales', etiqueta: 'Observaciones adicionales', tipo: 'textarea', ancho: 'completo' },
