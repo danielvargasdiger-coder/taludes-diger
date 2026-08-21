@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b4f6c">
+<title>Evaluación de Taludes — DIGER Pereira</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ============================ BARRA SUPERIOR ============================ -->
+<header id="topbar" hidden>
+  <div class="topbar-main">
+    <div class="topbar-title">
+      <strong>Evaluación de Taludes</strong>
+      <span>DIGER Pereira</span>
+    </div>
+    <button id="btn-sync" class="icon-btn" title="Sincronizar">
+      <span id="sync-icon">&#8635;</span>
+    </button>
+  </div>
+  <div id="estado-conexion" class="estado-linea"></div>
+</header>
+
+<!-- ============================ INGRESO ============================ -->
+<section id="vista-ingreso" class="vista">
+  <div class="ingreso-caja">
+    <div class="escudo">&#9968;</div>
+    <h1>Evaluación de Taludes<br><small>y Laderas</small></h1>
+    <p class="entidad">DIGER PEREIRA</p>
+
+    <label>Código de acceso
+      <input type="password" id="in-codigo" inputmode="numeric" autocomplete="off" placeholder="Entregado por la DIGER">
+    </label>
+    <label>Nombre completo
+      <input type="text" id="in-nombre" autocomplete="name" placeholder="Ej: Ana María Restrepo">
+    </label>
+    <label>Tarjeta profesional (TP)
+      <input type="text" id="in-tp" autocomplete="off" placeholder="Ej: 25202-123456 CPG">
+    </label>
+    <label>Entidad
+      <input type="text" id="in-entidad" autocomplete="organization" value="DIGER Pereira">
+    </label>
+
+    <button id="btn-ingresar" class="btn-principal">Ingresar</button>
+    <p id="msg-ingreso" class="msg-error"></p>
+    <p class="nota-ingreso">Tus datos quedan guardados en este celular para no volver a escribirlos.</p>
+  </div>
+</section>
+
+<!-- ============================ PENDIENTES ============================ -->
+<section id="vista-pendientes" class="vista con-tabs" hidden>
+  <div class="buscador">
+    <input type="search" id="buscar-pendientes" placeholder="Buscar por barrio, dirección o ID…">
+  </div>
+  <div id="resumen-pendientes" class="resumen"></div>
+  <div id="lista-pendientes" class="lista"></div>
+  <button id="btn-nueva-no-programada" class="btn-flotante" title="Registrar hallazgo en campo">+</button>
+</section>
+
+<!-- ============================ HISTORIAL ============================ -->
+<section id="vista-historial" class="vista con-tabs" hidden>
+  <div class="buscador">
+    <input type="search" id="buscar-historial" placeholder="Buscar visita realizada…">
+  </div>
+  <div id="resumen-historial" class="resumen"></div>
+  <div id="lista-historial" class="lista"></div>
+</section>
+
+<!-- ============================ POR ENVIAR ============================ -->
+<section id="vista-cola" class="vista con-tabs" hidden>
+  <div id="resumen-cola" class="resumen"></div>
+  <div id="lista-cola" class="lista"></div>
+  <div class="bloque-perfil">
+    <h3>Mi perfil</h3>
+    <p id="perfil-datos"></p>
+    <button id="btn-salir" class="btn-secundario">Cambiar de usuario / salir</button>
+  </div>
+</section>
+
+<!-- ============================ FICHA ============================ -->
+<section id="vista-ficha" class="vista pantalla-completa" hidden>
+  <div class="ficha-topbar">
+    <button id="btn-cerrar-ficha" class="icon-btn">&larr;</button>
+    <div class="ficha-topbar-titulo">
+      <strong id="ficha-titulo">Ficha de evaluación</strong>
+      <span id="ficha-subtitulo"></span>
+    </div>
+    <button id="btn-guardar-borrador" class="btn-mini">Guardar</button>
+  </div>
+  <div id="barra-progreso"><div id="barra-progreso-relleno"></div></div>
+  <form id="form-ficha" autocomplete="off"></form>
+  <div class="ficha-pie">
+    <p id="msg-validacion" class="msg-error"></p>
+    <button id="btn-enviar-ficha" class="btn-principal">Finalizar y enviar</button>
+  </div>
+</section>
+
+<!-- ============================ DETALLE (SOLO LECTURA) ============================ -->
+<section id="vista-detalle" class="vista pantalla-completa" hidden>
+  <div class="ficha-topbar">
+    <button id="btn-cerrar-detalle" class="icon-btn">&larr;</button>
+    <div class="ficha-topbar-titulo">
+      <strong id="detalle-titulo">Visita realizada</strong>
+      <span id="detalle-subtitulo"></span>
+    </div>
+  </div>
+  <div id="detalle-cuerpo" class="detalle-cuerpo"></div>
+</section>
+
+<!-- ============================ TABS ============================ -->
+<nav id="tabs" hidden>
+  <button data-vista="pendientes" class="tab activo">
+    <span class="tab-icono">&#9873;</span>
+    <span>Pendientes</span>
+    <span class="tab-badge" id="badge-pendientes"></span>
+  </button>
+  <button data-vista="historial" class="tab">
+    <span class="tab-icono">&#10003;</span>
+    <span>Realizadas</span>
+  </button>
+  <button data-vista="cola" class="tab">
+    <span class="tab-icono">&#8593;</span>
+    <span>Por enviar</span>
+    <span class="tab-badge alerta" id="badge-cola"></span>
+  </button>
+</nav>
+
+<div id="toast"></div>
+<div id="cargando" hidden><div class="spinner"></div><span id="cargando-texto">Cargando…</span></div>
+
+<script src="config.js"></script>
+<script src="ficha-schema.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
