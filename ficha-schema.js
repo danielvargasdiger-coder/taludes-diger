@@ -25,7 +25,8 @@
  * Propiedades opcionales de un campo:
  *   requerido: true   - no deja enviar la ficha sin llenarlo
  *   detalles: {...}   - al marcar esa opción se abre un campo para escribir cuál.
- *                       Ej: marcar "Otro" abre "¿Cuál material?"
+ *                       Ej: marcar "Otro" abre "¿Cuál material?".
+ *                       Con tipo:'numero' el campo pide una cantidad.
  *
  * Propiedades opcionales de una sección:
  *   noAplica: {...}   - agrega un interruptor para saltarse la sección completa
@@ -231,13 +232,20 @@ const FICHA_SCHEMA = {
       titulo: 'ELEMENTOS EXPUESTOS Y AFECTACIÓN',
       soloSi: { campo: 'hay_movimiento', valor: 'Sí' },
       campos: [
-        { id: 'personas_n', etiqueta: 'Personas (No.)', tipo: 'numero', ancho: 'medio' },
-        { id: 'viviendas_n', etiqueta: 'Viviendas (No.)', tipo: 'numero', ancho: 'medio' },
         {
           id: 'elementos_expuestos',
-          etiqueta: 'Otros elementos expuestos',
+          etiqueta: 'Elementos expuestos',
           tipo: 'checkbox',
-          opciones: ['Vías', 'Puentes', 'Servicios', 'Equipamientos', 'Cauces', 'Cultivos'],
+          requerido: true,
+          opciones: [
+            'Personas', 'Viviendas', 'Vías', 'Puentes',
+            'Servicios', 'Equipamientos', 'Cauces', 'Cultivos'
+          ],
+          // Al marcar Personas o Viviendas se pide cuántas.
+          detalles: {
+            'Personas': { id: 'personas_n', etiqueta: '¿Cuántas personas?', tipo: 'numero', requerido: true },
+            'Viviendas': { id: 'viviendas_n', etiqueta: '¿Cuántas viviendas?', tipo: 'numero', requerido: true }
+          },
           ancho: 'completo'
         },
         {
@@ -248,7 +256,13 @@ const FICHA_SCHEMA = {
           opciones: ['Ninguna', 'Leve', 'Moderada', 'Severa', 'Colapso/pérdida'],
           ancho: 'completo'
         },
-        { id: 'viviendas_evacuadas', etiqueta: 'Viviendas evacuadas (No.)', tipo: 'numero', ancho: 'medio' }
+        {
+          id: 'viviendas_evacuadas',
+          etiqueta: 'Viviendas evacuadas (No.)',
+          tipo: 'numero',
+          ayuda: 'Déjalo vacío si no hubo evacuación.',
+          ancho: 'medio'
+        }
       ]
     },
 

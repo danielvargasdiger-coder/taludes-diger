@@ -226,6 +226,18 @@ textarea { min-height: 96px; resize: vertical; }
 .detalle.faltante { border-left-color: var(--error); background: #fdecea; }
 .detalle.faltante input { border-color: var(--error); }
 
+/* Eliminar una ficha de la cola: acción destructiva, se ve como tal. */
+.btn-eliminar-cola {
+  display: block; width: 100%; margin-top: 11px; padding: 10px;
+  border: 1px solid var(--error); border-radius: 8px;
+  background: var(--blanco); color: var(--error);
+  font-size: .82rem; font-weight: 700; cursor: pointer;
+}
+.btn-eliminar-cola:active { background: #fdecea; }
+
+/* El campo de cantidad no necesita todo el ancho. */
+.detalle-numero input { max-width: 160px; }
+
 /* Lista de lo que falta, agrupada por sección. */
 .falta-seccion { display: block; margin-top: 4px; font-weight: 400; }
 

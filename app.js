@@ -96,6 +96,20 @@ function fechaBonita(iso) {
     ' · ' + d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
 }
 
+/**
+ * Deja un número escribible desde cualquier teclado de celular.
+ * Muchos teclados en español ponen coma como separador decimal y
+ * <input type="number"> la rechaza en silencio: por eso los campos
+ * numéricos son de texto y se normalizan aquí.
+ */
+function normalizarNumero(txt) {
+  return String(txt == null ? '' : txt)
+    .replace(/,/g, '.')          // coma decimal -> punto
+    .replace(/[^0-9.\-]/g, '')   // fuera letras y espacios
+    .replace(/(?!^)-/g, '')      // el menos solo al principio
+    .replace(/\.(?=.*\.)/g, ''); // un solo punto decimal
+}
+
 function normalizar(txt) {
   return String(txt || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
@@ -298,6 +312,20 @@ async function enviarCola(silencioso) {
       await DB.borrar('borradores', item.clave);
     } catch (e) {
       cargando(false);
+
+      // El servidor dice que esa solicitud ya quedó registrada: la ficha no
+      // está pendiente, está repetida. Se saca de la cola en vez de dejarla
+      // reintentando para siempre.
+      if (/ya tiene una visita registrada/i.test(e.message)) {
+        await DB.borrar('cola', item.idLocal);
+        APP.cola = APP.cola.filter((x) => x.idLocal !== item.idLocal);
+        await DB.borrar('borradores', item.clave);
+        if (!silencioso) {
+          toast('La solicitud ' + item.idSolicitud + ' ya estaba registrada. Se quitó de la cola.', 'ok');
+        }
+        continue;
+      }
+
       if (!silencioso) toast('No se pudo enviar la ficha ' + item.idSolicitud + ': ' + e.message, 'error');
       break; // sin conexión estable: deja el resto para el próximo intento
     }
@@ -455,12 +483,59 @@ function pintarCola() {
         '<span>· ' + fotos + ' foto(s)</span>' +
         (c.idServidor ? '<span>· subiendo (' + c.fotosSubidas + '/' + fotos + ')</span>' : '') +
       '</div>' +
+      '<button type="button" class="btn-eliminar-cola" data-id="' + esc(c.idLocal) + '">' +
+        'Eliminar del celular</button>' +
     '</div>';
   }).join('') +
   '<button id="btn-forzar-envio" class="btn-principal" style="margin-top:12px">Intentar enviar ahora</button>';
 
   const btn = $('#btn-forzar-envio');
   if (btn) btn.addEventListener('click', () => sincronizar());
+
+  cont.querySelectorAll('.btn-eliminar-cola').forEach((b) => {
+    b.addEventListener('click', () => eliminarDeLaCola(b.dataset.id));
+  });
+}
+
+/**
+ * Borra una ficha de la cola del celular. Es una acción sin vuelta atrás,
+ * así que se avisa distinto según lo que se vaya a perder.
+ */
+async function eliminarDeLaCola(idLocal) {
+  const item = APP.cola.find((x) => x.idLocal === idLocal);
+  if (!item) return;
+
+  const fotos = recolectarFotos(item.datos).length;
+  const yaEnServidor = !!item.idServidor;
+
+  let aviso =
+    'ELIMINAR LA FICHA DE LA SOLICITUD ' + item.idSolicitud + '\n\n' +
+    'Se borrará de este celular:\n' +
+    '  · Toda la ficha diligenciada\n' +
+    (fotos ? '  · Las ' + fotos + ' fotografía(s) tomadas\n' : '') +
+    '\nESTO NO SE PUEDE DESHACER.\n';
+
+  if (yaEnServidor) {
+    aviso += '\nATENCIÓN: esta ficha ya empezó a subirse al servidor. ' +
+      'Puede haber quedado registrada a medias. Revisa la hoja VISITAS ' +
+      'antes de volver a hacer esta visita.\n';
+  } else {
+    aviso += '\nLa visita NO quedó registrada. Si la borras, la solicitud ' +
+      item.idSolicitud + ' vuelve a aparecer como pendiente y toca visitarla de nuevo.\n';
+  }
+
+  aviso += '\n¿Continuar?';
+  if (!confirm(aviso)) return;
+
+  // Segunda confirmación: es una pérdida de trabajo de campo.
+  if (!confirm('Confirma otra vez.\n\nSe pierde el trabajo de la visita a la solicitud ' +
+      item.idSolicitud + '. ¿Eliminar definitivamente?')) return;
+
+  await DB.borrar('cola', idLocal);
+  await DB.borrar('borradores', item.clave);
+  APP.cola = APP.cola.filter((x) => x.idLocal !== idLocal);
+  pintarTodo();
+  toast('Ficha eliminada del celular', 'ok');
 }
 
 // ---------------------------------------------------------------- FICHA: ABRIR
@@ -655,12 +730,22 @@ function dibujarCampo(campo) {
     case 'texto':
     case 'numero':
     case 'fecha_hora': {
-      const tipoHtml = campo.tipo === 'numero' ? 'number' : campo.tipo === 'fecha_hora' ? 'datetime-local' : 'text';
+      // Los numéricos van como texto con teclado decimal: así el celular
+      // deja escribir el punto aunque su teclado muestre coma.
+      const tipoHtml = campo.tipo === 'fecha_hora' ? 'datetime-local' : 'text';
       div.innerHTML = etiqueta + '<input type="' + tipoHtml + '"' +
-        (campo.tipo === 'numero' ? ' inputmode="decimal" step="any"' : '') +
+        (campo.tipo === 'numero' ? ' inputmode="decimal"' : '') +
         (campo.soloLectura ? ' readonly' : '') +
         ' value="' + esc(valor || '') + '">';
-      div.querySelector('input').addEventListener('input', (e) => setValor(campo.id, e.target.value));
+      div.querySelector('input').addEventListener('input', (e) => {
+        if (campo.tipo === 'numero') {
+          const limpio = normalizarNumero(e.target.value);
+          if (limpio !== e.target.value) e.target.value = limpio;
+          setValor(campo.id, limpio);
+        } else {
+          setValor(campo.id, e.target.value);
+        }
+      });
       break;
     }
 
@@ -695,15 +780,26 @@ function dibujarCampo(campo) {
           .filter((op) => activos.includes(op))
           .map((op) => {
             const d = campo.detalles[op];
-            return '<div class="detalle" data-detalle="' + esc(d.id) + '">' +
+            const esNumero = d.tipo === 'numero';
+            return '<div class="detalle' + (esNumero ? ' detalle-numero' : '') + '" data-detalle="' + esc(d.id) + '">' +
               '<label class="campo-etiqueta">' + esc(d.etiqueta) +
                 (d.requerido ? ' <span class="req">*</span>' : '') + '</label>' +
-              '<input type="text" data-id="' + esc(d.id) + '" value="' + esc(APP.datos[d.id] || '') + '" ' +
-                'placeholder="Escribe aquí">' +
+              '<input type="text" data-id="' + esc(d.id) + '"' +
+                (esNumero ? ' inputmode="numeric" data-numero="1"' : '') +
+                ' value="' + esc(APP.datos[d.id] || '') + '" ' +
+                'placeholder="' + (esNumero ? 'Cantidad' : 'Escribe aquí') + '">' +
             '</div>';
           }).join('');
         caja.querySelectorAll('input').forEach((inp) => {
-          inp.addEventListener('input', () => setValor(inp.dataset.id, inp.value));
+          inp.addEventListener('input', () => {
+            if (inp.dataset.numero) {
+              const limpio = normalizarNumero(inp.value);
+              if (limpio !== inp.value) inp.value = limpio;
+              setValor(inp.dataset.id, limpio);
+            } else {
+              setValor(inp.dataset.id, inp.value);
+            }
+          });
         });
       };
 
@@ -733,9 +829,9 @@ function dibujarCampo(campo) {
         '<div class="gps-caja">' +
           '<button type="button" class="btn-secundario btn-gps">&#9678; Capturar mi ubicación</button>' +
           '<div class="gps-coords">' +
-            '<label>Latitud (Y)<input type="number" step="any" inputmode="decimal" class="gps-y" value="' + esc(c.y || '') + '"></label>' +
-            '<label>Longitud (X)<input type="number" step="any" inputmode="decimal" class="gps-x" value="' + esc(c.x || '') + '"></label>' +
-            '<label>Altitud (Z m)<input type="number" step="any" inputmode="decimal" class="gps-z" value="' + esc(c.z || '') + '"></label>' +
+            '<label>Latitud (Y)<input type="text" inputmode="decimal" class="gps-y" value="' + esc(c.y || '') + '" placeholder="4.8123456"></label>' +
+            '<label>Longitud (X)<input type="text" inputmode="decimal" class="gps-x" value="' + esc(c.x || '') + '" placeholder="-75.7012345"></label>' +
+            '<label>Altitud (Z m)<input type="text" inputmode="decimal" class="gps-z" value="' + esc(c.z || '') + '" placeholder="1487"></label>' +
           '</div>' +
           '<p class="gps-estado' + (c.y ? ' ok' : '') + '">' +
             (c.fuente === 'base' ? 'Coordenada de la solicitud. Captura el GPS para mayor precisión.'
@@ -751,7 +847,13 @@ function dibujarCampo(campo) {
         precision: (APP.datos[campo.id] || {}).precision,
         fuente: 'manual'
       });
-      div.querySelectorAll('.gps-coords input').forEach((i) => i.addEventListener('input', sincronizaCampos));
+      div.querySelectorAll('.gps-coords input').forEach((i) => {
+        i.addEventListener('input', () => {
+          const limpio = normalizarNumero(i.value);
+          if (limpio !== i.value) i.value = limpio;
+          sincronizaCampos();
+        });
+      });
 
       div.querySelector('.btn-gps').addEventListener('click', () => {
         if (!navigator.geolocation) { estado.textContent = 'Este celular no tiene GPS disponible.'; return; }
