@@ -251,6 +251,8 @@ textarea { min-height: 96px; resize: vertical; }
 .cercana-txt b { font-size: .82rem; color: var(--texto); }
 .cercana-txt small { font-size: .72rem; color: var(--texto-suave); }
 
+.opcional { font-weight: 400; color: var(--texto-suave); font-size: .78rem; }
+
 .nota-entidad {
   margin: 4px 0 0; font-size: .78rem; color: var(--texto-suave); text-align: center;
 }

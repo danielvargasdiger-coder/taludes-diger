@@ -11,7 +11,6 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="stylesheet" href="styles.css">
 <style>
-  /* Cinta permanente: que nadie confunda el gemelo con la app real. */
   #cinta-pruebas {
     position: fixed; top: 0; left: 0; right: 0; z-index: 200;
     background: #6a1b9a; color: #fff; text-align: center;
@@ -46,16 +45,22 @@
     <h1>Evaluación de Taludes<br><small>y Laderas</small></h1>
     <p class="entidad">DIGER PEREIRA</p>
 
-    <label>Código de acceso
-      <input type="password" id="in-codigo" inputmode="numeric" autocomplete="off" placeholder="Entregado por la DIGER">
+    <label>Código de acceso <span class="opcional">(opcional)</span>
+      <input type="password" id="in-codigo" inputmode="numeric" autocomplete="off" placeholder="Solo si la DIGER te lo dio">
     </label>
+    <p class="nota-entidad">Sin código entras igual: registras tus visitas y
+      consultas las ya realizadas. El código solo sirve para ver la lista de
+      solicitudes asignadas a tu entidad.</p>
     <label>Nombre completo
       <input type="text" id="in-nombre" autocomplete="name" placeholder="Ej: Ana María Restrepo">
     </label>
     <label>Tarjeta profesional (TP)
       <input type="text" id="in-tp" autocomplete="off" placeholder="Ej: 25202-123456 CPG">
     </label>
-    <p class="nota-entidad">Tu entidad la define el código de acceso.</p>
+    <label>Entidad <span class="req">*</span>
+      <input type="text" id="in-entidad" autocomplete="organization"
+             placeholder="Ej: Secretaría de Infraestructura de Pereira">
+    </label>
 
     <button id="btn-ingresar" class="btn-principal">Ingresar</button>
     <p id="msg-ingreso" class="msg-error"></p>

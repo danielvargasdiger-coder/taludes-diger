@@ -180,7 +180,8 @@ async function api(accion, carga = {}, msTimeout = 45000) {
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(Object.assign({
         accion: accion,
-        codigo: APP.perfil ? APP.perfil.codigo : ''
+        codigo: APP.perfil ? APP.perfil.codigo : '',
+        entidad: APP.perfil ? APP.perfil.entidad : ''
       }, carga)),
       signal: control.signal,
       redirect: 'follow'
@@ -189,11 +190,59 @@ async function api(accion, carga = {}, msTimeout = 45000) {
     let json;
     try { json = JSON.parse(texto); }
     catch (e) { throw new Error('El servidor respondió algo inesperado. Revisa que la app web esté publicada para "Cualquier usuario".'); }
-    if (!json.ok) throw new Error(json.error || 'Error del servidor');
+    if (!json.ok) {
+      const err = new Error(json.error || 'Error del servidor');
+      // El código dejó de servir (lo cambiaron o le quitaron el acceso a la
+      // entidad). Hay que avisarlo: si no, el geólogo seguiría llenando
+      // fichas creyendo que se están enviando.
+      if (/[Cc][oó]digo de acceso incorrecto/.test(err.message)) {
+        err.codigoInvalido = true;
+        pedirCodigoDeNuevo();
+      }
+      throw err;
+    }
     return json;
   } finally {
     clearTimeout(temp);
   }
+}
+
+/**
+ * Devuelve al geólogo a la pantalla de ingreso porque su código dejó de
+ * servir. Lo que tenga guardado en el celular NO se toca: los borradores y
+ * las fichas por enviar siguen ahí y se suben apenas ingrese con el nuevo.
+ */
+function pedirCodigoDeNuevo() {
+  if (!APP.perfil) return;               // ya está en la pantalla de ingreso
+
+  const nombre = APP.perfil.nombre;
+  const tp = APP.perfil.tp;
+  const entidadPrevia = APP.perfil.entidad;
+  APP.perfil = null;
+  localStorage.removeItem(CLAVE_PERFIL);
+
+  ['ficha', 'detalle', 'pendientes', 'historial', 'cola'].forEach((v) => {
+    const el = $('#vista-' + v);
+    if (el) el.hidden = true;
+  });
+  $('#topbar').hidden = true;
+  $('#tabs').hidden = true;
+  $('#vista-ingreso').hidden = false;
+  cargando(false);
+
+  // Se conserva lo que ya había escrito para que solo teclee el código.
+  $('#in-nombre').value = nombre || '';
+  $('#in-tp').value = tp || '';
+  $('#in-entidad').value = entidadPrevia || '';
+  $('#in-codigo').value = '';
+
+  $('#msg-ingreso').innerHTML =
+    'El código de acceso cambió. Pídele el nuevo a la DIGER, ' +
+    'o déjalo vacío para entrar sin lista de solicitudes.' +
+    (APP.cola.length
+      ? '<br><b>Tus ' + APP.cola.length + ' ficha(s) sin enviar están a salvo</b> ' +
+        'y se subirán apenas ingreses.'
+      : '');
 }
 
 // ---------------------------------------------------------------- INGRESO
@@ -216,19 +265,20 @@ $('#btn-ingresar').addEventListener('click', async () => {
   const codigo = $('#in-codigo').value.trim();
   const nombre = $('#in-nombre').value.trim();
   const tp = $('#in-tp').value.trim();
+  const entidad = $('#in-entidad').value.trim();
   const msg = $('#msg-ingreso');
 
-  if (!codigo || !nombre || !tp) {
-    msg.textContent = 'Completa el código, tu nombre y tu tarjeta profesional.';
+  // El código es opcional; identificarse no lo es.
+  if (!nombre || !tp || !entidad) {
+    msg.textContent = 'Completa tu nombre, tu tarjeta profesional y tu entidad.';
     return;
   }
   msg.textContent = '';
-  // La entidad la asigna el servidor según el código: el celular no la elige.
-  APP.perfil = { codigo, nombre, tp, entidad: '' };
+  APP.perfil = { codigo, nombre, tp, entidad };
 
-  cargando(true, 'Verificando código…');
+  cargando(true, codigo ? 'Verificando código…' : 'Entrando…');
   try {
-    const r = await api('verificar');
+    const r = await api('verificar', { entidad: entidad });
     APP.perfil.entidad = r.entidad || CONFIG.ENTIDAD;
     // Si el servidor todavía no informa este dato, se asume que sí ve
     // solicitudes: así una versión vieja del servidor no deja a la DIGER
@@ -317,7 +367,8 @@ async function sincronizar(silencioso = false) {
     pintarTodo();
     if (!silencioso) toast('Actualizado: ' + pendientes().length + ' pendientes', 'ok');
   } catch (e) {
-    if (!silencioso) toast(e.message, 'error');
+    // Un código inválido se avisa siempre, aunque la sincronización sea automática.
+    if (!silencioso || e.codigoInvalido) toast(e.message, 'error');
   } finally {
     APP.sincronizando = false;
     $('#sync-icon').classList.remove('girando');
@@ -373,6 +424,10 @@ async function enviarCola(silencioso) {
         }
         continue;
       }
+
+      // El código dejó de servir: no tiene sentido reintentar, hay que
+      // reingresar. La ficha se queda en la cola, intacta.
+      if (e.codigoInvalido) throw e;
 
       if (!silencioso) toast('No se pudo enviar la ficha ' + item.idSolicitud + ': ' + e.message, 'error');
       break; // sin conexión estable: deja el resto para el próximo intento
