@@ -11,7 +11,7 @@
  * service worker borra solo las cachés de SU prefijo.
  */
 const PREFIJO = 'pruebas';        // gemelo de pruebas: caché aparte de producción
-const VERSION = PREFIJO + '-v13';
+const VERSION = PREFIJO + '-v14';
 
 const ARCHIVOS = [
   './',
@@ -29,7 +29,17 @@ self.addEventListener('install', (ev) => {
   // Se descarga la versión nueva pero NO se activa todavía: se queda
   // esperando a que el geólogo acepte el aviso. Así nunca se le cambia
   // la app debajo de los pies mientras está llenando una ficha.
-  ev.waitUntil(caches.open(VERSION).then((c) => c.addAll(ARCHIVOS)));
+  //
+  // cache:'reload' es imprescindible: GitHub Pages manda los archivos con
+  // Cache-Control max-age=600, así que sin esto el navegador entregaría
+  // desde SU caché las copias viejas, y como la caché de cada versión es
+  // inmutable, quedarían congeladas para siempre. Ese fue el motivo real
+  // de que una actualización recién subida no se viera.
+  ev.waitUntil(
+    caches.open(VERSION).then((c) =>
+      c.addAll(ARCHIVOS.map((u) => new Request(u, { cache: 'reload' })))
+    )
+  );
 });
 
 // La app pide activarla cuando el geólogo toca "Actualizar".
