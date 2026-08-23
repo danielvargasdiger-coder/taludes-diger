@@ -33,6 +33,7 @@
       <button id="btn-sync" class="icon-btn" title="Sincronizar">
         <span id="sync-icon">&#8635;</span>
       </button>
+      <button id="btn-mapa" class="icon-btn" title="Ver en el mapa"><svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><path fill="currentColor" d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></button>
       <button id="btn-perfil" class="icon-btn" title="Mi perfil">&#9776;</button>
     </div>
   </div>
@@ -78,7 +79,6 @@
 
 <!-- ============================ PENDIENTES ============================ -->
 <section id="vista-pendientes" class="vista" hidden>
-  <!-- Una sola fila de controles: los filtros llevan el conteo adentro. -->
   <div id="filtros" class="filtros">
     <button class="filtro activo" data-filtro="pendientes">
       Por visitar <b id="dato-pendientes">0</b>
@@ -86,13 +86,16 @@
     <button class="filtro" data-filtro="realizadas">
       Visitadas <b id="dato-realizadas">0</b>
     </button>
-    <button class="filtro" data-filtro="todas">Todas</button>
+    <button id="btn-filtros" class="filtro filtro-mas" title="Filtrar">
+      <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path fill="currentColor" d="M3 5h18l-7 8v6l-4 2v-8L3 5z"/></svg><span id="filtros-activos" class="filtros-activos"></span>
+    </button>
   </div>
 
   <div class="buscador">
     <input type="search" id="buscar-pendientes" placeholder="Buscar barrio, dirección o N.º…">
   </div>
 
+  <div id="chips-activos" class="chips-activos"></div>
   <div id="resumen-pendientes" class="resumen"></div>
   <div id="lista-pendientes" class="lista"></div>
   <button id="btn-nueva-no-programada" class="btn-flotante" title="Registrar hallazgo en campo">+</button>
@@ -115,6 +118,45 @@
       <p id="perfil-datos"></p>
       <button id="btn-salir" class="btn-secundario">Cambiar de usuario / salir</button>
     </div>
+  </div>
+</section>
+
+<!-- ============================ MAPA ============================ -->
+<section id="vista-mapa" class="vista pantalla-completa" hidden>
+  <div class="ficha-topbar">
+    <button id="btn-cerrar-mapa" class="icon-btn">&larr;</button>
+    <div class="ficha-topbar-titulo">
+      <strong>Mapa de solicitudes</strong>
+      <span id="mapa-resumen"></span>
+    </div>
+    <button id="btn-mi-ubicacion" class="btn-mini">Mi ubicación</button>
+  </div>
+  <div id="mapa-leyenda" class="mapa-leyenda">
+    <span><i class="punto pendiente"></i>Por visitar</span>
+    <span><i class="punto realizada"></i>Visitada</span>
+    <span><i class="punto yo"></i>Estás aquí</span>
+  </div>
+  <div id="mapa"></div>
+  <div id="mapa-sin-red" class="mapa-sin-red" hidden>
+    <b>El mapa necesita internet</b>
+    <p>Los mapas se descargan al momento. Sin señal esta pantalla no se ve,
+       pero el resto de la app sigue funcionando normal.</p>
+  </div>
+</section>
+
+<!-- ==================== FILTROS PERSONALIZADOS ==================== -->
+<section id="vista-filtros" class="vista pantalla-completa" hidden>
+  <div class="ficha-topbar">
+    <button id="btn-cerrar-filtros" class="icon-btn">&larr;</button>
+    <div class="ficha-topbar-titulo">
+      <strong>Filtrar solicitudes</strong>
+      <span id="filtros-resultado"></span>
+    </div>
+    <button id="btn-limpiar-filtros" class="btn-mini">Limpiar</button>
+  </div>
+  <div class="panel-cuerpo" id="cuerpo-filtros"></div>
+  <div class="ficha-pie">
+    <button id="btn-aplicar-filtros" class="btn-principal">Ver resultados</button>
   </div>
 </section>
 

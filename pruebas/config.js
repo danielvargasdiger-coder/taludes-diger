@@ -1,14 +1,5 @@
 /**
- * CONFIGURACIÓN DEL GEMELO DE PRUEBAS — DIGER PEREIRA
- *
- * ESTA COPIA NO TOCA NADA REAL:
- *   · API_URL apunta al Apps Script de la HOJA COPIA
- *   · ESPACIO 'pruebas' le da su propio almacenamiento en el celular
- *
- * Si por error API_URL apunta al servidor real, las fichas de prueba
- * entrarían a la base de verdad. Revísalo antes de subir.
- *
- * (config original de la app — DIGER PEREIRA)
+ * CONFIGURACIÓN DE LA APP — DIGER PEREIRA
  * =======================================
  * Este es el ÚNICO archivo que necesitas editar después de instalar.
  * Ver GUIA_DE_INSTALACION.md, paso 5.
@@ -65,5 +56,8 @@ const CONFIG = {
    * 150 m cubre el error típico del GPS de un celular (5-20 m) más el
    * tamaño de un talud, sin llenar de avisos en zona urbana densa.
    */
-  METROS_ALERTA_CERCANIA: 150
+  METROS_ALERTA_CERCANIA: 150,
+
+  /** Radio del filtro "cerca de mí" en la lista de solicitudes. */
+  METROS_CERCA_DE_MI: 2000
 };

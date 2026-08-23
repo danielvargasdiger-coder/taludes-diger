@@ -278,6 +278,146 @@ textarea { min-height: 96px; resize: vertical; }
 }
 .filtro.activo b { background: rgba(255,255,255,.22); color: #fff; }
 
+/* ------------------------------------------------------------ MAPA */
+#mapa { position: absolute; inset: 0; top: 108px; }
+.mapa-leyenda {
+  position: absolute; top: 62px; left: 0; right: 0; z-index: 5;
+  display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;
+  padding: 9px 12px; background: var(--blanco);
+  border-bottom: 1px solid var(--borde);
+  font-size: .76rem; font-weight: 600; color: var(--texto-suave);
+}
+.mapa-leyenda span { display: inline-flex; align-items: center; gap: 5px; }
+.punto { width: 11px; height: 11px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--borde); }
+.punto.pendiente { background: var(--azul); }
+.punto.realizada { background: var(--baja); }
+.punto.yo { background: #1565c0; }
+
+.mapa-sin-red { padding: 40px 24px; text-align: center; color: var(--texto-suave); }
+.mapa-sin-red b { display: block; font-size: 1.05rem; color: var(--texto); margin-bottom: 8px; }
+.mapa-sin-red p { font-size: .88rem; line-height: 1.5; }
+
+.popup { min-width: 190px; font-family: inherit; }
+.popup b { display: block; font-size: .95rem; margin-bottom: 2px; }
+.popup small { display: block; color: #5a6b7a; font-size: .78rem; margin-top: 3px; }
+.popup-estado {
+  display: inline-block; margin-top: 6px; padding: 2px 8px; border-radius: 999px;
+  color: #fff; font-size: .66rem; font-weight: 800;
+}
+.popup-btn {
+  display: block; width: 100%; margin-top: 9px; padding: 9px;
+  border: 0; border-radius: 8px; background: var(--azul); color: #fff;
+  font-family: inherit; font-size: .84rem; font-weight: 700; cursor: pointer;
+}
+
+/* Campos de filtro plegables */
+.grupo-cabeza {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 12px 2px; border: 0; border-bottom: 1px solid var(--borde);
+  background: none; cursor: pointer; font-family: inherit;
+  font-size: .92rem; font-weight: 700; color: var(--texto); text-align: left;
+}
+.grupo-cabeza > span:first-child { flex: 1; }
+.grupo-marcados {
+  background: var(--azul); color: #fff; border-radius: 999px;
+  font-size: .68rem; font-weight: 800; padding: 2px 8px;
+}
+.grupo-flecha { color: var(--texto-suave); }
+.grupo-filtro.abierto .opciones-filtro { margin-top: 11px; }
+.titulo-seccion-filtros {
+  font-size: .78rem; color: var(--texto-suave); text-transform: uppercase;
+  letter-spacing: .05em; margin: 22px 0 4px;
+}
+.op-filtro.guardado { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; }
+.borrar-guardado {
+  border: 0; background: none; color: var(--error); cursor: pointer;
+  font-size: 1.05rem; line-height: 1; padding: 0 2px; font-family: inherit;
+}
+#btn-guardar-filtro { margin-top: 8px; }
+
+/* Botón de más filtros, con el número de filtros puestos. */
+.filtro-mas { flex: 0 0 auto; padding: 10px 15px; position: relative; display: flex; align-items: center; }
+.filtros-activos {
+  position: absolute; top: -4px; right: -4px;
+  background: var(--alta); color: #fff; border-radius: 999px;
+  font-size: .62rem; font-weight: 800; padding: 1px 6px; min-width: 17px;
+}
+.filtros-activos:empty { display: none; }
+
+/* Filtros puestos, visibles y quitables de a uno. */
+.chips-activos { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.chips-activos:empty { display: none; }
+.chip-activo {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 11px; border-radius: 999px; border: 0;
+  background: var(--azul-claro); color: var(--azul);
+  font-size: .76rem; font-weight: 700; font-family: inherit; cursor: pointer;
+}
+.chip-activo span { font-size: .95rem; line-height: 1; opacity: .7; }
+.chip-activo.limpiar { background: #fdecea; color: var(--error); }
+
+/* Panel de filtros */
+.ambito-filtro {
+  margin: 0 0 18px; padding: 9px 12px; border-radius: 8px;
+  background: var(--azul-claro); color: var(--azul);
+  font-size: .82rem; font-weight: 600;
+}
+.grupo-filtro { margin-bottom: 20px; }
+.grupo-filtro h3 {
+  font-size: .78rem; color: var(--texto-suave); text-transform: uppercase;
+  letter-spacing: .05em; margin-bottom: 9px;
+}
+.opciones-filtro { display: flex; flex-wrap: wrap; gap: 7px; }
+.op-filtro {
+  padding: 9px 13px; border-radius: 999px;
+  border: 1.5px solid var(--borde); background: var(--blanco);
+  color: var(--texto); font-size: .84rem; font-weight: 600;
+  cursor: pointer; font-family: inherit;
+}
+.op-filtro b { color: var(--texto-suave); font-size: .76rem; }
+.op-filtro.activa { background: var(--azul); border-color: var(--azul); color: #fff; }
+.op-filtro.activa b { color: rgba(255,255,255,.75); }
+.op-filtro.grande { width: 100%; padding: 13px; font-size: .9rem; font-weight: 700; }
+.ayuda-filtro { font-size: .78rem; color: var(--texto-suave); margin: 7px 0 0; }
+
+/* Visitas hechas alrededor. Es INFORMACIÓN, no una alerta: en zona urbana
+   dos casas vecinas están a 10 m y son taludes distintos. Va en azul y no
+   en amarillo justamente para que nadie lo lea como "no vayas". */
+.aviso-vecinas {
+  display: block; width: 100%; text-align: left; cursor: pointer;
+  margin-top: 8px; padding: 9px 11px; border: 0; border-radius: 8px;
+  background: var(--azul-claro); border-left: 3px solid var(--azul);
+  font-family: inherit; font-size: .8rem; line-height: 1.4;
+}
+.aviso-vecinas b { color: var(--azul); }
+.aviso-vecinas > b { display: block; margin-bottom: 2px; }
+.aviso-vecinas span { display: block; color: var(--texto-suave); }
+.ver-vecinas { color: var(--azul) !important; font-weight: 800; margin-top: 4px; }
+
+.nota-vecinas {
+  margin: 0 0 12px; padding: 10px 12px; border-radius: 8px;
+  background: #eef5ee; border-left: 3px solid var(--baja);
+  font-size: .85rem; line-height: 1.45;
+}
+.vecina {
+  display: flex; align-items: center; gap: 11px; width: 100%;
+  margin-bottom: 8px; padding: 11px 12px; text-align: left;
+  background: var(--blanco); border: 1px solid var(--borde);
+  border-radius: 10px; cursor: pointer; font-family: inherit;
+}
+.vecina-dist {
+  flex: none; min-width: 56px; padding: 5px 7px; border-radius: 7px;
+  background: var(--azul); color: #fff;
+  font-size: .76rem; font-weight: 800; text-align: center;
+}
+.vecina-txt { display: flex; flex-direction: column; min-width: 0; }
+.vecina-txt b { font-size: .85rem; color: var(--texto); }
+.vecina-txt small { font-size: .76rem; color: var(--texto-suave); }
+
+.tarjeta-distancia {
+  margin-top: 6px; font-size: .78rem; font-weight: 700; color: var(--azul);
+}
+
 /* ---------- Estado de cada solicitud ---------- */
 .chip.estado.pendiente   { background: var(--azul); }
 .chip.estado.en-proceso  { background: var(--media); }
@@ -288,14 +428,37 @@ textarea { min-height: 96px; resize: vertical; }
 .tarjeta.est-realizada { background: #f5f9f5; border-left-color: var(--baja); }
 .tarjeta.est-realizada .tarjeta-titulo { color: var(--texto-suave); font-weight: 600; }
 
-/* Visita hecha: se marca con un visto verde, no con una etiqueta que
-   se repite en todas las tarjetas y aprieta el encabezado. */
-.tarjeta-pie.hecha { color: var(--baja); font-weight: 600; }
+/* Visita hecha: el visto verde reemplaza a la etiqueta "REALIZADA", que
+   se repetía en todas las tarjetas y apretaba el encabezado. */
 .visto {
   display: inline-grid; place-items: center; flex: none;
   width: 17px; height: 17px; border-radius: 50%;
   background: var(--baja); color: #fff; font-size: .66rem; font-weight: 900;
 }
+
+/* El concepto técnico: es la conclusión de la visita y lo que de verdad
+   se quiere leer al consultar una solicitud ya atendida. */
+.tarjeta-concepto {
+  margin-top: 7px; padding: 8px 10px; border-radius: 8px;
+  background: #eef5ee; border-left: 3px solid var(--baja);
+  font-size: .84rem; line-height: 1.4; color: var(--texto);
+}
+
+.tarjeta-visita {
+  margin-top: 9px; padding-top: 8px; border-top: 1px dashed var(--borde);
+  font-size: .8rem;
+}
+.visita-linea {
+  display: flex; align-items: center; gap: 7px;
+  color: var(--baja); font-weight: 700;
+}
+.visita-quien { color: var(--texto-suave); margin: 2px 0 0 24px; }
+.visita-acciones { display: flex; gap: 8px; margin: 7px 0 0 24px; }
+.enlace-ficha, .enlace-pdf {
+  padding: 5px 11px; border-radius: 999px; font-size: .78rem; font-weight: 800;
+  background: var(--azul-claro); color: var(--azul); text-decoration: none;
+}
+.enlace-pdf { background: #fdecea; color: var(--error); }
 
 .tarjeta.est-por-enviar { border-left-color: #6a1b9a; }
 .tarjeta.est-en-proceso { border-left-color: var(--media); }
@@ -541,6 +704,16 @@ body.con-aviso { padding-top: var(--alto-aviso, 52px); }
 .campo { margin-bottom: 15px; }
 .campo-etiqueta { font-size: .84rem; font-weight: 700; display: block; margin-bottom: 6px; }
 .campo-etiqueta .req { color: var(--error); }
+/* Valor que no se puede cambiar: se ve como dato, no como campo. */
+.valor-fijo {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin-top: 5px; padding: 12px;
+  border: 1.5px dashed var(--borde); border-radius: var(--radio);
+  background: var(--fondo); color: var(--texto);
+  font-size: 16px; font-weight: 700;
+}
+.candado { flex: none; font-size: .9rem; opacity: .55; }
+
 .campo-ayuda { font-size: .76rem; color: var(--texto-suave); margin: 0 0 7px; }
 .campo.faltante .campo-etiqueta { color: var(--error); }
 .campo.faltante input, .campo.faltante textarea { border-color: var(--error); }

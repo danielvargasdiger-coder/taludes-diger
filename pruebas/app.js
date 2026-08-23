@@ -13,7 +13,11 @@ const APP = {
   datos: {},           // ficha que se está llenando ahora
   solicitudActual: null,
   vistaActual: 'pendientes',
-  filtro: 'pendientes',   // pendientes | realizadas | todas
+  filtro: 'pendientes',   // pendientes | realizadas
+  // Filtros que arma el evaluador. Vacío = no filtra por ese criterio.
+  filtros: { prioridad: [], responsable: [], comuna: [], barrio: [], entidad: [],
+             sinCoords: false, cercanas: false, abiertos: [] },
+  miUbicacion: null,
   sincronizando: false
 };
 
@@ -32,6 +36,7 @@ const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 const SUFIJO = (typeof CONFIG !== 'undefined' && CONFIG.ESPACIO) ? '-' + CONFIG.ESPACIO : '';
 const NOMBRE_BD = 'taludes-diger' + SUFIJO;
 const CLAVE_PERFIL = 'perfil' + SUFIJO;
+const CLAVE_FILTROS = 'filtros' + SUFIJO;
 
 const DB = {
   _db: null,
@@ -95,6 +100,34 @@ function ahoraLocal() {
   const d = new Date();
   d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
   return d.toISOString().slice(0, 16);
+}
+
+/**
+ * Convierte el enlace de Drive en uno que el celular abra de verdad.
+ *
+ * El enlace que guarda Drive (.../file/d/ID/view?usp=drivesdk) lo intercepta
+ * la app de Google Drive en Android, que intenta abrirlo con la cuenta del
+ * usuario y falla aunque el archivo sea público. El de descarga directa lo
+ * atiende el visor de PDF del teléfono, sin cuenta de por medio.
+ */
+function enlacePdf(url) {
+  const u = String(url || '');
+  const m = u.match(/[-\w]{25,}/);
+  return m ? 'https://drive.google.com/uc?export=download&id=' + m[0] : u;
+}
+
+/**
+ * Enlace de Drive que el navegador SÍ muestra dentro de una etiqueta de imagen.
+ *
+ * El que devuelve Drive (uc?id=...) dejó de servir para incrustar: responde
+ * bien a una descarga pero el navegador lo rechaza como imagen. El de
+ * miniatura sí funciona y además llega redimensionado, que en campo ahorra
+ * datos.
+ */
+function enlaceFoto(url, ancho) {
+  const m = String(url || '').match(/[-\w]{25,}/);
+  if (!m) return url;
+  return 'https://drive.google.com/thumbnail?id=' + m[0] + '&sz=w' + (ancho || 1200);
 }
 
 function fechaBonita(iso) {
@@ -326,6 +359,8 @@ function irA(vista) {
   APP.vistaActual = vista;
   $('#vista-pendientes').hidden = vista !== 'pendientes';
   $('#vista-cola').hidden = vista !== 'cola';
+  $('#vista-filtros').hidden = vista !== 'filtros';
+  $('#vista-mapa').hidden = vista !== 'mapa';
   $('#btn-nueva-no-programada').style.display = vista === 'pendientes' ? '' : 'none';
 }
 
@@ -333,12 +368,355 @@ $('#btn-perfil').addEventListener('click', () => irA('cola'));
 $('#btn-cerrar-cola').addEventListener('click', () => irA('pendientes'));
 $('#aviso-cola').addEventListener('click', () => irA('cola'));
 
-$$('#filtros .filtro').forEach((b) => {
+$$('#filtros .filtro[data-filtro]').forEach((b) => {
   b.addEventListener('click', () => {
     APP.filtro = b.dataset.filtro;
     pintarPendientes();
   });
 });
+
+// ---------------------------------------------------------------- MAPA
+$('#btn-mapa').addEventListener('click', () => { irA('mapa'); abrirMapa(); });
+$('#btn-cerrar-mapa').addEventListener('click', () => irA('pendientes'));
+$('#btn-mi-ubicacion').addEventListener('click', () => centrarEnMi());
+
+/** Carga Leaflet la primera vez que se pide el mapa, no antes. */
+function cargarLeaflet() {
+  if (window.L) return Promise.resolve(true);
+  return new Promise((ok) => {
+    const css = document.createElement('link');
+    css.rel = 'stylesheet';
+    css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(css);
+    const js = document.createElement('script');
+    js.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    js.onload = () => ok(true);
+    js.onerror = () => ok(false);
+    document.head.appendChild(js);
+  });
+}
+
+const COLOR_ESTADO = {
+  realizada: '#2e7d32',
+  'por-enviar': '#6a1b9a',
+  'en-proceso': '#ef8c00',
+  pendiente: '#0b4f6c'
+};
+const COLOR_PRIORIDAD = { 'CRÍTICA': '#a3000d', 'CRITICA': '#a3000d', 'ALTA': '#d84315', 'MEDIA': '#ef8c00', 'BAJA': '#2e7d32' };
+
+async function abrirMapa() {
+  const cargo = await cargarLeaflet();
+  if (!cargo) {
+    $('#mapa-sin-red').hidden = false;
+    $('#mapa').style.display = 'none';
+    return;
+  }
+  $('#mapa-sin-red').hidden = true;
+  $('#mapa').style.display = '';
+
+  if (!APP.mapa) {
+    APP.mapa = L.map('mapa', { zoomControl: true });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap'
+    }).addTo(APP.mapa);
+    APP.capaPuntos = L.layerGroup().addTo(APP.mapa);
+    APP.mapa.setView([4.8133, -75.6961], 12);   // Pereira
+  }
+  setTimeout(() => APP.mapa.invalidateSize(), 60);
+  pintarMapa();
+}
+
+function pintarMapa() {
+  if (!APP.mapa) return;
+  APP.capaPuntos.clearLayers();
+
+  // Se juntan las pendientes con TODAS las visitas hechas: si no, una
+  // entidad invitada vería el mapa vacío.
+  const pendientes = solicitudesConEstado().filter((s) => s._estado.clave !== 'realizada');
+  const hechas = visitadasConDatos().map((v) => Object.assign({}, v, {
+    latitud: v.latitud !== '' && v.latitud != null ? v.latitud : v._estado.visita.latitud,
+    longitud: v.longitud !== '' && v.longitud != null ? v.longitud : v._estado.visita.longitud
+  }));
+  const conCoords = pendientes.concat(hechas)
+    .filter((s) => s.latitud !== '' && s.latitud != null &&
+                   s.longitud !== '' && s.longitud != null);
+  let nPend = 0, nReal = 0;
+  const puntos = [];
+
+  conCoords.forEach((s) => {
+    const hecha = s._estado.clave === 'realizada';
+    hecha ? nReal++ : nPend++;
+    const color = hecha
+      ? COLOR_ESTADO.realizada
+      : (COLOR_PRIORIDAD[(s.prioridad || '').toUpperCase()] || COLOR_ESTADO[s._estado.clave] || COLOR_ESTADO.pendiente);
+
+    const m = L.circleMarker([s.latitud, s.longitud], {
+      radius: hecha ? 6 : 8,
+      color: '#fff', weight: 2,
+      fillColor: color, fillOpacity: hecha ? .75 : 1
+    });
+
+    const v = s._estado.visita;
+    m.bindPopup(
+      '<div class="popup">' +
+        '<b>' + esc(s.direccion || s.barrio || 'Sin dirección') + '</b>' +
+        '<small>Solicitud ' + esc(s.idSolicitud) +
+          (s.barrio ? ' · ' + esc(s.barrio) : '') + '</small>' +
+        '<span class="popup-estado" style="background:' + color + '">' +
+          (hecha ? 'VISITADA' : 'POR VISITAR') + '</span>' +
+        (hecha && v
+          ? '<small>' + esc(fechaBonita(v.fechaVisita)) + '<br>' +
+            esc(v.evaluadores || '') + (v.entidad ? ' · ' + esc(v.entidad) : '') + '</small>'
+          : (s.responsable ? '<small>Asignada a ' + esc(s.responsable) + '</small>' : '')) +
+        '<button type="button" class="popup-btn" data-id="' + esc(s.idSolicitud) + '">' +
+          (hecha ? 'Ver la ficha' : 'Hacer la visita') + '</button>' +
+      '</div>');
+    puntos.push([s.latitud, s.longitud]);
+    APP.capaPuntos.addLayer(m);
+  });
+
+  $('#mapa-resumen').textContent = nPend + ' por visitar · ' + nReal + ' visitadas';
+  if (puntos.length && !APP.mapaCentrado) {
+    APP.mapa.fitBounds(puntos, { padding: [30, 30] });
+    APP.mapaCentrado = true;
+  }
+
+  // El botón del globo se enlaza cuando el globo se abre.
+  APP.mapa.off('popupopen').on('popupopen', (ev) => {
+    const b = ev.popup.getElement().querySelector('.popup-btn');
+    if (!b) return;
+    b.addEventListener('click', () => {
+      const s = APP.solicitudes.find((x) => String(x.idSolicitud) === b.dataset.id);
+      if (!s) return;
+      const est = estadoSolicitud(s);
+      irA('pendientes');
+      if (est.clave === 'realizada' && est.visita) abrirDetalle(est.visita.idVisita);
+      else abrirFicha(s);
+    });
+  });
+}
+
+/** Marca dónde está el geólogo y centra el mapa ahí. */
+function centrarEnMi() {
+  if (!navigator.geolocation || !APP.mapa) return;
+  const btn = $('#btn-mi-ubicacion');
+  btn.textContent = 'Buscando…';
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const p = [pos.coords.latitude, pos.coords.longitude];
+      APP.miUbicacion = { lat: p[0], lon: p[1] };
+      if (APP.marcadorYo) APP.mapa.removeLayer(APP.marcadorYo);
+      APP.marcadorYo = L.circleMarker(p, {
+        radius: 9, color: '#fff', weight: 3, fillColor: '#1565c0', fillOpacity: 1
+      }).addTo(APP.mapa).bindPopup('Estás aquí');
+      APP.mapa.setView(p, 16);
+      btn.textContent = 'Mi ubicación';
+    },
+    () => { toast('No se pudo obtener tu ubicación.', 'error'); btn.textContent = 'Mi ubicación'; },
+    { enableHighAccuracy: true, timeout: 20000 }
+  );
+}
+
+// ---------------------------------------------------------------- FILTROS
+$('#btn-filtros').addEventListener('click', () => { dibujarPanelFiltros(); irA('filtros'); });
+$('#btn-cerrar-filtros').addEventListener('click', () => irA('pendientes'));
+$('#btn-aplicar-filtros').addEventListener('click', () => { irA('pendientes'); pintarPendientes(); });
+$('#btn-limpiar-filtros').addEventListener('click', () => {
+  APP.filtros = { prioridad: [], responsable: [], comuna: [], barrio: [], entidad: [], sinCoords: false, cercanas: false, abiertos: [] };
+  APP.miUbicacion = null;
+  dibujarPanelFiltros();
+  pintarPendientes();
+});
+
+/**
+ * Campos por los que se puede filtrar. El evaluador elige cuáles usar;
+ * no se le imponen. Agregar uno nuevo es agregar una línea aquí.
+ */
+const CAMPOS_FILTRABLES = [
+  { clave: 'prioridad',   titulo: 'Prioridad',              vacio: 'SIN PRIORIDAD' },
+  { clave: 'responsable', titulo: 'Responsable',            vacio: '(sin asignar)' },
+  { clave: 'comuna',      titulo: 'Comuna o corregimiento', vacio: '(sin comuna)' },
+  { clave: 'barrio',      titulo: 'Barrio o vereda',        vacio: '(sin barrio)' },
+  { clave: 'entidad',     titulo: 'Entidad',                vacio: '(sin entidad)' }
+];
+
+/**
+ * Valores distintos de un campo con su conteo.
+ *
+ * Cuenta solo dentro del estado que se está viendo (por visitar / visitadas):
+ * ofrecer "ALTA 12" y que al marcarlo salgan cero porque esas doce ya se
+ * visitaron es desconcertante. Las opciones que quedarían en cero se ocultan.
+ */
+function opcionesDe(campo, vacio) {
+  const cuenta = {};
+  (APP.filtro === 'realizadas'
+    ? visitadasConDatos()
+    : solicitudesConEstado().filter((s) => s._estado.clave !== 'realizada'))
+    .forEach((s) => {
+      const v = String(s[campo] || '').trim() || vacio;
+      cuenta[v] = (cuenta[v] || 0) + 1;
+    });
+  return Object.keys(cuenta)
+    .filter((v) => v !== '' && cuenta[v] > 0)
+    .sort((a, b) => cuenta[b] - cuenta[a])
+    .map((v) => ({ valor: v, n: cuenta[v] }));
+}
+
+function dibujarPanelFiltros() {
+  const f = APP.filtros;
+  if (!f.abiertos) f.abiertos = [];
+
+  // Un campo se despliega si el evaluador lo abrió o si ya tiene algo marcado.
+  const estaAbierto = (c) => f.abiertos.indexOf(c) !== -1 || (f[c] && f[c].length);
+
+  const grupo = (campo) => {
+    const opciones = opcionesDe(campo.clave, campo.vacio);
+    if (!opciones.length) return '';
+    const marcados = (f[campo.clave] || []).length;
+    const abierto = estaAbierto(campo.clave);
+
+    return '<div class="grupo-filtro' + (abierto ? ' abierto' : '') + '">' +
+      '<button type="button" class="grupo-cabeza" data-abrir="' + esc(campo.clave) + '">' +
+        '<span>' + esc(campo.titulo) + '</span>' +
+        (marcados ? '<span class="grupo-marcados">' + marcados + '</span>' : '') +
+        '<span class="grupo-flecha">' + (abierto ? '&#9662;' : '&#9656;') + '</span>' +
+      '</button>' +
+      (abierto
+        ? '<div class="opciones-filtro">' + opciones.map((o) =>
+            '<button type="button" class="op-filtro' +
+              ((f[campo.clave] || []).indexOf(o.valor) !== -1 ? ' activa' : '') + '" ' +
+              'data-clave="' + esc(campo.clave) + '" data-valor="' + esc(o.valor) + '">' +
+              esc(o.valor) + ' <b>' + o.n + '</b></button>').join('') + '</div>'
+        : '') +
+    '</div>';
+  };
+
+  const guardados = filtrosGuardados();
+
+  $('#cuerpo-filtros').innerHTML =
+    '<p class="ambito-filtro">Filtrando sobre <b>' +
+      (APP.filtro === 'realizadas' ? 'las visitadas' : 'las que faltan por visitar') +
+    '</b></p>' +
+
+    (guardados.length
+      ? '<div class="grupo-filtro abierto"><h3>Mis filtros guardados</h3>' +
+        '<div class="opciones-filtro">' + guardados.map((g, i) =>
+          '<span class="op-filtro guardado" data-guardado="' + i + '">' + esc(g.nombre) +
+            '<button type="button" class="borrar-guardado" data-borrar="' + i + '">&times;</button>' +
+          '</span>').join('') + '</div></div>'
+      : '') +
+
+    '<div class="grupo-filtro abierto"><h3>Dónde estoy</h3>' +
+      '<button type="button" id="btn-cerca-mi" class="op-filtro grande' +
+        (f.cercanas ? ' activa' : '') + '">&#9678; Solo las cercanas a mí</button>' +
+      '<p class="ayuda-filtro">Usa el GPS para mostrar lo que tienes a menos de ' +
+        (CONFIG.METROS_CERCA_DE_MI / 1000) + ' km.</p>' +
+    '</div>' +
+
+    '<h3 class="titulo-seccion-filtros">Filtrar por</h3>' +
+    CAMPOS_FILTRABLES.map(grupo).join('') +
+
+    '<div class="grupo-filtro abierto"><h3>Otros</h3>' +
+      '<button type="button" class="op-filtro' + (f.sinCoords ? ' activa' : '') + '" ' +
+        'data-clave="sinCoords">Sin coordenadas (hay que capturar GPS)</button>' +
+    '</div>' +
+
+    '<button type="button" id="btn-guardar-filtro" class="btn-secundario">' +
+      'Guardar esta combinación</button>';
+
+  // Abrir o cerrar un campo
+  $('#cuerpo-filtros').querySelectorAll('.grupo-cabeza').forEach((b) => {
+    b.addEventListener('click', () => {
+      const c = b.dataset.abrir;
+      const i = f.abiertos.indexOf(c);
+      if (i === -1) f.abiertos.push(c); else f.abiertos.splice(i, 1);
+      dibujarPanelFiltros();
+    });
+  });
+
+  // Aplicar un filtro guardado
+  $('#cuerpo-filtros').querySelectorAll('.op-filtro.guardado').forEach((b) => {
+    b.addEventListener('click', (ev) => {
+      if (ev.target.classList.contains('borrar-guardado')) return;
+      const g = filtrosGuardados()[Number(b.dataset.guardado)];
+      if (!g) return;
+      APP.filtros = Object.assign({ abiertos: [] }, JSON.parse(JSON.stringify(g.filtros)));
+      dibujarPanelFiltros();
+      actualizarConteoFiltros();
+    });
+  });
+  $('#cuerpo-filtros').querySelectorAll('.borrar-guardado').forEach((b) => {
+    b.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const lista = filtrosGuardados();
+      lista.splice(Number(b.dataset.borrar), 1);
+      localStorage.setItem(CLAVE_FILTROS, JSON.stringify(lista));
+      dibujarPanelFiltros();
+    });
+  });
+
+  const btnGuardar = $('#btn-guardar-filtro');
+  if (btnGuardar) btnGuardar.addEventListener('click', () => {
+    const nombre = prompt('¿Con qué nombre guardas esta combinación?\n\nEj: Mis ALTA de Cuba');
+    if (!nombre || !nombre.trim()) return;
+    const lista = filtrosGuardados();
+    const copia = JSON.parse(JSON.stringify(APP.filtros));
+    delete copia.abiertos;
+    lista.push({ nombre: nombre.trim(), filtros: copia });
+    localStorage.setItem(CLAVE_FILTROS, JSON.stringify(lista));
+    toast('Filtro guardado', 'ok');
+    dibujarPanelFiltros();
+  });
+
+  $('#cuerpo-filtros').querySelectorAll('.op-filtro[data-clave]').forEach((b) => {
+    b.addEventListener('click', () => {
+      const clave = b.dataset.clave;
+      if (clave === 'sinCoords') {
+        f.sinCoords = !f.sinCoords;
+      } else {
+        const i = f[clave].indexOf(b.dataset.valor);
+        if (i === -1) f[clave].push(b.dataset.valor); else f[clave].splice(i, 1);
+      }
+      b.classList.toggle('activa');
+      actualizarConteoFiltros();
+    });
+  });
+
+  const btnCerca = $('#btn-cerca-mi');
+  if (btnCerca) btnCerca.addEventListener('click', async () => {
+    if (f.cercanas) { f.cercanas = false; APP.miUbicacion = null; btnCerca.classList.remove('activa'); actualizarConteoFiltros(); return; }
+    if (!navigator.geolocation) { toast('Este celular no tiene GPS disponible.', 'error'); return; }
+    btnCerca.textContent = 'Buscando tu ubicación…';
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        APP.miUbicacion = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+        f.cercanas = true;
+        dibujarPanelFiltros();
+        actualizarConteoFiltros();
+      },
+      () => { toast('No se pudo obtener tu ubicación.', 'error'); dibujarPanelFiltros(); },
+      { enableHighAccuracy: true, timeout: 20000 }
+    );
+  });
+
+  actualizarConteoFiltros();
+}
+
+/** Combinaciones que el evaluador guardó en este celular. */
+function filtrosGuardados() {
+  try { return JSON.parse(localStorage.getItem(CLAVE_FILTROS) || '[]'); }
+  catch (e) { return []; }
+}
+
+/** Cuántas solicitudes quedarían con los filtros marcados ahora mismo. */
+function actualizarConteoFiltros() {
+  const antes = $('#lista-pendientes').innerHTML;
+  pintarPendientes();
+  const n = document.querySelectorAll('#lista-pendientes .tarjeta').length;
+  $('#filtros-resultado').textContent = n + (n === 1 ? ' solicitud' : ' solicitudes');
+  $('#lista-pendientes').innerHTML = antes;
+}
 
 function pintarConexion() {
   const el = $('#estado-conexion');
@@ -502,6 +880,74 @@ function pintarTodo() {
     : '';
 }
 
+/**
+ * Lista las visitas hechas alrededor de una solicitud, con dirección y
+ * fecha, para que el geólogo COMPARE y decida si es el mismo talud.
+ * Se abre solo si él lo pide: nunca interrumpe ni sugiere saltarse nada.
+ */
+function mostrarVecinas(s) {
+  const filas = s._vecinas.map((v) =>
+    '<button type="button" class="vecina" data-id="' + esc(v.idVisita) + '">' +
+      '<span class="vecina-dist">' + v.distancia + ' m</span>' +
+      '<span class="vecina-txt">' +
+        '<b>Solicitud ' + esc(v.idSolicitud) + ' — ' +
+          esc(v.direccion || v.barrio || 'sin dirección') + '</b>' +
+        '<small>' + esc(fechaBonita(v.fechaVisita)) +
+          (v.entidad ? ' · ' + esc(v.entidad) : '') + '</small>' +
+      '</span>' +
+    '</button>').join('');
+
+  $('#detalle-titulo').textContent = 'Visitas cerca de la solicitud ' + s.idSolicitud;
+  $('#detalle-subtitulo').textContent = esc(s.direccion || s.barrio || '');
+  $('#detalle-cuerpo').innerHTML =
+    '<div class="detalle-seccion">' +
+      '<p class="nota-vecinas">Estas visitas corresponden a <b>otras solicitudes</b> ' +
+        'cercanas. Compáralas con la tuya: si es un talud distinto, ' +
+        '<b>haz tu visita igual</b>.</p>' +
+      filas +
+    '</div>';
+  $('#vista-detalle').hidden = false;
+  $('#detalle-cuerpo').querySelectorAll('.vecina').forEach((b) => {
+    b.addEventListener('click', () => abrirDetalle(b.dataset.id));
+  });
+}
+
+/** Muestra qué filtros están puestos, y permite quitarlos de a uno. */
+function pintarChipsActivos() {
+  const f = APP.filtros;
+  const cont = $('#chips-activos');
+  if (!cont) return;
+  const activos = [];
+  ['prioridad', 'responsable', 'comuna', 'entidad'].forEach((clave) => {
+    f[clave].forEach((v) => activos.push({ clave: clave, valor: v, texto: v }));
+  });
+  if (f.sinCoords) activos.push({ clave: 'sinCoords', texto: 'Sin coordenadas' });
+  if (f.cercanas) activos.push({ clave: 'cercanas', texto: 'Cerca de mí' });
+
+  const btn = $('#filtros-activos');
+  if (btn) btn.textContent = activos.length ? String(activos.length) : '';
+
+  cont.innerHTML = activos.map((a, i) =>
+    '<button type="button" class="chip-activo" data-i="' + i + '">' +
+      esc(a.texto) + ' <span>&times;</span></button>').join('') +
+    (activos.length > 1 ? '<button type="button" class="chip-activo limpiar">Quitar todos</button>' : '');
+
+  cont.querySelectorAll('.chip-activo').forEach((b) => {
+    b.addEventListener('click', () => {
+      if (b.classList.contains('limpiar')) {
+        APP.filtros = { prioridad: [], responsable: [], comuna: [], barrio: [], entidad: [], sinCoords: false, cercanas: false, abiertos: [] };
+        APP.miUbicacion = null;
+      } else {
+        const a = activos[Number(b.dataset.i)];
+        if (a.clave === 'sinCoords') f.sinCoords = false;
+        else if (a.clave === 'cercanas') { f.cercanas = false; APP.miUbicacion = null; }
+        else f[a.clave].splice(f[a.clave].indexOf(a.valor), 1);
+      }
+      pintarPendientes();
+    });
+  });
+}
+
 function filtrar(lista, texto, campos) {
   const q = normalizar(texto);
   if (!q) return lista;
@@ -529,7 +975,26 @@ function estadoSolicitud(s) {
 /** Solicitudes con su estado resuelto, lo que falta primero. */
 function solicitudesConEstado() {
   return APP.solicitudes
-    .map((s) => Object.assign({}, s, { _estado: estadoSolicitud(s) }))
+    .map((s) => {
+      const con = Object.assign({}, s, { _estado: estadoSolicitud(s) });
+      // Contexto, NO advertencia de repetido: en zona urbana dos casas
+      // vecinas están a 10 m y son taludes distintos. La duplicidad real
+      // la define el número de solicitud, no la distancia. Esto solo
+      // informa que hay trabajo hecho al lado, para que el geólogo compare
+      // y decida. Nunca debe llevar a omitir una visita.
+      if (con._estado.clave !== 'realizada' && s.latitud !== '') {
+        const cerca = visitasCercanas(s.latitud, s.longitud, CONFIG.METROS_ALERTA_CERCANIA)
+          .filter((v) => String(v.idSolicitud) !== String(s.idSolicitud));
+        if (cerca.length) con._vecinas = cerca;
+      }
+      // Distancia a donde está parado el geólogo, si la pidió.
+      if (APP.miUbicacion && s.latitud !== '') {
+        con._distancia = distanciaMetros(APP.miUbicacion.lat, APP.miUbicacion.lon,
+                                         parseFloat(s.latitud), parseFloat(s.longitud));
+        con._cerca = con._distancia <= CONFIG.METROS_CERCA_DE_MI;
+      }
+      return con;
+    })
     .sort((a, b) => {
       const ra = a._estado.clave === 'realizada' ? 1 : 0;
       const rb = b._estado.clave === 'realizada' ? 1 : 0;
@@ -550,20 +1015,51 @@ function solicitudesConEstado() {
     });
 }
 
+/**
+ * Cada visita realizada como tarjeta, venga de donde venga: de una solicitud
+ * programada, de un hallazgo en campo o de otra entidad. Si existe la
+ * solicitud se le pegan sus datos; si no, la tarjeta se arma con lo que
+ * trae la propia visita.
+ */
+function visitadasConDatos() {
+  return APP.historial.map((v) => {
+    const s = APP.solicitudes.find((x) => String(x.idSolicitud) === String(v.idSolicitud)) || {};
+    return Object.assign({}, s, {
+      idSolicitud: v.idSolicitud,
+      barrio: s.barrio || v.barrio || '',
+      direccion: s.direccion || v.direccion || '',
+      prioridad: v.prioridad || s.prioridad || '',
+      _estado: { clave: 'realizada', texto: 'REALIZADA', visita: v }
+    });
+  });
+}
+
 function pintarPendientes() {
   const conEstado = solicitudesConEstado();
+  const visitadas = visitadasConDatos();
   const nPend = conEstado.filter((s) => s._estado.clave !== 'realizada').length;
-  const nReal = conEstado.length - nPend;
+  const nReal = visitadas.length;
 
   $('#dato-pendientes').textContent = nPend;
   $('#dato-realizadas').textContent = nReal;
-  $$('#filtros .filtro').forEach((b) => {
+  $$('#filtros .filtro[data-filtro]').forEach((b) => {
     b.classList.toggle('activo', b.dataset.filtro === APP.filtro);
   });
+  pintarChipsActivos();
 
-  const porFiltro = conEstado.filter((s) => {
-    if (APP.filtro === 'realizadas') return s._estado.clave === 'realizada';
-    if (APP.filtro === 'pendientes') return s._estado.clave !== 'realizada';
+  const f = APP.filtros;
+  const base = APP.filtro === 'realizadas' ? visitadas : conEstado;
+  const porFiltro = base.filter((s) => {
+    if (APP.filtro === 'pendientes' && s._estado.clave === 'realizada') return false;
+
+    if (f.prioridad.length &&
+        f.prioridad.indexOf((s.prioridad || 'SIN PRIORIDAD').toUpperCase()) === -1) return false;
+    if (f.responsable.length && f.responsable.indexOf(s.responsable || '(sin asignar)') === -1) return false;
+    if (f.comuna.length && f.comuna.indexOf(s.comuna || '(sin comuna)') === -1) return false;
+    if ((f.barrio || []).length && f.barrio.indexOf(s.barrio || '(sin barrio)') === -1) return false;
+    if (f.entidad.length && f.entidad.indexOf(s.entidad || '(sin entidad)') === -1) return false;
+    if (f.sinCoords && s.latitud !== '') return false;
+    if (f.cercanas && !s._cerca) return false;
     return true;
   });
   const lista = filtrar(porFiltro, $('#buscar-pendientes').value,
@@ -587,8 +1083,8 @@ function pintarPendientes() {
           '<b>' + esc(APP.perfil.entidad) + '</b><br>' +
           'Tu entidad no tiene solicitudes asignadas.<br>' +
           'Toca el botón <b>+</b> para registrar una visita de talud.<br><br>' +
-          '<small>En "Realizadas" puedes consultar las visitas hechas por todas ' +
-          'las entidades, para no repetir trabajo.</small></div>'
+          '<small>En <b>Visitadas</b> puedes consultar las ' + APP.historial.length +
+          ' visitas hechas por todas las entidades, para no repetir trabajo.</small></div>'
         : '<div class="vacio"><span class="vacio-icono">&#8681;</span>' +
           'Toca el botón de sincronizar (arriba a la derecha) para descargar las solicitudes.</div>';
     return;
@@ -599,19 +1095,35 @@ function pintarPendientes() {
   // letra menuda. Solo se marca lo que aporta: la prioridad se muestra si
   // existe, y el estado solo cuando no es "por visitar".
   cont.innerHTML = lista.map((s) => {
-    const p = (s.prioridad || '').toUpperCase();
     const e = s._estado;
     const hecha = e.clave === 'realizada';
+    // En una visitada vale la prioridad que asignó el geólogo en campo,
+    // no la que traía la solicitud desde la oficina.
+    const p = ((hecha && e.visita && e.visita.prioridad) || s.prioridad || '').toUpperCase();
     const lugar = [s.barrio, s.comuna].filter(Boolean).join(' · ');
 
     // Una visita por hacer necesita todo lo que sirve para llegar y para
     // llamar antes; una ya hecha solo necesita decir cuándo y quién.
     const pie = hecha
-      ? '<div class="tarjeta-pie hecha">' +
-          '<span class="visto">&#10003;</span>' +
+      ? '<div class="tarjeta-visita">' +
+          '<div class="visita-linea">' +
+            '<span class="visto">&#10003;</span>' +
+            '<span>' + (e.visita
+              ? esc(fechaBonita(e.visita.fechaVisita))
+              : 'Registrada como atendida') + '</span>' +
+          '</div>' +
           (e.visita
-            ? esc(fechaBonita(e.visita.fechaVisita)) + ' · ' + esc(e.visita.evaluadores || '')
-            : 'Registrada como atendida') +
+            ? '<div class="visita-quien">' + esc(e.visita.evaluadores || '') +
+                (e.visita.entidad ? ' · ' + esc(e.visita.entidad) : '') + '</div>' +
+              '<div class="visita-acciones">' +
+                '<span class="enlace-ficha">Ver ficha completa</span>' +
+                (e.visita.pdfUrl
+                  ? '<a class="enlace-pdf" target="_blank" rel="noopener" ' +
+                    'href="' + esc(enlacePdf(e.visita.pdfUrl)) + '" ' +
+                    'onclick="event.stopPropagation()">PDF</a>'
+                  : '') +
+              '</div>'
+            : '') +
         '</div>'
       : (s.contacto || s.telefono
           ? '<div class="tarjeta-contacto">' +
@@ -640,11 +1152,40 @@ function pintarPendientes() {
       '<div class="tarjeta-titulo">' + esc(s.direccion || s.edificacion || 'Sin dirección') + '</div>' +
       (s.edificacion && s.direccion && !hecha
         ? '<div class="tarjeta-edif">' + esc(s.edificacion) + '</div>' : '') +
-      (s.recomendaciones && !hecha
-        ? '<div class="tarjeta-desc">' + esc(s.recomendaciones) + '</div>' : '') +
+      (s._vecinas
+        ? '<div class="aviso-vecinas">' +
+            '<b>&#9432; ' + s._vecinas.length +
+              (s._vecinas.length === 1 ? ' visita hecha cerca' : ' visitas hechas cerca') +
+              ' (' + s._vecinas.slice(0, 3).map((v) => v.distancia + ' m').join(', ') + ')</b>' +
+            '<span>Son <b>otras solicitudes</b>. Revísalas solo para confirmar que ' +
+              'no es el mismo talud. Si es distinto, haz tu visita normalmente.</span>' +
+            '<span class="ver-vecinas">Ver cuáles &rarr;</span>' +
+          '</div>'
+        : '') +
+      (typeof s._distancia === 'number'
+        ? '<div class="tarjeta-distancia">A ' +
+          (s._distancia >= 1000 ? (s._distancia/1000).toFixed(1) + ' km' : s._distancia + ' m') +
+          ' de donde estás</div>'
+        : '') +
+      (hecha
+        ? (e.visita && e.visita.concepto
+            ? '<div class="tarjeta-concepto">' + esc(e.visita.concepto) +
+              (e.visita.concepto.length >= 260 ? '…' : '') + '</div>'
+            : '')
+        : (s.recomendaciones
+            ? '<div class="tarjeta-desc">' + esc(s.recomendaciones) + '</div>' : '')) +
       pie +
     '</div>';
   }).join('');
+
+  cont.querySelectorAll('.aviso-vecinas').forEach((av) => {
+    av.addEventListener('click', (ev) => {
+      ev.stopPropagation();   // no abrir la ficha, solo mostrar las vecinas
+      const el = av.closest('.tarjeta');
+      const s = lista.find((x) => String(x.idSolicitud) === el.dataset.id);
+      if (s && s._vecinas) mostrarVecinas(s);
+    });
+  });
 
   cont.querySelectorAll('.tarjeta').forEach((el) => {
     el.addEventListener('click', () => {
@@ -934,10 +1475,21 @@ function dibujarCampo(campo) {
     case 'fecha_hora': {
       // Los numéricos van como texto con teclado decimal: así el celular
       // deja escribir el punto aunque su teclado muestre coma.
+      // Un campo de solo lectura NO se dibuja como campo de escritura:
+      // "readonly" bloquea el teclado pero no el autocompletado ni el pegado,
+      // y sobre todo se ve idéntico a uno editable. El código de evaluación
+      // es la llave que une la ficha con la solicitud: no puede cambiarse.
+      if (campo.soloLectura) {
+        div.innerHTML = etiqueta +
+          '<div class="valor-fijo">' + esc(valor || '—') +
+            '<span class="candado" title="No se puede modificar">&#128274;</span>' +
+          '</div>';
+        break;
+      }
+
       const tipoHtml = campo.tipo === 'fecha_hora' ? 'datetime-local' : 'text';
       div.innerHTML = etiqueta + '<input type="' + tipoHtml + '"' +
         (campo.tipo === 'numero' ? ' inputmode="decimal"' : '') +
-        (campo.soloLectura ? ' readonly' : '') +
         ' value="' + esc(valor || '') + '">';
       div.querySelector('input').addEventListener('input', (e) => {
         if (campo.tipo === 'numero') {
@@ -1053,8 +1605,9 @@ function dibujarCampo(campo) {
 
         cajaCercanas.innerHTML =
           '<div class="aviso-cercanas">' +
-            '<b>&#9888; Ya hay ' + cerca.length + ' visita(s) realizada(s) cerca de aquí</b>' +
-            '<p>Verifica que no sea el mismo talud antes de continuar.</p>' +
+            '<b>&#9432; ' + cerca.length + ' visita(s) realizada(s) cerca de aquí</b>' +
+            '<p>Son otras solicitudes. Compáralas: si tu talud es distinto, ' +
+              'continúa con tu ficha normalmente.</p>' +
             cerca.slice(0, 4).map((h) =>
               '<button type="button" class="cercana" data-id="' + esc(h.idVisita) + '">' +
                 '<span class="cercana-dist">' + h.distancia + ' m</span>' +
@@ -1510,7 +2063,7 @@ async function abrirDetalle(idVisita) {
   let html = '';
   if (h.pdfUrl) {
     html += '<div class="detalle-seccion"><div class="detalle-acciones">' +
-      '<a class="btn-pdf" href="' + esc(h.pdfUrl) + '" target="_blank" rel="noopener">&#128196; Abrir el PDF de la ficha</a>' +
+      '<a class="btn-pdf" href="' + esc(enlacePdf(h.pdfUrl)) + '" target="_blank" rel="noopener">&#128196; Abrir el PDF de la ficha</a>' +
       '</div></div>';
   }
 
@@ -1530,7 +2083,8 @@ async function abrirDetalle(idVisita) {
     html += '<div class="detalle-seccion"><h3>' + sec.numero + '. ' + esc(sec.titulo) + '</h3>' +
       (filas ? '<table class="detalle-tabla">' + filas + '</table>' : '') +
       (fotos.length ? '<div class="detalle-fotos">' + fotos.map((u) =>
-        '<a href="' + esc(u) + '" target="_blank" rel="noopener"><img src="' + esc(u) + '" alt="" loading="lazy"></a>').join('') + '</div>' : '') +
+        '<a href="' + esc(enlaceFoto(u, 1600)) + '" target="_blank" rel="noopener">' +
+        '<img src="' + esc(enlaceFoto(u, 800)) + '" alt="" loading="lazy"></a>').join('') + '</div>' : '') +
       '</div>';
   });
 
