@@ -70,7 +70,7 @@ const CONFIG = {
    * GPS_PRECISION_OBJETIVO metros, corta antes y no hace esperar.
    */
   GPS_PRECISION_OBJETIVO: 8,
-  GPS_SEGUNDOS_MAX: 20,
+  GPS_SEGUNDOS_MAX: 15,
 
   /** Radio del filtro "cerca de mí" en la lista de solicitudes. */
   METROS_CERCA_DE_MI: 2000

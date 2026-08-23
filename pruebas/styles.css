@@ -112,7 +112,11 @@ small { font-weight: 400; }
   display: grid; place-items: center;
 }
 .icon-btn:active { background: rgba(255,255,255,.3); }
-#sync-icon.girando { animation: girar 1s linear infinite; display: inline-block; }
+/* Icono de sincronizar. Era el caracter tipografico ↻, que cada celular
+   dibuja distinto y se veia mas delgado que los otros dos iconos de la
+   barra. Ahora es un SVG igual que el del mapa: mismo grosor y mismo tamano. */
+#sync-icon { display: block; transform-origin: center; }
+#sync-icon.girando { animation: girar .9s linear infinite; }
 @keyframes girar { to { transform: rotate(360deg); } }
 
 .estado-linea {

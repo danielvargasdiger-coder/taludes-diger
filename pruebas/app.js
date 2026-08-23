@@ -172,75 +172,46 @@ function distanciaMetros(lat1, lon1, lat2, lon2) {
 }
 
 /**
- * Toma la MEJOR lectura de GPS que consiga en unos segundos, en vez de la
- * primera que llegue.
+ * Captura de GPS compartida por toda la app.
  *
- * Un celular responde de inmediato con una posición de red (±30-100 m) y va
- * mejorando conforme engancha satélites. Con getCurrentPosition se guardaba
- * esa primera lectura, que con un radio de aviso de 10 m no sirve de nada.
- * Aquí se escucha con watchPosition, se conserva la lectura de menor error
- * y se corta apenas se alcanza la precisión objetivo.
+ * El problema de la versión anterior era el tiempo: esperaba hasta 20 s
+ * parado frente al celular. Tres cambios lo arreglan sin perder precisión:
  *
- * Devuelve una función para detener antes, por si el geólogo tiene prisa.
+ *  1. EMPIEZA SOLA al abrir la ficha (si el permiso ya está dado), así el
+ *     GPS se va afinando mientras el geólogo llena las primeras casillas.
+ *     Cuando llega a las coordenadas la lectura suele estar lista y el
+ *     botón responde al instante.
+ *  2. EL LISTÓN CEDE con el tiempo: exige ±8 m al principio, se conforma
+ *     con ±15 m a los 6 s y con ±25 m a los 10 s. Esperar 20 s para ganar
+ *     un metro no cambia nada en campo.
+ *  3. CORTA SI SE ESTANCA: si la señal deja de mejorar durante 4 s y ya es
+ *     usable, no sigue esperando. Un GPS que se estabilizó ya no mejora.
+ *
+ * Además, mientras busca se puede aceptar lo que haya con un toque.
  */
-function afinarUbicacion(cb) {
-  if (!navigator.geolocation) {
-    cb.error({ code: 2, message: 'Este celular no tiene GPS disponible.' });
-    return function () {};
-  }
+const GPS = {
+  buscando: false,
+  mejor: null,      // { y, x, z, precision }
+  cuando: 0,        // cuándo se logró la mejor lectura
+  lecturas: 0,
+  inicio: 0,
+  vigia: null,
+  reloj: null,
+  oyentes: []
+};
 
-  const objetivo = CONFIG.GPS_PRECISION_OBJETIVO || 8;
-  const limite = (CONFIG.GPS_SEGUNDOS_MAX || 20) * 1000;
-  const inicio = Date.now();
-  let mejor = null, lecturas = 0, cerrado = false;
+/** Después de 2 minutos el geólogo ya caminó: la lectura deja de servir. */
+const GPS_VIGENCIA = 120000;
 
-  const terminar = () => {
-    if (cerrado) return;
-    cerrado = true;
-    navigator.geolocation.clearWatch(vigia);
-    clearInterval(reloj);
-    APP.gpsActivo = null;
-    if (mejor) cb.listo(Object.assign({}, mejor, { lecturas: lecturas }));
-    else cb.error({ code: 3, message: 'Sin lecturas de GPS.' });
-  };
+function gpsSegundos() { return Math.round((Date.now() - GPS.inicio) / 1000); }
+function gpsFresco() { return !!GPS.mejor && (Date.now() - GPS.cuando) < GPS_VIGENCIA; }
 
-  const vigia = navigator.geolocation.watchPosition(
-    (pos) => {
-      const p = pos.coords;
-      lecturas++;
-      if (!mejor || p.accuracy < mejor.precision) {
-        mejor = {
-          y: p.latitude.toFixed(7),
-          x: p.longitude.toFixed(7),
-          z: p.altitude != null ? String(Math.round(p.altitude)) : '',
-          precision: Math.round(p.accuracy)
-        };
-      }
-      cb.progreso(mejor, Math.round((Date.now() - inicio) / 1000));
-      if (mejor.precision <= objetivo) terminar();
-    },
-    (err) => {
-      if (cerrado) return;
-      // Un error después de tener lecturas no bota lo ya conseguido.
-      if (mejor) { terminar(); return; }
-      cerrado = true;
-      navigator.geolocation.clearWatch(vigia);
-      clearInterval(reloj);
-      APP.gpsActivo = null;
-      cb.error(err);
-    },
-    { enableHighAccuracy: true, timeout: limite, maximumAge: 0 }
-  );
-
-  // Late cada segundo aunque el GPS no reporte, para que se vea que trabaja.
-  const reloj = setInterval(() => {
-    const seg = Math.round((Date.now() - inicio) / 1000);
-    cb.progreso(mejor, seg);
-    if (Date.now() - inicio >= limite) terminar();
-  }, 1000);
-
-  APP.gpsActivo = terminar;
-  return terminar;
+/** Se conforma con menos a medida que pasan los segundos. */
+function gpsSuficiente(metros, seg) {
+  const obj = CONFIG.GPS_PRECISION_OBJETIVO || 8;
+  return metros <= obj ||
+         (seg >= 6 && metros <= 15) ||
+         (seg >= 10 && metros <= 25);
 }
 
 /** Qué tan buena es una lectura, para pintarla de color. */
@@ -249,6 +220,99 @@ function calidadGps(metros) {
   if (metros <= (CONFIG.GPS_PRECISION_OBJETIVO || 8)) return 'ok';
   if (metros <= 25) return 'regular';
   return 'malo';
+}
+
+function gpsCerrar(err) {
+  if (GPS.vigia != null) navigator.geolocation.clearWatch(GPS.vigia);
+  clearInterval(GPS.reloj);
+  GPS.vigia = null; GPS.reloj = null; GPS.buscando = false;
+
+  const oyentes = GPS.oyentes;
+  GPS.oyentes = [];
+  oyentes.forEach((o) => {
+    if (GPS.mejor && o.listo) o.listo(Object.assign({}, GPS.mejor, { lecturas: GPS.lecturas }));
+    else if (!GPS.mejor && o.error) o.error(err || { code: 3, message: 'Sin lecturas de GPS.' });
+  });
+}
+
+/**
+ * Pide la ubicación. cb = { progreso, listo, error }.
+ * Si ya hay una lectura reciente responde de una vez, sin hacer esperar.
+ * Si otra parte de la app ya está midiendo, se engancha a esa medición.
+ */
+function pedirUbicacion(cb, remedir) {
+  if (!navigator.geolocation) {
+    if (cb && cb.error) cb.error({ code: 2, message: 'Este celular no tiene GPS disponible.' });
+    return;
+  }
+  if (cb) GPS.oyentes.push(cb);
+
+  if (GPS.buscando) {                                  // ya hay una en curso
+    if (cb && cb.progreso) cb.progreso(GPS.mejor, gpsSegundos());
+    return;
+  }
+  if (!remedir && gpsFresco()) { gpsCerrar(); return; }   // lectura guardada
+
+  // Empieza una medición nueva, así que la lectura anterior se descarta.
+  // Si todavía sirviera, se habría devuelto en la línea de arriba sin medir.
+  // Conservarla haría que una lectura buena pero VIEJA —de otro talud, de
+  // hace media hora— le ganara para siempre a las lecturas de ahora.
+  GPS.mejor = null;
+  GPS.lecturas = 0;
+  GPS.buscando = true;
+  GPS.inicio = Date.now();
+  const limite = (CONFIG.GPS_SEGUNDOS_MAX || 15) * 1000;
+  let ultimaMejora = Date.now();
+
+  GPS.vigia = navigator.geolocation.watchPosition(
+    (pos) => {
+      const p = pos.coords;
+      GPS.lecturas++;
+      if (!GPS.mejor || p.accuracy < GPS.mejor.precision) {
+        GPS.mejor = {
+          y: p.latitude.toFixed(7),
+          x: p.longitude.toFixed(7),
+          z: p.altitude != null ? String(Math.round(p.altitude)) : '',
+          precision: Math.round(p.accuracy)
+        };
+        GPS.cuando = Date.now();
+        ultimaMejora = Date.now();
+      }
+      const seg = gpsSegundos();
+      GPS.oyentes.forEach((o) => o.progreso && o.progreso(GPS.mejor, seg));
+      if (gpsSuficiente(GPS.mejor.precision, seg)) gpsCerrar();
+    },
+    (err) => {
+      if (!GPS.buscando) return;
+      gpsCerrar(err);          // si ya había lectura, gpsCerrar la entrega igual
+    },
+    { enableHighAccuracy: true, timeout: limite, maximumAge: 0 }
+  );
+
+  // Late cada segundo aunque el GPS no reporte, para que se vea que trabaja.
+  GPS.reloj = setInterval(() => {
+    const seg = gpsSegundos();
+    GPS.oyentes.forEach((o) => o.progreso && o.progreso(GPS.mejor, seg));
+    const estancado = GPS.mejor && (Date.now() - ultimaMejora) >= 4000 &&
+                      GPS.mejor.precision <= 30;
+    if (estancado || (Date.now() - GPS.inicio) >= limite) gpsCerrar();
+  }, 1000);
+}
+
+/** Acepta ya mismo la mejor lectura conseguida hasta el momento. */
+function usarLoQueHayaGps() { if (GPS.buscando) gpsCerrar(); }
+
+/**
+ * Arranca el GPS al abrir la ficha, SOLO si el permiso ya está concedido.
+ * Si no lo está, pedirlo aquí sacaría un cuadro de permiso que el geólogo
+ * no pidió; en ese caso se espera a que toque el botón.
+ */
+function precalentarGps(cb) {
+  if (!navigator.geolocation) return;
+  if (!navigator.permissions || !navigator.permissions.query) return;
+  navigator.permissions.query({ name: 'geolocation' })
+    .then((p) => { if (p.state === 'granted') pedirUbicacion(cb); })
+    .catch(() => {});
 }
 
 /**
@@ -1755,37 +1819,62 @@ function dibujarCampo(campo) {
       });
 
       const btnGps = div.querySelector('.btn-gps');
-      btnGps.addEventListener('click', () => {
-        if (APP.gpsActivo) { APP.gpsActivo(); return; }   // segundo toque = detener
-        btnGps.textContent = '\u25A0 Detener y usar la mejor';
+      const ETIQUETA_GPS = '\u25CE Capturar mi ubicación';
 
-        afinarUbicacion({
-          progreso: (mejor, seg) => {
-            estado.className = 'gps-estado';
-            estado.textContent = mejor
-              ? 'Afinando… mejor lectura ±' + mejor.precision + ' m (' + seg + ' s)'
-              : 'Buscando señal GPS… (' + seg + ' s)';
-          },
-          listo: (p) => {
-            btnGps.textContent = '\u25CE Capturar mi ubicación';
-            div.querySelector('.gps-y').value = p.y;
-            div.querySelector('.gps-x').value = p.x;
-            if (p.z !== '') div.querySelector('.gps-z').value = p.z;
-            setValor(campo.id, { y: p.y, x: p.x, z: p.z, precision: p.precision, fuente: 'gps' });
-            estado.className = 'gps-estado ' + calidadGps(p.precision);
-            estado.textContent = 'Ubicación capturada · precisión ±' + p.precision + ' m' +
-              (p.lecturas > 1 ? ' (mejor de ' + p.lecturas + ' lecturas)' : '');
-            revisarCercanas();
-          },
-          error: (err) => {
-            btnGps.textContent = '\u25CE Capturar mi ubicación';
-            estado.className = 'gps-estado malo';
-            estado.textContent = err.code === 1
-              ? 'Permiso de ubicación denegado. Actívalo en los ajustes del navegador.'
-              : 'No se pudo obtener la ubicación. Escríbela a mano o intenta al aire libre.';
-          }
-        });
+      /** Escribe una lectura en las casillas y en el borrador. */
+      const ponerUbicacion = (p, sola) => {
+        div.querySelector('.gps-y').value = p.y;
+        div.querySelector('.gps-x').value = p.x;
+        if (p.z !== '') div.querySelector('.gps-z').value = p.z;
+        setValor(campo.id, { y: p.y, x: p.x, z: p.z, precision: p.precision, fuente: 'gps' });
+        estado.className = 'gps-estado ' + calidadGps(p.precision);
+        estado.textContent = (sola ? 'Ubicación tomada automáticamente' : 'Ubicación capturada') +
+          ' · precisión ±' + p.precision + ' m' +
+          (p.lecturas > 1 ? ' (mejor de ' + p.lecturas + ' lecturas)' : '');
+        revisarCercanas();
+      };
+
+      const oyenteGps = (sola) => ({
+        progreso: (mejor, seg) => {
+          estado.className = 'gps-estado';
+          estado.textContent = mejor
+            ? 'Afinando… ±' + mejor.precision + ' m (' + seg + ' s)'
+            : 'Buscando señal GPS… (' + seg + ' s)';
+          btnGps.textContent = mejor
+            ? '\u2713 Usar esta (\u00b1' + mejor.precision + ' m)'
+            : '\u25CB Buscando… (' + seg + ' s)';
+        },
+        listo: (p) => { btnGps.textContent = ETIQUETA_GPS; ponerUbicacion(p, sola); },
+        error: (err) => {
+          btnGps.textContent = ETIQUETA_GPS;
+          estado.className = 'gps-estado malo';
+          estado.textContent = err.code === 1
+            ? 'Permiso de ubicación denegado. Actívalo en los ajustes del navegador.'
+            : 'No se pudo obtener la ubicación. Escríbela a mano o intenta al aire libre.';
+        }
       });
+
+      btnGps.addEventListener('click', () => {
+        if (GPS.buscando) { usarLoQueHayaGps(); return; }   // segundo toque = aceptar ya
+        btnGps.textContent = '\u25CB Buscando…';
+        // remedir: si ya hay una coordenada puesta, el geólogo quiere una nueva
+        pedirUbicacion(oyenteGps(false), !!(APP.datos[campo.id] || {}).y);
+      });
+
+      // El GPS empieza a afinar apenas se abre la ficha. Si el campo está
+      // vacío la lectura se escribe sola; si ya trae la coordenada de la
+      // solicitud no se pisa, solo se avisa que hay una mejor disponible.
+      const yaTiene = !!(APP.datos[campo.id] || {}).y;
+      precalentarGps(yaTiene ? {
+        progreso: () => {},
+        listo: (p) => {
+          estado.className = 'gps-estado';
+          estado.textContent = 'GPS listo (±' + p.precision + ' m). ' +
+            'Toca «Capturar» para usar esta lectura.';
+        },
+        error: () => {}
+      } : oyenteGps(true));
+
       revisarCercanas();   // la solicitud puede traer coordenadas de entrada
       break;
     }
