@@ -227,7 +227,7 @@ function pedirCodigoDeNuevo() {
     if (el) el.hidden = true;
   });
   $('#topbar').hidden = true;
-  $('#tabs').hidden = true;
+  $('#aviso-cola').hidden = true;
   $('#vista-ingreso').hidden = false;
   cargando(false);
 
@@ -302,7 +302,7 @@ $('#btn-ingresar').addEventListener('click', async () => {
 function entrarApp() {
   $('#vista-ingreso').hidden = true;
   $('#topbar').hidden = false;
-  $('#tabs').hidden = false;
+
   pintarConexion();
   irA('pendientes');
   pintarTodo();
@@ -318,16 +318,20 @@ $('#btn-salir').addEventListener('click', async () => {
 });
 
 // ---------------------------------------------------------------- NAVEGACIÓN
+/**
+ * Ya no hay pestañas: la app es una sola lista con filtros.
+ * El panel de perfil y envíos se abre y se cierra por encima.
+ */
 function irA(vista) {
   APP.vistaActual = vista;
-  ['pendientes', 'historial', 'cola'].forEach((v) => {
-    $('#vista-' + v).hidden = v !== vista;
-  });
-  $$('#tabs .tab').forEach((b) => b.classList.toggle('activo', b.dataset.vista === vista));
+  $('#vista-pendientes').hidden = vista !== 'pendientes';
+  $('#vista-cola').hidden = vista !== 'cola';
   $('#btn-nueva-no-programada').style.display = vista === 'pendientes' ? '' : 'none';
 }
 
-$$('#tabs .tab').forEach((b) => b.addEventListener('click', () => irA(b.dataset.vista)));
+$('#btn-perfil').addEventListener('click', () => irA('cola'));
+$('#btn-cerrar-cola').addEventListener('click', () => irA('pendientes'));
+$('#aviso-cola').addEventListener('click', () => irA('cola'));
 
 $$('#filtros .filtro').forEach((b) => {
   b.addEventListener('click', () => {
@@ -478,11 +482,21 @@ function pendientes() {
 
 function pintarTodo() {
   pintarPendientes();
-  pintarHistorial();
   pintarCola();
   pintarConexion();
-  $('#badge-pendientes').textContent = pendientes().length || '';
-  $('#badge-cola').textContent = APP.cola.length || '';
+
+  // El aviso de envíos pendientes solo existe cuando hay algo que enviar.
+  const aviso = $('#aviso-cola');
+  if (APP.cola.length) {
+    $('#aviso-cola-txt').textContent = APP.cola.length === 1
+      ? '1 ficha sin enviar'
+      : APP.cola.length + ' fichas sin enviar';
+    aviso.hidden = false;
+  } else {
+    aviso.hidden = true;
+  }
+
+  $('#perfil-entidad').textContent = APP.perfil ? APP.perfil.entidad : '';
   $('#perfil-datos').innerHTML = APP.perfil
     ? esc(APP.perfil.nombre) + '<br>TP ' + esc(APP.perfil.tp) + ' · ' + esc(APP.perfil.entidad)
     : '';
@@ -495,7 +509,7 @@ function filtrar(lista, texto, campos) {
 }
 
 $('#buscar-pendientes').addEventListener('input', pintarPendientes);
-$('#buscar-historial').addEventListener('input', pintarHistorial);
+
 
 /**
  * Estado de una solicitud desde el punto de vista del geólogo.
@@ -625,35 +639,6 @@ function pintarPendientes() {
       }
       abrirFicha(APP.solicitudes.find((x) => String(x.idSolicitud) === el.dataset.id));
     });
-  });
-}
-
-function pintarHistorial() {
-  const lista = filtrar(APP.historial, $('#buscar-historial').value,
-    ['idSolicitud', 'barrio', 'direccion', 'evaluadores', 'prioridad']);
-  const cont = $('#lista-historial');
-  $('#resumen-historial').textContent = APP.historial.length + ' visitas realizadas';
-
-  if (!lista.length) {
-    cont.innerHTML = '<div class="vacio"><span class="vacio-icono">&#9998;</span>Todavía no hay visitas realizadas.</div>';
-    return;
-  }
-
-  cont.innerHTML = lista.map((h) => {
-    const p = (h.prioridad || '').toUpperCase();
-    return '<div class="tarjeta ' + claseP(p) + '" data-id="' + esc(h.idVisita) + '">' +
-      '<div class="tarjeta-cabeza">' +
-        '<div><div class="tarjeta-id">SOLICITUD ' + esc(h.idSolicitud) + '</div>' +
-        '<div class="tarjeta-titulo">' + esc(h.direccion || '') + '</div>' +
-        '<div class="tarjeta-sub">' + esc(h.barrio || '') + '</div></div>' +
-        (p ? '<span class="chip ' + normalizar(p) + '">' + esc(p) + '</span>' : '') +
-      '</div>' +
-      '<div class="tarjeta-pie"><span>' + fechaBonita(h.fechaVisita) + '</span><span>· ' + esc(h.evaluadores || '') + '</span></div>' +
-    '</div>';
-  }).join('');
-
-  cont.querySelectorAll('.tarjeta').forEach((el) => {
-    el.addEventListener('click', () => abrirDetalle(el.dataset.id));
   });
 }
 

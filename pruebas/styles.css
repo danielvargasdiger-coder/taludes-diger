@@ -24,7 +24,7 @@
 
   --radio: 10px;
   --sombra: 0 1px 3px rgba(16, 32, 44, .12);
-  --alto-tabs: 62px;
+
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -60,6 +60,22 @@ small { font-weight: 400; }
 }
 .topbar-title strong { display: block; font-size: 1.02rem; }
 .topbar-title span { font-size: .76rem; opacity: .82; letter-spacing: .04em; }
+.topbar-acciones { display: flex; gap: 8px; flex: none; }
+
+/* Aviso de fichas sin enviar. Sustituye a la pestaña "Por enviar":
+   solo aparece cuando hay algo pendiente, en vez de ocupar un tercio
+   de la barra inferior para un estado que casi siempre está vacío. */
+.aviso-cola {
+  display: flex; width: 100%; align-items: center; justify-content: space-between;
+  gap: 10px; padding: 9px 14px; border: 0; cursor: pointer;
+  background: #6a1b9a; color: #fff;
+  font-family: inherit; font-size: .84rem; font-weight: 700; text-align: left;
+}
+.aviso-cola-ir { flex: none; opacity: .9; font-weight: 800; }
+.aviso-cola:active { background: #55157a; }
+
+/* Panel de perfil y envíos */
+.panel-cuerpo { padding: 14px 13px 30px; }
 
 .icon-btn {
   background: rgba(255,255,255,.14); color: #fff; border: 0;
@@ -80,7 +96,7 @@ small { font-weight: 400; }
 
 /* ------------------------------------------------------------ VISTAS */
 .vista { padding: 10px 13px 18px; }
-.vista.con-tabs { padding-bottom: calc(var(--alto-tabs) + 22px); }
+
 .vista.pantalla-completa {
   position: fixed; inset: 0; z-index: 60;
   background: var(--fondo); overflow-y: auto;
@@ -139,7 +155,7 @@ textarea { min-height: 96px; resize: vertical; }
   cursor: pointer; font-family: inherit; white-space: nowrap;
 }
 .btn-flotante {
-  position: fixed; right: 16px; bottom: calc(var(--alto-tabs) + 16px); z-index: 45;
+  position: fixed; right: 16px; bottom: calc(env(safe-area-inset-bottom) + 18px); z-index: 45;
   width: 58px; height: 58px; border-radius: 50%; border: 0;
   background: var(--azul); color: #fff; font-size: 2rem; line-height: 1;
   box-shadow: 0 4px 14px rgba(11,79,108,.45); cursor: pointer;
@@ -428,29 +444,6 @@ body.con-aviso { padding-top: var(--alto-aviso, 52px); }
 }
 .vacio-icono { font-size: 2.4rem; display: block; margin-bottom: 8px; opacity: .5; }
 
-/* ------------------------------------------------------------ TABS */
-#tabs {
-  position: fixed; bottom: 0; left: 0; right: 0; z-index: 50;
-  display: grid; grid-template-columns: repeat(3, 1fr);
-  background: #fff; border-top: 1px solid var(--borde);
-  padding-bottom: env(safe-area-inset-bottom);
-}
-.tab {
-  background: none; border: 0; padding: 8px 4px 9px; cursor: pointer;
-  font-size: .7rem; font-weight: 700; color: var(--texto-suave);
-  font-family: inherit; display: grid; gap: 1px; justify-items: center;
-  position: relative; min-height: var(--alto-tabs);
-}
-.tab .tab-icono { font-size: 1.3rem; line-height: 1.1; }
-.tab.activo { color: var(--azul); }
-.tab-badge {
-  position: absolute; top: 4px; right: 50%; transform: translateX(26px);
-  background: var(--azul); color: #fff; border-radius: 999px;
-  font-size: .64rem; padding: 1px 6px; min-width: 18px;
-}
-.tab-badge:empty { display: none; }
-.tab-badge.alerta { background: var(--alta); }
-
 /* ------------------------------------------------------------ FICHA */
 .ficha-topbar {
   position: sticky; top: 0; z-index: 20;
@@ -631,7 +624,7 @@ body.con-aviso { padding-top: var(--alto-aviso, 52px); }
 
 /* ------------------------------------------------------------ TOAST / CARGANDO */
 #toast {
-  position: fixed; left: 50%; bottom: calc(var(--alto-tabs) + 22px);
+  position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 24px);
   transform: translateX(-50%) translateY(20px);
   background: #16202a; color: #fff; padding: 11px 18px; border-radius: 999px;
   font-size: .86rem; font-weight: 600; z-index: 200; max-width: 90vw; text-align: center;

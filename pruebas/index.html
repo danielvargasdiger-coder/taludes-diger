@@ -29,11 +29,21 @@
       <strong>Evaluación de Taludes</strong>
       <span>DIGER Pereira</span>
     </div>
-    <button id="btn-sync" class="icon-btn" title="Sincronizar">
-      <span id="sync-icon">&#8635;</span>
-    </button>
+    <div class="topbar-acciones">
+      <button id="btn-sync" class="icon-btn" title="Sincronizar">
+        <span id="sync-icon">&#8635;</span>
+      </button>
+      <button id="btn-perfil" class="icon-btn" title="Mi perfil">&#9776;</button>
+    </div>
   </div>
   <div id="estado-conexion" class="estado-linea"></div>
+
+  <!-- Solo aparece si hay fichas esperando: no ocupa una pestaña completa
+       para un estado que casi siempre está vacío. -->
+  <button id="aviso-cola" class="aviso-cola" hidden>
+    <span id="aviso-cola-txt"></span>
+    <span class="aviso-cola-ir">Ver &rarr;</span>
+  </button>
 </header>
 
 <!-- ============================ INGRESO ============================ -->
@@ -67,7 +77,7 @@
 </section>
 
 <!-- ============================ PENDIENTES ============================ -->
-<section id="vista-pendientes" class="vista con-tabs" hidden>
+<section id="vista-pendientes" class="vista" hidden>
   <!-- Una sola fila de controles: los filtros llevan el conteo adentro. -->
   <div id="filtros" class="filtros">
     <button class="filtro activo" data-filtro="pendientes">
@@ -88,23 +98,23 @@
   <button id="btn-nueva-no-programada" class="btn-flotante" title="Registrar hallazgo en campo">+</button>
 </section>
 
-<!-- ============================ HISTORIAL ============================ -->
-<section id="vista-historial" class="vista con-tabs" hidden>
-  <div class="buscador">
-    <input type="search" id="buscar-historial" placeholder="Buscar visita realizada…">
-  </div>
-  <div id="resumen-historial" class="resumen"></div>
-  <div id="lista-historial" class="lista"></div>
-</section>
-
 <!-- ============================ POR ENVIAR ============================ -->
-<section id="vista-cola" class="vista con-tabs" hidden>
-  <div id="resumen-cola" class="resumen"></div>
-  <div id="lista-cola" class="lista"></div>
-  <div class="bloque-perfil">
-    <h3>Mi perfil</h3>
-    <p id="perfil-datos"></p>
-    <button id="btn-salir" class="btn-secundario">Cambiar de usuario / salir</button>
+<section id="vista-cola" class="vista pantalla-completa" hidden>
+  <div class="ficha-topbar">
+    <button id="btn-cerrar-cola" class="icon-btn">&larr;</button>
+    <div class="ficha-topbar-titulo">
+      <strong>Mi perfil y envíos</strong>
+      <span id="perfil-entidad"></span>
+    </div>
+  </div>
+  <div class="panel-cuerpo">
+    <div id="resumen-cola" class="resumen"></div>
+    <div id="lista-cola" class="lista"></div>
+    <div class="bloque-perfil">
+      <h3>Mis datos</h3>
+      <p id="perfil-datos"></p>
+      <button id="btn-salir" class="btn-secundario">Cambiar de usuario / salir</button>
+    </div>
   </div>
 </section>
 
@@ -137,24 +147,6 @@
   </div>
   <div id="detalle-cuerpo" class="detalle-cuerpo"></div>
 </section>
-
-<!-- ============================ TABS ============================ -->
-<nav id="tabs" hidden>
-  <button data-vista="pendientes" class="tab activo">
-    <span class="tab-icono">&#9873;</span>
-    <span>Pendientes</span>
-    <span class="tab-badge" id="badge-pendientes"></span>
-  </button>
-  <button data-vista="historial" class="tab">
-    <span class="tab-icono">&#10003;</span>
-    <span>Realizadas</span>
-  </button>
-  <button data-vista="cola" class="tab">
-    <span class="tab-icono">&#8593;</span>
-    <span>Por enviar</span>
-    <span class="tab-badge alerta" id="badge-cola"></span>
-  </button>
-</nav>
 
 <!-- Aviso de versión nueva: evita tener que cerrar y abrir la app dos veces. -->
 <div id="aviso-version" hidden>
