@@ -533,10 +533,19 @@ function solicitudesConEstado() {
     .sort((a, b) => {
       const ra = a._estado.clave === 'realizada' ? 1 : 0;
       const rb = b._estado.clave === 'realizada' ? 1 : 0;
-      if (ra !== rb) return ra - rb;
-      const pa = ORDEN_PRIORIDAD[(a.prioridad || '').toUpperCase()] ?? 4;
-      const pb = ORDEN_PRIORIDAD[(b.prioridad || '').toUpperCase()] ?? 4;
-      if (pa !== pb) return pa - pb;
+      if (ra !== rb) return ra - rb;   // lo que falta, primero
+
+      // Entre visitadas manda la fecha: lo más reciente arriba, que es
+      // lo que se quiere consultar. La prioridad ahí ya no ordena nada.
+      if (ra === 1) {
+        const fa = (a._estado.visita && a._estado.visita.fechaVisita) || '';
+        const fb = (b._estado.visita && b._estado.visita.fechaVisita) || '';
+        if (fa !== fb) return fb.localeCompare(fa);
+      } else {
+        const pa = ORDEN_PRIORIDAD[(a.prioridad || '').toUpperCase()] ?? 4;
+        const pb = ORDEN_PRIORIDAD[(b.prioridad || '').toUpperCase()] ?? 4;
+        if (pa !== pb) return pa - pb;
+      }
       return String(a.idSolicitud).localeCompare(String(b.idSolicitud), 'es', { numeric: true });
     });
 }

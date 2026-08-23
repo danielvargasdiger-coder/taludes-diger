@@ -33,6 +33,13 @@
    (varias vistas usan display:grid y sin esto nunca se ocultarían). */
 [hidden] { display: none !important; }
 
+html {
+  /* Reserva siempre el ancho de la barra de desplazamiento. Sin esto, al
+     abrir la ficha o el perfil la página deja de tener scroll, la barra
+     desaparece y TODO se corre 15 px hacia la derecha. */
+  scrollbar-gutter: stable;
+}
+
 html, body {
   margin: 0;
   padding: 0;
@@ -50,15 +57,16 @@ small { font-weight: 400; }
 /* ------------------------------------------------------------ BARRA SUPERIOR */
 #topbar {
   position: sticky; top: 0; z-index: 40;
-  background: var(--azul); color: #fff;
+  background: linear-gradient(135deg, var(--azul) 0%, var(--azul-oscuro) 100%);
+  color: #fff;
   padding: env(safe-area-inset-top) 0 0;
-  box-shadow: var(--sombra);
+  box-shadow: 0 2px 12px rgba(6, 58, 80, .28);
 }
 .topbar-main {
   display: flex; align-items: center; justify-content: space-between;
   padding: 10px 14px;
 }
-.topbar-title strong { display: block; font-size: 1.02rem; }
+.topbar-title strong { display: block; font-size: 1.06rem; letter-spacing: -.01em; }
 .topbar-title span { font-size: .76rem; opacity: .82; letter-spacing: .04em; }
 .topbar-acciones { display: flex; gap: 8px; flex: none; }
 
@@ -157,9 +165,12 @@ textarea { min-height: 96px; resize: vertical; }
 .btn-flotante {
   position: fixed; right: 16px; bottom: calc(env(safe-area-inset-bottom) + 18px); z-index: 45;
   width: 58px; height: 58px; border-radius: 50%; border: 0;
-  background: var(--azul); color: #fff; font-size: 2rem; line-height: 1;
-  box-shadow: 0 4px 14px rgba(11,79,108,.45); cursor: pointer;
+  background: linear-gradient(140deg, var(--azul) 0%, var(--azul-oscuro) 100%);
+  color: #fff; font-size: 2rem; line-height: 1;
+  box-shadow: 0 6px 18px rgba(11,79,108,.42); cursor: pointer;
+  transition: transform .12s;
 }
+.btn-flotante:active { transform: scale(.92); }
 
 .msg-error { color: var(--error); font-size: .84rem; margin: 10px 0 0; font-weight: 600; }
 .msg-error:empty { display: none; }
@@ -179,11 +190,16 @@ textarea { min-height: 96px; resize: vertical; }
 
 .tarjeta {
   min-width: 0; overflow: hidden;
-  background: #fff; border-radius: var(--radio); padding: 11px 13px;
-  box-shadow: var(--sombra); border-left: 5px solid var(--borde);
+  background: #fff; border-radius: 12px; padding: 12px 14px;
+  box-shadow: 0 1px 2px rgba(16,32,44,.07), 0 3px 10px rgba(16,32,44,.05);
+  border-left: 5px solid var(--borde);
   cursor: pointer; position: relative;
+  transition: transform .12s, box-shadow .12s;
 }
-.tarjeta:active { background: #fafcfd; }
+.tarjeta:active {
+  transform: scale(.985);
+  box-shadow: 0 1px 2px rgba(16,32,44,.1);
+}
 .tarjeta.p-alta, .tarjeta.p-ALTA { border-left-color: var(--alta); }
 .tarjeta.p-media, .tarjeta.p-MEDIA { border-left-color: var(--media); }
 .tarjeta.p-baja, .tarjeta.p-BAJA { border-left-color: var(--baja); }
@@ -225,14 +241,18 @@ textarea { min-height: 96px; resize: vertical; }
   flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px;
   padding: 10px 8px; border-radius: 999px;
   border: 1.5px solid var(--borde); background: var(--blanco);
-  color: var(--texto); font-size: .82rem; font-weight: 700;
+  color: var(--texto-suave); font-size: .82rem; font-weight: 700;
   cursor: pointer; font-family: inherit; white-space: nowrap;
+  transition: background .15s, color .15s, border-color .15s;
 }
 .filtro b {
   font-size: .78rem; padding: 1px 7px; border-radius: 999px;
   background: var(--fondo); color: var(--texto-suave);
 }
-.filtro.activo { background: var(--azul); border-color: var(--azul); color: #fff; }
+.filtro.activo {
+  background: var(--azul); border-color: var(--azul); color: #fff;
+  box-shadow: 0 2px 8px rgba(11, 79, 108, .3);
+}
 .filtro.activo b { background: rgba(255,255,255,.22); color: #fff; }
 
 /* ---------- Estado de cada solicitud ---------- */
@@ -427,6 +447,7 @@ body.con-aviso { padding-top: var(--alto-aviso, 52px); }
 
 .chip {
   display: inline-block; padding: 3px 9px; border-radius: 999px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.14);
   font-size: .68rem; font-weight: 800; letter-spacing: .05em; color: #fff;
   white-space: nowrap;
 }
