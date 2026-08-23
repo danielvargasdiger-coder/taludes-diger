@@ -172,6 +172,86 @@ function distanciaMetros(lat1, lon1, lat2, lon2) {
 }
 
 /**
+ * Toma la MEJOR lectura de GPS que consiga en unos segundos, en vez de la
+ * primera que llegue.
+ *
+ * Un celular responde de inmediato con una posición de red (±30-100 m) y va
+ * mejorando conforme engancha satélites. Con getCurrentPosition se guardaba
+ * esa primera lectura, que con un radio de aviso de 10 m no sirve de nada.
+ * Aquí se escucha con watchPosition, se conserva la lectura de menor error
+ * y se corta apenas se alcanza la precisión objetivo.
+ *
+ * Devuelve una función para detener antes, por si el geólogo tiene prisa.
+ */
+function afinarUbicacion(cb) {
+  if (!navigator.geolocation) {
+    cb.error({ code: 2, message: 'Este celular no tiene GPS disponible.' });
+    return function () {};
+  }
+
+  const objetivo = CONFIG.GPS_PRECISION_OBJETIVO || 8;
+  const limite = (CONFIG.GPS_SEGUNDOS_MAX || 20) * 1000;
+  const inicio = Date.now();
+  let mejor = null, lecturas = 0, cerrado = false;
+
+  const terminar = () => {
+    if (cerrado) return;
+    cerrado = true;
+    navigator.geolocation.clearWatch(vigia);
+    clearInterval(reloj);
+    APP.gpsActivo = null;
+    if (mejor) cb.listo(Object.assign({}, mejor, { lecturas: lecturas }));
+    else cb.error({ code: 3, message: 'Sin lecturas de GPS.' });
+  };
+
+  const vigia = navigator.geolocation.watchPosition(
+    (pos) => {
+      const p = pos.coords;
+      lecturas++;
+      if (!mejor || p.accuracy < mejor.precision) {
+        mejor = {
+          y: p.latitude.toFixed(7),
+          x: p.longitude.toFixed(7),
+          z: p.altitude != null ? String(Math.round(p.altitude)) : '',
+          precision: Math.round(p.accuracy)
+        };
+      }
+      cb.progreso(mejor, Math.round((Date.now() - inicio) / 1000));
+      if (mejor.precision <= objetivo) terminar();
+    },
+    (err) => {
+      if (cerrado) return;
+      // Un error después de tener lecturas no bota lo ya conseguido.
+      if (mejor) { terminar(); return; }
+      cerrado = true;
+      navigator.geolocation.clearWatch(vigia);
+      clearInterval(reloj);
+      APP.gpsActivo = null;
+      cb.error(err);
+    },
+    { enableHighAccuracy: true, timeout: limite, maximumAge: 0 }
+  );
+
+  // Late cada segundo aunque el GPS no reporte, para que se vea que trabaja.
+  const reloj = setInterval(() => {
+    const seg = Math.round((Date.now() - inicio) / 1000);
+    cb.progreso(mejor, seg);
+    if (Date.now() - inicio >= limite) terminar();
+  }, 1000);
+
+  APP.gpsActivo = terminar;
+  return terminar;
+}
+
+/** Qué tan buena es una lectura, para pintarla de color. */
+function calidadGps(metros) {
+  if (metros == null) return '';
+  if (metros <= (CONFIG.GPS_PRECISION_OBJETIVO || 8)) return 'ok';
+  if (metros <= 25) return 'regular';
+  return 'malo';
+}
+
+/**
  * Visitas ya realizadas cerca de un punto, sin importar qué entidad las hizo.
  * Es la defensa contra que dos secretarías visiten el mismo talud.
  */
@@ -1628,11 +1708,21 @@ function dibujarCampo(campo) {
         const cerca = visitasCercanas(v.y, v.x);
         if (!cerca.length) { cajaCercanas.innerHTML = ''; return; }
 
+        // El margen del GPS puede ser mayor que el radio del aviso. En ese
+        // caso el aviso no es concluyente y hay que decirlo: si no, el
+        // equipo confía en un silencio que no significa nada.
+        const margen = v.precision || 0;
+        const dudoso = margen > CONFIG.METROS_ALERTA_CERCANIA;
+
         cajaCercanas.innerHTML =
           '<div class="aviso-cercanas">' +
-            '<b>&#9432; ' + cerca.length + ' visita(s) realizada(s) cerca de aquí</b>' +
-            '<p>Son otras solicitudes. Compáralas: si tu talud es distinto, ' +
-              'continúa con tu ficha normalmente.</p>' +
+            '<b>&#9432; ' + cerca.length + ' visita(s) a menos de ' +
+              CONFIG.METROS_ALERTA_CERCANIA + ' m de este punto</b>' +
+            '<p>Están prácticamente encima. Aun así <b>pueden ser otro talud</b>: ' +
+              'ábrelas y compara. Si el tuyo es distinto, sigue con tu ficha normalmente — ' +
+              'nunca omitas una visita por este aviso.' +
+              (dudoso ? ' <b>Tu ubicación tiene ±' + margen + ' m de margen</b>, ' +
+                'así que esta comparación es apenas orientativa.' : '') + '</p>' +
             cerca.slice(0, 4).map((h) =>
               '<button type="button" class="cercana" data-id="' + esc(h.idVisita) + '">' +
                 '<span class="cercana-dist">' + h.distancia + ' m</span>' +
@@ -1664,32 +1754,37 @@ function dibujarCampo(campo) {
         });
       });
 
-      div.querySelector('.btn-gps').addEventListener('click', () => {
-        if (!navigator.geolocation) { estado.textContent = 'Este celular no tiene GPS disponible.'; return; }
-        estado.className = 'gps-estado';
-        estado.textContent = 'Buscando señal GPS…';
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            const p = pos.coords;
-            div.querySelector('.gps-y').value = p.latitude.toFixed(7);
-            div.querySelector('.gps-x').value = p.longitude.toFixed(7);
-            if (p.altitude != null) div.querySelector('.gps-z').value = Math.round(p.altitude);
-            setValor(campo.id, {
-              y: p.latitude.toFixed(7), x: p.longitude.toFixed(7),
-              z: p.altitude != null ? Math.round(p.altitude) : '',
-              precision: Math.round(p.accuracy), fuente: 'gps'
-            });
-            estado.className = 'gps-estado ok';
-            estado.textContent = 'Ubicación capturada · precisión ' + Math.round(p.accuracy) + ' m';
+      const btnGps = div.querySelector('.btn-gps');
+      btnGps.addEventListener('click', () => {
+        if (APP.gpsActivo) { APP.gpsActivo(); return; }   // segundo toque = detener
+        btnGps.textContent = '\u25A0 Detener y usar la mejor';
+
+        afinarUbicacion({
+          progreso: (mejor, seg) => {
+            estado.className = 'gps-estado';
+            estado.textContent = mejor
+              ? 'Afinando… mejor lectura ±' + mejor.precision + ' m (' + seg + ' s)'
+              : 'Buscando señal GPS… (' + seg + ' s)';
+          },
+          listo: (p) => {
+            btnGps.textContent = '\u25CE Capturar mi ubicación';
+            div.querySelector('.gps-y').value = p.y;
+            div.querySelector('.gps-x').value = p.x;
+            if (p.z !== '') div.querySelector('.gps-z').value = p.z;
+            setValor(campo.id, { y: p.y, x: p.x, z: p.z, precision: p.precision, fuente: 'gps' });
+            estado.className = 'gps-estado ' + calidadGps(p.precision);
+            estado.textContent = 'Ubicación capturada · precisión ±' + p.precision + ' m' +
+              (p.lecturas > 1 ? ' (mejor de ' + p.lecturas + ' lecturas)' : '');
             revisarCercanas();
           },
-          (err) => {
+          error: (err) => {
+            btnGps.textContent = '\u25CE Capturar mi ubicación';
+            estado.className = 'gps-estado malo';
             estado.textContent = err.code === 1
               ? 'Permiso de ubicación denegado. Actívalo en los ajustes del navegador.'
               : 'No se pudo obtener la ubicación. Escríbela a mano o intenta al aire libre.';
-          },
-          { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
-        );
+          }
+        });
       });
       revisarCercanas();   // la solicitud puede traer coordenadas de entrada
       break;

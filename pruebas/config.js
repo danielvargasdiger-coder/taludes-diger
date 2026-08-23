@@ -53,10 +53,24 @@ const CONFIG = {
 
   /**
    * Radio para avisar que ya hay una visita hecha en el sitio.
-   * 150 m cubre el error típico del GPS de un celular (5-20 m) más el
-   * tamaño de un talud, sin llenar de avisos en zona urbana densa.
+   * 10 m = prácticamente el mismo punto. Es un radio exigente a propósito:
+   * casas vecinas o taludes contiguos NO deben generar el aviso, porque el
+   * riesgo real es que el equipo se salte una visita creyendo que ya la
+   * hicieron. Para que 10 m signifique algo, la captura de GPS insiste
+   * hasta afinar (ver GPS_PRECISION_OBJETIVO); si el celular no baja de
+   * ese margen, la ficha lo advierte.
    */
-  METROS_ALERTA_CERCANIA: 150,
+  METROS_ALERTA_CERCANIA: 10,
+
+  /**
+   * Captura de GPS. El primer dato que entrega un celular suele venir de la
+   * red (±30-100 m) y va afinando en segundos a medida que engancha
+   * satélites. Antes se tomaba esa primera lectura y ya. Ahora se escucha
+   * durante GPS_SEGUNDOS_MAX y se guarda la MEJOR lectura; si llega a
+   * GPS_PRECISION_OBJETIVO metros, corta antes y no hace esperar.
+   */
+  GPS_PRECISION_OBJETIVO: 8,
+  GPS_SEGUNDOS_MAX: 20,
 
   /** Radio del filtro "cerca de mí" en la lista de solicitudes. */
   METROS_CERCA_DE_MI: 2000

@@ -784,6 +784,10 @@ body.con-aviso { padding-top: var(--alto-aviso, 52px); }
 .gps-coords input { padding: 9px; font-size: .9rem; }
 .gps-estado { font-size: .78rem; color: var(--texto-suave); margin-top: 8px; }
 .gps-estado.ok { color: var(--ok); font-weight: 600; }
+/* Una lectura de ±40 m con un radio de aviso de 10 m no sirve: el color
+   se lo dice al geólogo antes de que guarde la ficha. */
+.gps-estado.regular { color: #8a5a00; font-weight: 600; }
+.gps-estado.malo { color: var(--error); font-weight: 600; }
 
 /* Valoración (sección 6) */
 .valoracion-fila { border: 1.5px solid var(--borde); border-radius: var(--radio); padding: 11px 12px; margin-bottom: 10px; background: #fbfdfe; }
