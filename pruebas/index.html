@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="stylesheet" href="styles.css">
 <style>
-  #cinta-pruebas { position: fixed; top:0; left:0; right:0; z-index:200;
+  #cinta-pruebas { position:fixed; top:0; left:0; right:0; z-index:200;
     background:#6a1b9a; color:#fff; text-align:center;
     font:700 .72rem/1 system-ui,sans-serif; letter-spacing:.08em;
     padding: calc(env(safe-area-inset-top) + 5px) 8px 5px; }
@@ -68,27 +68,19 @@
 
 <!-- ============================ PENDIENTES ============================ -->
 <section id="vista-pendientes" class="vista con-tabs" hidden>
-  <!-- Tablero de estado: de un vistazo, qué falta y qué ya se hizo. -->
-  <div id="tablero" class="tablero">
-    <button class="tablero-dato" data-filtro="pendientes">
-      <strong id="dato-pendientes">0</strong><span>Pendientes</span>
+  <!-- Una sola fila de controles: los filtros llevan el conteo adentro. -->
+  <div id="filtros" class="filtros">
+    <button class="filtro activo" data-filtro="pendientes">
+      Por visitar <b id="dato-pendientes">0</b>
     </button>
-    <button class="tablero-dato" data-filtro="realizadas">
-      <strong id="dato-realizadas">0</strong><span>Realizadas</span>
+    <button class="filtro" data-filtro="realizadas">
+      Visitadas <b id="dato-realizadas">0</b>
     </button>
-    <button class="tablero-dato" data-filtro="todas">
-      <strong id="dato-total">0</strong><span>Total</span>
-    </button>
+    <button class="filtro" data-filtro="todas">Todas</button>
   </div>
 
   <div class="buscador">
-    <input type="search" id="buscar-pendientes" placeholder="Buscar por barrio, dirección o ID…">
-  </div>
-
-  <div id="filtros" class="filtros">
-    <button class="filtro activo" data-filtro="pendientes">Por visitar</button>
-    <button class="filtro" data-filtro="realizadas">Ya visitadas</button>
-    <button class="filtro" data-filtro="todas">Todas</button>
+    <input type="search" id="buscar-pendientes" placeholder="Buscar barrio, dirección o N.º…">
   </div>
 
   <div id="resumen-pendientes" class="resumen"></div>

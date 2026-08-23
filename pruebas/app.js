@@ -329,13 +329,10 @@ function irA(vista) {
 
 $$('#tabs .tab').forEach((b) => b.addEventListener('click', () => irA(b.dataset.vista)));
 
-// Tablero y filtros: los dos cambian la misma vista.
-$$('#tablero .tablero-dato, #filtros .filtro').forEach((b) => {
+$$('#filtros .filtro').forEach((b) => {
   b.addEventListener('click', () => {
     APP.filtro = b.dataset.filtro;
-    irA('pendientes');
     pintarPendientes();
-    $('#lista-pendientes').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   });
 });
 
@@ -537,8 +534,7 @@ function pintarPendientes() {
 
   $('#dato-pendientes').textContent = nPend;
   $('#dato-realizadas').textContent = nReal;
-  $('#dato-total').textContent = conEstado.length;
-  $$('#tablero .tablero-dato, #filtros .filtro').forEach((b) => {
+  $$('#filtros .filtro').forEach((b) => {
     b.classList.toggle('activo', b.dataset.filtro === APP.filtro);
   });
 
@@ -575,43 +571,45 @@ function pintarPendientes() {
     return;
   }
 
+  // Tarjeta pensada para escanear en la calle: número y barrio arriba,
+  // dirección como titular, el motivo en dos líneas, y el resto abajo en
+  // letra menuda. Solo se marca lo que aporta: la prioridad se muestra si
+  // existe, y el estado solo cuando no es "por visitar".
   cont.innerHTML = lista.map((s) => {
     const p = (s.prioridad || '').toUpperCase();
     const e = s._estado;
     const hecha = e.clave === 'realizada';
+    const lugar = [s.barrio, s.comuna].filter(Boolean).join(' · ');
+
+    const pie = hecha
+      ? '<div class="tarjeta-pie hecha">' +
+          '<span class="visto">&#10003;</span>' +
+          (e.visita
+            ? esc(fechaBonita(e.visita.fechaVisita)) + ' · ' + esc(e.visita.evaluadores || '')
+            : 'Registrada como atendida') +
+        '</div>'
+      : '<div class="tarjeta-pie">' +
+          (s.telefono
+            ? '<a href="tel:' + esc(s.telefono) + '" class="tel" onclick="event.stopPropagation()">' +
+              esc(s.telefono) + '</a>' : '') +
+          (s.responsable ? '<span>' + esc(s.responsable) + '</span>' : '') +
+          (!s.latitud ? '<span class="aviso-sin-gps">sin GPS</span>' : '') +
+        '</div>';
+
     return '<div class="tarjeta ' + claseP(p) + ' est-' + e.clave + '" data-id="' + esc(s.idSolicitud) + '">' +
-      '<div class="tarjeta-cabeza">' +
-        '<div class="tarjeta-cabeza-txt">' +
-          '<div class="tarjeta-id">SOLICITUD ' + esc(s.idSolicitud) + '</div>' +
-          '<div class="tarjeta-titulo">' + esc(s.direccion || 'Sin dirección') + '</div>' +
-          '<div class="tarjeta-sub">' + esc(s.barrio || '') +
-            (s.comuna ? ' · ' + esc(s.comuna) : '') + '</div>' +
-        '</div>' +
-        '<div class="tarjeta-chips">' +
-          '<span class="chip estado ' + e.clave + '">' + e.texto + '</span>' +
-          (p ? '<span class="chip ' + normalizar(p) + '">' + esc(p) + '</span>'
-             : '<span class="chip gris">SIN PRIORIDAD</span>') +
-        '</div>' +
+      '<div class="tarjeta-alto">' +
+        '<span class="tarjeta-id">' + esc(s.idSolicitud) +
+          (lugar ? ' · ' + esc(lugar) : '') + '</span>' +
+        (p ? '<span class="chip ' + normalizar(p) + '">' + esc(p) + '</span>' : '') +
+        // El chip de estado solo cuando pide atención. Que una visita esté
+        // hecha ya lo dicen el borde verde, el fondo y el visto del pie.
+        (e.clave === 'en-proceso' || e.clave === 'por-enviar'
+          ? '<span class="chip estado ' + e.clave + '">' + e.texto + '</span>' : '') +
       '</div>' +
-      (hecha
-        ? '<div class="tarjeta-hecha">' +
-            (e.visita
-              ? 'Visitada el ' + esc(fechaBonita(e.visita.fechaVisita)) +
-                '<br>por ' + esc(e.visita.evaluadores || '') +
-                (e.visita.entidad ? ' · ' + esc(e.visita.entidad) : '') +
-                '<span class="ver-ficha">Ver la ficha &rarr;</span>'
-              : 'Ya registrada como atendida.') +
-          '</div>'
-        : (s.edificacion ? '<div class="tarjeta-linea"><b>Edificación:</b> ' + esc(s.edificacion) + '</div>' : '') +
-          (s.contacto ? '<div class="tarjeta-linea"><b>Contacto:</b> ' + esc(s.contacto) + '</div>' : '') +
-          (s.telefono ? '<div class="tarjeta-linea"><b>Teléfono:</b> ' +
-            '<a href="tel:' + esc(s.telefono) + '" class="tel" onclick="event.stopPropagation()">' +
-            esc(s.telefono) + '</a></div>' : '') +
-          (s.recomendaciones ? '<div class="tarjeta-desc">' + esc(s.recomendaciones) + '</div>' : '') +
-          '<div class="tarjeta-pie">' +
-            (s.responsable ? '<span>Asignada a ' + esc(s.responsable) + '</span>' : '') +
-            (!s.latitud ? '<span class="aviso-sin-gps">Sin coordenadas — capturar GPS</span>' : '') +
-          '</div>') +
+      '<div class="tarjeta-titulo">' + esc(s.direccion || s.edificacion || 'Sin dirección') + '</div>' +
+      (s.recomendaciones && !hecha
+        ? '<div class="tarjeta-desc">' + esc(s.recomendaciones) + '</div>' : '') +
+      pie +
     '</div>';
   }).join('');
 

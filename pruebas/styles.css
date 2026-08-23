@@ -79,7 +79,7 @@ small { font-weight: 400; }
 .estado-linea.oculto { display: none; }
 
 /* ------------------------------------------------------------ VISTAS */
-.vista { padding: 12px 14px 18px; }
+.vista { padding: 10px 13px 18px; }
 .vista.con-tabs { padding-bottom: calc(var(--alto-tabs) + 22px); }
 .vista.pantalla-completa {
   position: fixed; inset: 0; z-index: 60;
@@ -149,15 +149,21 @@ textarea { min-height: 96px; resize: vertical; }
 .msg-error:empty { display: none; }
 
 /* ------------------------------------------------------------ LISTAS */
-.buscador { margin-bottom: 10px; }
+.buscador { margin-bottom: 8px; }
+.buscador input { margin-top: 0; padding: 10px 12px; }
 .resumen {
-  font-size: .8rem; color: var(--texto-suave);
-  margin-bottom: 10px; font-weight: 600;
+  font-size: .76rem; color: var(--texto-suave);
+  margin-bottom: 8px; font-weight: 600;
 }
-.lista { display: grid; gap: 10px; }
+.resumen:empty { display: none; }
+/* minmax(0,1fr) es obligatorio: sin eso los elementos de una cuadrícula
+   no bajan del ancho de su contenido, y una dirección larga o un texto
+   con nowrap estiraban la tarjeta más allá de la pantalla. */
+.lista { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
 
 .tarjeta {
-  background: #fff; border-radius: var(--radio); padding: 13px 14px;
+  min-width: 0; overflow: hidden;
+  background: #fff; border-radius: var(--radio); padding: 11px 13px;
   box-shadow: var(--sombra); border-left: 5px solid var(--borde);
   cursor: pointer; position: relative;
 }
@@ -167,62 +173,70 @@ textarea { min-height: 96px; resize: vertical; }
 .tarjeta.p-baja, .tarjeta.p-BAJA { border-left-color: var(--baja); }
 .tarjeta.p-critica, .tarjeta.p-CRÍTICA, .tarjeta.p-CRITICA { border-left-color: var(--critica); }
 
-.tarjeta-cabeza { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
-.tarjeta-id { font-size: .72rem; color: var(--texto-suave); font-weight: 700; letter-spacing: .04em; }
-.tarjeta-titulo { font-weight: 700; font-size: 1rem; margin: 2px 0 3px; }
-.tarjeta-sub { font-size: .86rem; color: var(--texto-suave); }
+.tarjeta-alto {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  margin-bottom: 3px; min-height: 18px; min-width: 0;
+}
+.tarjeta-id {
+  /* Tope al 58%: con identificadores largos (TAL-MT2ZUIVY) más el barrio,
+     el texto se comía la fila y dejaba las etiquetas pegadas al borde. */
+  flex: 1 1 auto; min-width: 0; max-width: 58%;
+  font-size: .74rem; color: var(--texto-suave);
+  font-weight: 700; letter-spacing: .02em; text-transform: uppercase;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.tarjeta-alto .chip { flex: none; }
+.tarjeta-titulo {
+  font-weight: 700; font-size: 1.02rem; line-height: 1.25;
+  overflow-wrap: anywhere;   /* direcciones largas sin espacios */
+}
+
+/* El motivo se recorta a dos líneas: da contexto sin robarse la pantalla. */
 .tarjeta-desc {
-  font-size: .84rem; margin-top: 7px; color: var(--texto);
-  border-top: 1px dashed var(--borde); padding-top: 7px;
+  font-size: .84rem; margin-top: 5px; color: var(--texto-suave); line-height: 1.35;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .tarjeta-pie {
   display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
-  margin-top: 9px; font-size: .8rem; color: var(--texto-suave);
+  margin-top: 7px; font-size: .78rem; color: var(--texto-suave);
 }
 
-/* ------------------------------------------------------------ TABLERO */
-.tablero {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
-  margin-bottom: 12px;
-}
-.tablero-dato {
-  display: flex; flex-direction: column; align-items: center; gap: 2px;
-  padding: 12px 6px; border-radius: var(--radio);
-  background: var(--blanco); border: 2px solid transparent;
-  box-shadow: var(--sombra); cursor: pointer; font-family: inherit;
-}
-.tablero-dato strong { font-size: 1.5rem; line-height: 1; color: var(--azul); }
-.tablero-dato span { font-size: .7rem; color: var(--texto-suave); font-weight: 700; letter-spacing: .03em; }
-.tablero-dato.activo { border-color: var(--azul); background: var(--azul-claro); }
-.tablero-dato:active { transform: scale(.97); }
-
-/* Filtros de estado */
-.filtros { display: flex; gap: 8px; margin-bottom: 12px; overflow-x: auto; padding-bottom: 2px; }
+/* Filtros de estado. Llevan el conteo adentro para no necesitar
+   una segunda fila de indicadores encima. */
+.filtros { display: flex; gap: 7px; margin-bottom: 10px; }
 .filtro {
-  flex: none; padding: 9px 15px; border-radius: 999px;
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px;
+  padding: 10px 8px; border-radius: 999px;
   border: 1.5px solid var(--borde); background: var(--blanco);
-  color: var(--texto); font-size: .84rem; font-weight: 700;
+  color: var(--texto); font-size: .82rem; font-weight: 700;
   cursor: pointer; font-family: inherit; white-space: nowrap;
 }
+.filtro b {
+  font-size: .78rem; padding: 1px 7px; border-radius: 999px;
+  background: var(--fondo); color: var(--texto-suave);
+}
 .filtro.activo { background: var(--azul); border-color: var(--azul); color: #fff; }
+.filtro.activo b { background: rgba(255,255,255,.22); color: #fff; }
 
 /* ---------- Estado de cada solicitud ---------- */
-.tarjeta-cabeza-txt { min-width: 0; flex: 1; }
-.tarjeta-chips { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; flex: none; }
-
 .chip.estado.pendiente   { background: var(--azul); }
 .chip.estado.en-proceso  { background: var(--media); }
 .chip.estado.por-enviar  { background: #6a1b9a; }
 .chip.estado.realizada   { background: var(--baja); }
 
 /* Una solicitud ya visitada se ve distinta: no invita a llenarla otra vez. */
-.tarjeta.est-realizada { background: #f4f9f4; border-left-color: var(--baja); }
-.tarjeta.est-realizada .tarjeta-titulo { color: var(--texto-suave); }
-.tarjeta-hecha {
-  margin-top: 9px; padding-top: 9px; border-top: 1px dashed var(--baja);
-  font-size: .8rem; color: var(--texto-suave); line-height: 1.5;
+.tarjeta.est-realizada { background: #f5f9f5; border-left-color: var(--baja); }
+.tarjeta.est-realizada .tarjeta-titulo { color: var(--texto-suave); font-weight: 600; }
+
+/* Visita hecha: se marca con un visto verde, no con una etiqueta que
+   se repite en todas las tarjetas y aprieta el encabezado. */
+.tarjeta-pie.hecha { color: var(--baja); font-weight: 600; }
+.visto {
+  display: inline-grid; place-items: center; flex: none;
+  width: 17px; height: 17px; border-radius: 50%;
+  background: var(--baja); color: #fff; font-size: .66rem; font-weight: 900;
 }
-.ver-ficha { display: block; margin-top: 6px; color: var(--baja); font-weight: 800; }
 
 .tarjeta.est-por-enviar { border-left-color: #6a1b9a; }
 .tarjeta.est-en-proceso { border-left-color: var(--media); }
