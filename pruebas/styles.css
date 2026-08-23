@@ -9,7 +9,7 @@
   --azul-oscuro: #063a50;
   --azul-claro: #e7f1f6;
   --texto: #16202a;
-  --texto-suave: #5a6b7a;
+  --texto-suave: #4a5b6a;   /* más oscuro: se lee bajo el sol */
   --borde: #cdd8e0;
   --fondo: #f4f7f9;
   --blanco: #ffffff;
@@ -170,15 +170,62 @@ textarea { min-height: 96px; resize: vertical; }
 .tarjeta-cabeza { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
 .tarjeta-id { font-size: .72rem; color: var(--texto-suave); font-weight: 700; letter-spacing: .04em; }
 .tarjeta-titulo { font-weight: 700; font-size: 1rem; margin: 2px 0 3px; }
-.tarjeta-sub { font-size: .84rem; color: var(--texto-suave); }
+.tarjeta-sub { font-size: .86rem; color: var(--texto-suave); }
 .tarjeta-desc {
   font-size: .84rem; margin-top: 7px; color: var(--texto);
   border-top: 1px dashed var(--borde); padding-top: 7px;
 }
 .tarjeta-pie {
   display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
-  margin-top: 9px; font-size: .74rem; color: var(--texto-suave);
+  margin-top: 9px; font-size: .8rem; color: var(--texto-suave);
 }
+
+/* ------------------------------------------------------------ TABLERO */
+.tablero {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+  margin-bottom: 12px;
+}
+.tablero-dato {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 12px 6px; border-radius: var(--radio);
+  background: var(--blanco); border: 2px solid transparent;
+  box-shadow: var(--sombra); cursor: pointer; font-family: inherit;
+}
+.tablero-dato strong { font-size: 1.5rem; line-height: 1; color: var(--azul); }
+.tablero-dato span { font-size: .7rem; color: var(--texto-suave); font-weight: 700; letter-spacing: .03em; }
+.tablero-dato.activo { border-color: var(--azul); background: var(--azul-claro); }
+.tablero-dato:active { transform: scale(.97); }
+
+/* Filtros de estado */
+.filtros { display: flex; gap: 8px; margin-bottom: 12px; overflow-x: auto; padding-bottom: 2px; }
+.filtro {
+  flex: none; padding: 9px 15px; border-radius: 999px;
+  border: 1.5px solid var(--borde); background: var(--blanco);
+  color: var(--texto); font-size: .84rem; font-weight: 700;
+  cursor: pointer; font-family: inherit; white-space: nowrap;
+}
+.filtro.activo { background: var(--azul); border-color: var(--azul); color: #fff; }
+
+/* ---------- Estado de cada solicitud ---------- */
+.tarjeta-cabeza-txt { min-width: 0; flex: 1; }
+.tarjeta-chips { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; flex: none; }
+
+.chip.estado.pendiente   { background: var(--azul); }
+.chip.estado.en-proceso  { background: var(--media); }
+.chip.estado.por-enviar  { background: #6a1b9a; }
+.chip.estado.realizada   { background: var(--baja); }
+
+/* Una solicitud ya visitada se ve distinta: no invita a llenarla otra vez. */
+.tarjeta.est-realizada { background: #f4f9f4; border-left-color: var(--baja); }
+.tarjeta.est-realizada .tarjeta-titulo { color: var(--texto-suave); }
+.tarjeta-hecha {
+  margin-top: 9px; padding-top: 9px; border-top: 1px dashed var(--baja);
+  font-size: .8rem; color: var(--texto-suave); line-height: 1.5;
+}
+.ver-ficha { display: block; margin-top: 6px; color: var(--baja); font-weight: 800; }
+
+.tarjeta.est-por-enviar { border-left-color: #6a1b9a; }
+.tarjeta.est-en-proceso { border-left-color: var(--media); }
 
 /* ---------- Ayudas para llenar la ficha ---------- */
 

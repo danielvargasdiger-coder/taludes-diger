@@ -11,14 +11,12 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="stylesheet" href="styles.css">
 <style>
-  #cinta-pruebas {
-    position: fixed; top: 0; left: 0; right: 0; z-index: 200;
-    background: #6a1b9a; color: #fff; text-align: center;
-    font: 700 .72rem/1 system-ui, sans-serif; letter-spacing: .08em;
-    padding: calc(env(safe-area-inset-top) + 5px) 8px 5px;
-  }
-  body.es-pruebas { padding-top: 26px; }
-  body.es-pruebas #topbar { top: 26px; }
+  #cinta-pruebas { position: fixed; top:0; left:0; right:0; z-index:200;
+    background:#6a1b9a; color:#fff; text-align:center;
+    font:700 .72rem/1 system-ui,sans-serif; letter-spacing:.08em;
+    padding: calc(env(safe-area-inset-top) + 5px) 8px 5px; }
+  body.es-pruebas { padding-top:26px; }
+  body.es-pruebas #topbar { top:26px; }
 </style>
 </head>
 <body class="es-pruebas">
@@ -46,7 +44,7 @@
     <p class="entidad">DIGER PEREIRA</p>
 
     <label>Código de acceso <span class="opcional">(opcional)</span>
-      <input type="password" id="in-codigo" inputmode="numeric" autocomplete="off" placeholder="Solo si la DIGER te lo dio">
+      <input type="password" id="in-codigo" inputmode="numeric" autocomplete="off" placeholder="DIGER en pruebas: 144787">
     </label>
     <p class="nota-entidad">Sin código entras igual: registras tus visitas y
       consultas las ya realizadas. El código solo sirve para ver la lista de
@@ -70,9 +68,29 @@
 
 <!-- ============================ PENDIENTES ============================ -->
 <section id="vista-pendientes" class="vista con-tabs" hidden>
+  <!-- Tablero de estado: de un vistazo, qué falta y qué ya se hizo. -->
+  <div id="tablero" class="tablero">
+    <button class="tablero-dato" data-filtro="pendientes">
+      <strong id="dato-pendientes">0</strong><span>Pendientes</span>
+    </button>
+    <button class="tablero-dato" data-filtro="realizadas">
+      <strong id="dato-realizadas">0</strong><span>Realizadas</span>
+    </button>
+    <button class="tablero-dato" data-filtro="todas">
+      <strong id="dato-total">0</strong><span>Total</span>
+    </button>
+  </div>
+
   <div class="buscador">
     <input type="search" id="buscar-pendientes" placeholder="Buscar por barrio, dirección o ID…">
   </div>
+
+  <div id="filtros" class="filtros">
+    <button class="filtro activo" data-filtro="pendientes">Por visitar</button>
+    <button class="filtro" data-filtro="realizadas">Ya visitadas</button>
+    <button class="filtro" data-filtro="todas">Todas</button>
+  </div>
+
   <div id="resumen-pendientes" class="resumen"></div>
   <div id="lista-pendientes" class="lista"></div>
   <button id="btn-nueva-no-programada" class="btn-flotante" title="Registrar hallazgo en campo">+</button>

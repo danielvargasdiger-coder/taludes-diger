@@ -11,7 +11,7 @@
  * service worker borra solo las cachés de SU prefijo.
  */
 const PREFIJO = 'pruebas';        // gemelo de pruebas: caché aparte de producción
-const VERSION = PREFIJO + '-v12';
+const VERSION = PREFIJO + '-v13';
 
 const ARCHIVOS = [
   './',

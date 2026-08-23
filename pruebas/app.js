@@ -13,6 +13,7 @@ const APP = {
   datos: {},           // ficha que se está llenando ahora
   solicitudActual: null,
   vistaActual: 'pendientes',
+  filtro: 'pendientes',   // pendientes | realizadas | todas
   sincronizando: false
 };
 
@@ -328,6 +329,16 @@ function irA(vista) {
 
 $$('#tabs .tab').forEach((b) => b.addEventListener('click', () => irA(b.dataset.vista)));
 
+// Tablero y filtros: los dos cambian la misma vista.
+$$('#tablero .tablero-dato, #filtros .filtro').forEach((b) => {
+  b.addEventListener('click', () => {
+    APP.filtro = b.dataset.filtro;
+    irA('pendientes');
+    pintarPendientes();
+    $('#lista-pendientes').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+});
+
 function pintarConexion() {
   const el = $('#estado-conexion');
   if (!navigator.onLine) {
@@ -489,21 +500,69 @@ function filtrar(lista, texto, campos) {
 $('#buscar-pendientes').addEventListener('input', pintarPendientes);
 $('#buscar-historial').addEventListener('input', pintarHistorial);
 
-function pintarPendientes() {
-  const todas = pendientes();
-  const lista = filtrar(todas, $('#buscar-pendientes').value,
-    ['idSolicitud', 'barrio', 'comuna', 'direccion', 'edificacion', 'responsable']);
-  const cont = $('#lista-pendientes');
+/**
+ * Estado de una solicitud desde el punto de vista del geólogo.
+ * Se calcula en el celular para que también funcione sin señal.
+ */
+function estadoSolicitud(s) {
+  const visita = APP.historial.find((h) => String(h.idSolicitud) === String(s.idSolicitud));
+  if (visita) return { clave: 'realizada', texto: 'REALIZADA', visita: visita };
+  if (APP.cola.some((c) => String(c.idSolicitud) === String(s.idSolicitud))) {
+    return { clave: 'por-enviar', texto: 'POR ENVIAR' };
+  }
+  if (String(s.estado).toUpperCase() === 'ATENDIDA') return { clave: 'realizada', texto: 'REALIZADA' };
+  if (s._tieneBorrador) return { clave: 'en-proceso', texto: 'EN PROCESO' };
+  return { clave: 'pendiente', texto: 'POR VISITAR' };
+}
 
-  $('#resumen-pendientes').textContent =
-    todas.length + ' pendientes de ' + APP.solicitudes.length + ' solicitudes' +
-    (lista.length !== todas.length ? ' · ' + lista.length + ' coinciden' : '');
+/** Solicitudes con su estado resuelto, lo que falta primero. */
+function solicitudesConEstado() {
+  return APP.solicitudes
+    .map((s) => Object.assign({}, s, { _estado: estadoSolicitud(s) }))
+    .sort((a, b) => {
+      const ra = a._estado.clave === 'realizada' ? 1 : 0;
+      const rb = b._estado.clave === 'realizada' ? 1 : 0;
+      if (ra !== rb) return ra - rb;
+      const pa = ORDEN_PRIORIDAD[(a.prioridad || '').toUpperCase()] ?? 4;
+      const pb = ORDEN_PRIORIDAD[(b.prioridad || '').toUpperCase()] ?? 4;
+      if (pa !== pb) return pa - pb;
+      return String(a.idSolicitud).localeCompare(String(b.idSolicitud), 'es', { numeric: true });
+    });
+}
+
+function pintarPendientes() {
+  const conEstado = solicitudesConEstado();
+  const nPend = conEstado.filter((s) => s._estado.clave !== 'realizada').length;
+  const nReal = conEstado.length - nPend;
+
+  $('#dato-pendientes').textContent = nPend;
+  $('#dato-realizadas').textContent = nReal;
+  $('#dato-total').textContent = conEstado.length;
+  $$('#tablero .tablero-dato, #filtros .filtro').forEach((b) => {
+    b.classList.toggle('activo', b.dataset.filtro === APP.filtro);
+  });
+
+  const porFiltro = conEstado.filter((s) => {
+    if (APP.filtro === 'realizadas') return s._estado.clave === 'realizada';
+    if (APP.filtro === 'pendientes') return s._estado.clave !== 'realizada';
+    return true;
+  });
+  const lista = filtrar(porFiltro, $('#buscar-pendientes').value,
+    ['idSolicitud', 'barrio', 'comuna', 'direccion', 'edificacion', 'responsable']);
+
+  const cont = $('#lista-pendientes');
+  $('#resumen-pendientes').textContent = lista.length
+    ? lista.length + (lista.length === 1 ? ' solicitud' : ' solicitudes')
+    : '';
 
   if (!lista.length) {
-    // Las entidades sin lista propia trabajan solo por hallazgo en campo.
     const sinLista = APP.perfil && APP.perfil.verSolicitudes === false;
     cont.innerHTML = APP.solicitudes.length
-      ? '<div class="vacio"><span class="vacio-icono">&#10003;</span>No hay solicitudes pendientes que coincidan.</div>'
+      ? '<div class="vacio"><span class="vacio-icono">&#10003;</span>' +
+        ($('#buscar-pendientes').value
+          ? 'Ninguna solicitud coincide con la búsqueda.'
+          : APP.filtro === 'realizadas' ? 'Todavía no hay solicitudes visitadas.'
+          : 'No queda ninguna solicitud por visitar.') + '</div>'
       : sinLista
         ? '<div class="vacio"><span class="vacio-icono">&#43;</span>' +
           '<b>' + esc(APP.perfil.entidad) + '</b><br>' +
@@ -511,34 +570,63 @@ function pintarPendientes() {
           'Toca el botón <b>+</b> para registrar una visita de talud.<br><br>' +
           '<small>En "Realizadas" puedes consultar las visitas hechas por todas ' +
           'las entidades, para no repetir trabajo.</small></div>'
-        : '<div class="vacio"><span class="vacio-icono">&#8681;</span>Toca el botón de sincronizar (arriba a la derecha) para descargar las solicitudes.</div>';
+        : '<div class="vacio"><span class="vacio-icono">&#8681;</span>' +
+          'Toca el botón de sincronizar (arriba a la derecha) para descargar las solicitudes.</div>';
     return;
   }
 
   cont.innerHTML = lista.map((s) => {
     const p = (s.prioridad || '').toUpperCase();
-    const borrador = s._tieneBorrador ? '<span class="chip borrador">BORRADOR</span>' : '';
-    return '<div class="tarjeta ' + claseP(p) + '" data-id="' + esc(s.idSolicitud) + '">' +
+    const e = s._estado;
+    const hecha = e.clave === 'realizada';
+    return '<div class="tarjeta ' + claseP(p) + ' est-' + e.clave + '" data-id="' + esc(s.idSolicitud) + '">' +
       '<div class="tarjeta-cabeza">' +
-        '<div><div class="tarjeta-id">SOLICITUD ' + esc(s.idSolicitud) + '</div>' +
-        '<div class="tarjeta-titulo">' + esc(s.direccion || 'Sin dirección') + '</div>' +
-        '<div class="tarjeta-sub">' + esc(s.barrio || '') + (s.comuna ? ' · ' + esc(s.comuna) : '') + '</div></div>' +
-        (p ? '<span class="chip ' + normalizar(p) + '">' + esc(p) + '</span>' : '<span class="chip gris">SIN PRIORIDAD</span>') +
+        '<div class="tarjeta-cabeza-txt">' +
+          '<div class="tarjeta-id">SOLICITUD ' + esc(s.idSolicitud) + '</div>' +
+          '<div class="tarjeta-titulo">' + esc(s.direccion || 'Sin dirección') + '</div>' +
+          '<div class="tarjeta-sub">' + esc(s.barrio || '') +
+            (s.comuna ? ' · ' + esc(s.comuna) : '') + '</div>' +
+        '</div>' +
+        '<div class="tarjeta-chips">' +
+          '<span class="chip estado ' + e.clave + '">' + e.texto + '</span>' +
+          (p ? '<span class="chip ' + normalizar(p) + '">' + esc(p) + '</span>'
+             : '<span class="chip gris">SIN PRIORIDAD</span>') +
+        '</div>' +
       '</div>' +
-      (s.edificacion ? '<div class="tarjeta-linea"><b>Edificación:</b> ' + esc(s.edificacion) + '</div>' : '') +
-      (s.contacto ? '<div class="tarjeta-linea"><b>Contacto:</b> ' + esc(s.contacto) + '</div>' : '') +
-      (s.telefono ? '<div class="tarjeta-linea"><b>Teléfono:</b> ' +
-        '<a href="tel:' + esc(s.telefono) + '" class="tel" onclick="event.stopPropagation()">' + esc(s.telefono) + '</a></div>' : '') +
-      (s.recomendaciones ? '<div class="tarjeta-desc">' + esc(s.recomendaciones) + '</div>' : '') +
-      '<div class="tarjeta-pie">' + borrador +
-        (s.responsable ? '<span>Asignada a ' + esc(s.responsable) + '</span>' : '') +
-        (!s.latitud ? '<span class="aviso-sin-gps">Sin coordenadas — capturar GPS</span>' : '') +
-      '</div>' +
+      (hecha
+        ? '<div class="tarjeta-hecha">' +
+            (e.visita
+              ? 'Visitada el ' + esc(fechaBonita(e.visita.fechaVisita)) +
+                '<br>por ' + esc(e.visita.evaluadores || '') +
+                (e.visita.entidad ? ' · ' + esc(e.visita.entidad) : '') +
+                '<span class="ver-ficha">Ver la ficha &rarr;</span>'
+              : 'Ya registrada como atendida.') +
+          '</div>'
+        : (s.edificacion ? '<div class="tarjeta-linea"><b>Edificación:</b> ' + esc(s.edificacion) + '</div>' : '') +
+          (s.contacto ? '<div class="tarjeta-linea"><b>Contacto:</b> ' + esc(s.contacto) + '</div>' : '') +
+          (s.telefono ? '<div class="tarjeta-linea"><b>Teléfono:</b> ' +
+            '<a href="tel:' + esc(s.telefono) + '" class="tel" onclick="event.stopPropagation()">' +
+            esc(s.telefono) + '</a></div>' : '') +
+          (s.recomendaciones ? '<div class="tarjeta-desc">' + esc(s.recomendaciones) + '</div>' : '') +
+          '<div class="tarjeta-pie">' +
+            (s.responsable ? '<span>Asignada a ' + esc(s.responsable) + '</span>' : '') +
+            (!s.latitud ? '<span class="aviso-sin-gps">Sin coordenadas — capturar GPS</span>' : '') +
+          '</div>') +
     '</div>';
   }).join('');
 
   cont.querySelectorAll('.tarjeta').forEach((el) => {
-    el.addEventListener('click', () => abrirFicha(APP.solicitudes.find((s) => String(s.idSolicitud) === el.dataset.id)));
+    el.addEventListener('click', () => {
+      const s = lista.find((x) => String(x.idSolicitud) === el.dataset.id);
+      if (!s) return;
+      // Una solicitud ya visitada se consulta, no se vuelve a llenar.
+      if (s._estado.clave === 'realizada') {
+        if (s._estado.visita) abrirDetalle(s._estado.visita.idVisita);
+        else toast('Esta solicitud ya está registrada como atendida.');
+        return;
+      }
+      abrirFicha(APP.solicitudes.find((x) => String(x.idSolicitud) === el.dataset.id));
+    });
   });
 }
 
