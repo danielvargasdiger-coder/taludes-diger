@@ -604,6 +604,8 @@ function pintarPendientes() {
     const hecha = e.clave === 'realizada';
     const lugar = [s.barrio, s.comuna].filter(Boolean).join(' · ');
 
+    // Una visita por hacer necesita todo lo que sirve para llegar y para
+    // llamar antes; una ya hecha solo necesita decir cuándo y quién.
     const pie = hecha
       ? '<div class="tarjeta-pie hecha">' +
           '<span class="visto">&#10003;</span>' +
@@ -611,12 +613,18 @@ function pintarPendientes() {
             ? esc(fechaBonita(e.visita.fechaVisita)) + ' · ' + esc(e.visita.evaluadores || '')
             : 'Registrada como atendida') +
         '</div>'
-      : '<div class="tarjeta-pie">' +
-          (s.telefono
-            ? '<a href="tel:' + esc(s.telefono) + '" class="tel" onclick="event.stopPropagation()">' +
-              esc(s.telefono) + '</a>' : '') +
-          (s.responsable ? '<span>' + esc(s.responsable) + '</span>' : '') +
-          (!s.latitud ? '<span class="aviso-sin-gps">sin GPS</span>' : '') +
+      : (s.contacto || s.telefono
+          ? '<div class="tarjeta-contacto">' +
+              (s.contacto ? '<span class="contacto-nombre">' + esc(s.contacto) + '</span>' : '') +
+              (s.telefono
+                ? '<a href="tel:' + esc(s.telefono) + '" class="tel btn-llamar" ' +
+                  'onclick="event.stopPropagation()">&#128222; ' + esc(s.telefono) + '</a>'
+                : '') +
+            '</div>'
+          : '') +
+        '<div class="tarjeta-pie">' +
+          (s.responsable ? '<span>Asignada a <b>' + esc(s.responsable) + '</b></span>' : '') +
+          (!s.latitud ? '<span class="aviso-sin-gps">Sin coordenadas — capturar GPS</span>' : '') +
         '</div>';
 
     return '<div class="tarjeta ' + claseP(p) + ' est-' + e.clave + '" data-id="' + esc(s.idSolicitud) + '">' +
@@ -630,6 +638,8 @@ function pintarPendientes() {
           ? '<span class="chip estado ' + e.clave + '">' + e.texto + '</span>' : '') +
       '</div>' +
       '<div class="tarjeta-titulo">' + esc(s.direccion || s.edificacion || 'Sin dirección') + '</div>' +
+      (s.edificacion && s.direccion && !hecha
+        ? '<div class="tarjeta-edif">' + esc(s.edificacion) + '</div>' : '') +
       (s.recomendaciones && !hecha
         ? '<div class="tarjeta-desc">' + esc(s.recomendaciones) + '</div>' : '') +
       pie +
