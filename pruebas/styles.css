@@ -14,6 +14,13 @@
   --fondo: #f4f7f9;
   --blanco: #ffffff;
 
+  /* Colores del escudo institucional. Se usan como acento fino -la franja
+     bajo el logo-, no como color de fondo: el rojo institucional está muy
+     cerca del rojo de "prioridad alta" y en grande se confundirían. */
+  --inst-rojo: #d93933;
+  --inst-verde: #3f8c54;
+  --inst-amarillo: #f4bc42;
+
   --baja: #2e7d32;
   --media: #ef8c00;
   --alta: #d84315;
@@ -61,13 +68,26 @@ small { font-weight: 400; }
   color: #fff;
   padding: env(safe-area-inset-top) 0 0;
   box-shadow: 0 2px 12px rgba(6, 58, 80, .28);
+  border-bottom: 3px solid transparent;
+  border-image: linear-gradient(90deg,
+    var(--inst-rojo) 0 33.3%, var(--inst-amarillo) 33.3% 66.6%, var(--inst-verde) 66.6%) 1;
 }
 .topbar-main {
   display: flex; align-items: center; justify-content: space-between;
   padding: 10px 14px;
 }
+.topbar-title { min-width: 0; }
 .topbar-title strong { display: block; font-size: 1.06rem; letter-spacing: -.01em; }
 .topbar-title span { font-size: .76rem; opacity: .82; letter-spacing: .04em; }
+
+/* El logo va sobre blanco: es un escudo a color y sobre el azul de la barra
+   se ensuciaría. La pastilla blanca lo aísla y hace de firma institucional,
+   así que ocupa el lugar del texto "DIGER Pereira". */
+.logo-barra {
+  display: block; height: 27px; width: auto; margin-top: 6px;
+  background: #fff; border-radius: 5px; padding: 3px 6px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .25);
+}
 .topbar-acciones { display: flex; gap: 8px; flex: none; }
 
 /* Aviso de fichas sin enviar. Sustituye a la pestaña "Por enviar":
@@ -122,12 +142,18 @@ small { font-weight: 400; }
   background: #fff; border-radius: 16px; padding: 26px 22px;
   width: 100%; max-width: 420px; box-shadow: 0 8px 30px rgba(0,0,0,.28);
 }
-.escudo { font-size: 2.6rem; text-align: center; line-height: 1; }
-.ingreso-caja h1 { text-align: center; font-size: 1.3rem; color: var(--azul); margin-top: 8px; }
+.ingreso-caja h1 { text-align: center; font-size: 1.3rem; color: var(--azul); margin-top: 0; }
 .ingreso-caja h1 small { font-size: 1.1rem; }
-.entidad {
-  text-align: center; margin: 0 0 20px; font-size: .78rem;
-  letter-spacing: .12em; color: var(--texto-suave); font-weight: 600;
+.logo-ingreso {
+  display: block; width: 100%; max-width: 230px; height: auto;
+  margin: 16px auto 12px;
+}
+/* Franja con los colores del escudo. Da identidad sin repintar la app
+   entera de rojo, que chocaría con la escala de prioridades. */
+.franja-inst {
+  height: 4px; border-radius: 3px; margin: 0 auto 20px; max-width: 230px;
+  background: linear-gradient(90deg,
+    var(--inst-rojo) 0 33.3%, var(--inst-amarillo) 33.3% 66.6%, var(--inst-verde) 66.6%);
 }
 .nota-ingreso { font-size: .76rem; color: var(--texto-suave); text-align: center; margin: 14px 0 0; }
 

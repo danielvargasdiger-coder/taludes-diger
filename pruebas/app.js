@@ -103,17 +103,17 @@ function ahoraLocal() {
 }
 
 /**
- * Convierte el enlace de Drive en uno que el celular abra de verdad.
+ * Abre el PDF en el visor de Drive, sin descargarlo.
  *
- * El enlace que guarda Drive (.../file/d/ID/view?usp=drivesdk) lo intercepta
- * la app de Google Drive en Android, que intenta abrirlo con la cuenta del
- * usuario y falla aunque el archivo sea público. El de descarga directa lo
- * atiende el visor de PDF del teléfono, sin cuenta de por medio.
+ * Se reconstruye el enlace desde el id en vez de usar el que guarda Drive
+ * (.../view?usp=drivesdk): ese parámetro es el que hace que Android se lo
+ * pase a la app de Drive, que intenta abrirlo con la cuenta del usuario y
+ * falla aunque el archivo sea público. Sin él, el visor abre en el navegador.
  */
 function enlacePdf(url) {
   const u = String(url || '');
   const m = u.match(/[-\w]{25,}/);
-  return m ? 'https://drive.google.com/uc?export=download&id=' + m[0] : u;
+  return m ? 'https://drive.google.com/file/d/' + m[0] + '/view' : u;
 }
 
 /**
@@ -487,12 +487,24 @@ function pintarMapa() {
     const b = ev.popup.getElement().querySelector('.popup-btn');
     if (!b) return;
     b.addEventListener('click', () => {
-      const s = APP.solicitudes.find((x) => String(x.idSolicitud) === b.dataset.id);
-      if (!s) return;
-      const est = estadoSolicitud(s);
+      const id = String(b.dataset.id);
       irA('pendientes');
-      if (est.clave === 'realizada' && est.visita) abrirDetalle(est.visita.idVisita);
-      else abrirFicha(s);
+
+      const s = APP.solicitudes.find((x) => String(x.idSolicitud) === id);
+      if (s) {
+        const est = estadoSolicitud(s);
+        if (est.clave === 'realizada' && est.visita) abrirDetalle(est.visita.idVisita);
+        else abrirFicha(s);
+        return;
+      }
+
+      // El punto puede ser una visita que no está en las solicitudes de esta
+      // entidad: un hallazgo de campo, o una visita hecha por otra entidad.
+      // Antes el botón no hacía nada en ese caso, que es TODOS los casos
+      // para quien entra sin código.
+      const v = APP.historial.find((x) => String(x.idSolicitud) === id);
+      if (v) abrirDetalle(v.idVisita);
+      else toast('No se encontró la ficha de ' + id, 'error');
     });
   });
 }
@@ -1040,6 +1052,13 @@ function pintarPendientes() {
   const nPend = conEstado.filter((s) => s._estado.clave !== 'realizada').length;
   const nReal = visitadas.length;
 
+  // Una entidad sin solicitudes asignadas no tiene nada "por visitar":
+  // esa pestaña solo la confundiría. Le queda la lista de visitadas -que es
+  // común a todas las entidades- y el botón + para registrar lo que encuentre.
+  const sinLista = !!(APP.perfil && APP.perfil.verSolicitudes === false);
+  $('#filtros .filtro[data-filtro="pendientes"]').hidden = sinLista;
+  if (sinLista && APP.filtro !== 'realizadas') APP.filtro = 'realizadas';
+
   $('#dato-pendientes').textContent = nPend;
   $('#dato-realizadas').textContent = nReal;
   $$('#filtros .filtro[data-filtro]').forEach((b) => {
@@ -1067,11 +1086,15 @@ function pintarPendientes() {
 
   const cont = $('#lista-pendientes');
   $('#resumen-pendientes').textContent = lista.length
-    ? lista.length + (lista.length === 1 ? ' solicitud' : ' solicitudes')
+    // En 'Visitadas' lo que se cuenta son visitas, no solicitudes: puede
+    // haber varias visitas de una misma solicitud, y hallazgos que no
+    // nacieron de ninguna.
+    ? lista.length + (APP.filtro === 'realizadas'
+        ? (lista.length === 1 ? ' visita' : ' visitas')
+        : (lista.length === 1 ? ' solicitud' : ' solicitudes'))
     : '';
 
   if (!lista.length) {
-    const sinLista = APP.perfil && APP.perfil.verSolicitudes === false;
     cont.innerHTML = APP.solicitudes.length
       ? '<div class="vacio"><span class="vacio-icono">&#10003;</span>' +
         ($('#buscar-pendientes').value
@@ -1081,10 +1104,12 @@ function pintarPendientes() {
       : sinLista
         ? '<div class="vacio"><span class="vacio-icono">&#43;</span>' +
           '<b>' + esc(APP.perfil.entidad) + '</b><br>' +
-          'Tu entidad no tiene solicitudes asignadas.<br>' +
+          ($('#buscar-pendientes').value
+            ? 'Ninguna visita coincide con la búsqueda.'
+            : 'Todavía no hay visitas registradas.') + '<br>' +
           'Toca el botón <b>+</b> para registrar una visita de talud.<br><br>' +
-          '<small>En <b>Visitadas</b> puedes consultar las ' + APP.historial.length +
-          ' visitas hechas por todas las entidades, para no repetir trabajo.</small></div>'
+          '<small>Aquí verás las visitas hechas por todas las entidades, ' +
+          'para no repetir trabajo.</small></div>'
         : '<div class="vacio"><span class="vacio-icono">&#8681;</span>' +
           'Toca el botón de sincronizar (arriba a la derecha) para descargar las solicitudes.</div>';
     return;
