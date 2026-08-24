@@ -12,14 +12,14 @@ const CONFIG = {
    * Solo hay que cambiarla si algún día creas una implementación NUEVA
    * (no hace falta al publicar una versión nueva de la existente).
    */
-  API_URL: 'https://script.google.com/macros/s/AKfycby5wFeE_iQCvbtqIcKE_50XCbdP3rMx6G6coRh9TgUVerO9KNL9ujugZA7JovD-KS4/exec',
+  API_URL: 'https://script.google.com/macros/s/AKfycbxSDpvnPd82Pk2vyYe-tgdDLKCjLj99XXPRoos632HDC-5fVVMJQHwxgfiKFtKZYXU/exec',
 
   /**
    * Separa este montaje de cualquier otro que viva en la misma direccion.
    * Vacio  = produccion (no tocar: cambiarlo borraria los borradores guardados).
    * 'pruebas' = gemelo de pruebas, con su propio almacenamiento en el celular.
    */
-  ESPACIO: 'pruebas',
+  ESPACIO: '',
 
   /** Nombre que aparece en la app y en el PDF. */
   ENTIDAD: 'DIGER Pereira',

@@ -10,7 +10,7 @@
  * distintos y que ninguno empiece igual que el otro: al activarse, cada
  * service worker borra solo las cachés de SU prefijo.
  */
-const PREFIJO = 'pruebas';        // gemelo de pruebas: caché aparte de producción
+const PREFIJO = 'taludes';        // en el gemelo de pruebas: 'pruebas'
 const VERSION = PREFIJO + '-v34';
 
 const ARCHIVOS = [
