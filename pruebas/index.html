@@ -17,6 +17,7 @@
     padding: calc(env(safe-area-inset-top) + 5px) 8px 5px; }
   body.es-pruebas { padding-top:26px; }
   body.es-pruebas #topbar { top:26px; }
+  body.es-pruebas .vista.pantalla-completa { top:26px; }
 </style>
 </head>
 <body class="es-pruebas">
@@ -132,6 +133,11 @@
       <span id="mapa-resumen"></span>
     </div>
     <button id="btn-mi-ubicacion" class="btn-mini">Mi ubicación</button>
+  </div>
+  <div class="mapa-buscador">
+    <input type="search" id="buscar-mapa" autocomplete="off"
+           placeholder="Buscar barrio, dirección o N.º…">
+    <span id="mapa-resultados" class="mapa-resultados"></span>
   </div>
   <div id="mapa-leyenda" class="mapa-leyenda">
     <span><i class="punto pendiente"></i>Por visitar</span>

@@ -32,6 +32,14 @@
   --radio: 10px;
   --sombra: 0 1px 3px rgba(16, 32, 44, .12);
 
+  /* Anchos máximos del contenido. Son dos a propósito:
+     --ancho-app     para listas y mapas, que aprovechan la pantalla ancha.
+     --ancho-lectura para la ficha y el detalle, que NO deben ensancharse:
+                     un renglón de 1200 px obliga a barrer la pantalla con
+                     los ojos y se pierde el hilo al llenar el formulario. */
+  --ancho-app: 1180px;
+  --ancho-lectura: 780px;
+
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -309,18 +317,45 @@ textarea { min-height: 96px; resize: vertical; }
 .filtro.activo b { background: rgba(255,255,255,.22); color: #fff; }
 
 /* ------------------------------------------------------------ MAPA */
-#mapa { position: absolute; inset: 0; top: 108px; }
-.mapa-leyenda {
-  position: absolute; top: 62px; left: 0; right: 0; z-index: 5;
-  display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;
-  padding: 9px 12px; background: var(--blanco);
+/* El mapa se arma en columna en lugar de posiciones absolutas con alturas
+   fijas. Antes la leyenda iba a 62 px y el mapa a 108 px, así que agregar
+   el buscador habría obligado a recalcular los dos números a mano. */
+#vista-mapa { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+#vista-mapa .ficha-topbar { position: static; flex: none; }
+#mapa { position: relative; inset: auto; flex: 1; min-height: 0; }
+
+/* Los mapas de OpenStreetMap son de colores fuertes (parques verdes, vías
+   naranjas, agua azul) y se comían los puntos. Bajarles el color deja el
+   mapa legible como referencia y hace que los puntos sean lo que salta. */
+.leaflet-tile-pane { filter: saturate(.32) brightness(1.07) contrast(.9); }
+
+/* Aro blanco y sombra: los puntos se despegan del fondo aunque caigan
+   sobre una vía clara o sobre una mancha verde. */
+.leaflet-overlay-pane path { filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .5)); }
+
+.mapa-buscador {
+  flex: none; display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; background: var(--blanco);
   border-bottom: 1px solid var(--borde);
-  font-size: .76rem; font-weight: 600; color: var(--texto-suave);
 }
-.mapa-leyenda span { display: inline-flex; align-items: center; gap: 5px; }
-.punto { width: 11px; height: 11px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--borde); }
-.punto.pendiente { background: var(--azul); }
-.punto.realizada { background: var(--baja); }
+.mapa-buscador input { margin-top: 0; }
+.mapa-resultados {
+  flex: none; font-size: .76rem; font-weight: 700; color: var(--texto-suave);
+  white-space: nowrap;
+}
+.mapa-resultados.vacio { color: var(--error); }
+
+.mapa-leyenda {
+  flex: none;
+  display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
+  padding: 8px 12px; background: var(--blanco);
+  border-bottom: 1px solid var(--borde);
+  font-size: .72rem; font-weight: 600; color: var(--texto-suave);
+}
+.mapa-leyenda span { display: inline-flex; align-items: center; gap: 4px; }
+.punto { width: 11px; height: 11px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.35); }
+.punto.pendiente { background: #0b4f6c; }
+.punto.realizada { background: #1b7a1f; }
 .punto.yo { background: #1565c0; }
 
 .mapa-sin-red { padding: 40px 24px; text-align: center; color: var(--texto-suave); }
@@ -499,6 +534,7 @@ textarea { min-height: 96px; resize: vertical; }
 .seccion-faltan {
   font-size: .64rem; font-weight: 800; letter-spacing: .03em;
   padding: 3px 8px; border-radius: 999px; white-space: nowrap;
+  flex: none;
 }
 .seccion-faltan.pendiente { background: #fff3cd; color: #8a5a00; }
 .seccion-faltan.lista     { background: #e3f4e4; color: var(--baja); }
@@ -714,8 +750,13 @@ body.con-aviso { padding-top: var(--alto-aviso, 52px); }
   border-radius: 6px; display: grid; place-items: center;
   font-size: .82rem; font-weight: 800; flex: none;
 }
-.seccion-titulo { flex: 1; font-size: .88rem; font-weight: 800; color: var(--azul); letter-spacing: .02em; }
-.seccion-flecha { color: var(--azul); font-size: .9rem; transition: transform .2s; }
+/* min-width:0 es lo que permite que el título se parta en dos renglones.
+   Sin eso un elemento de una fila flex no baja del ancho de su texto, y en
+   una pantalla de 320 px los títulos largos empujaban la flecha de desplegar
+   fuera de la tarjeta: quedaba recortada y no había forma de ver que la
+   sección se abre y se cierra. */
+.seccion-titulo { flex: 1 1 auto; min-width: 0; font-size: .88rem; font-weight: 800; color: var(--azul); letter-spacing: .02em; }
+.seccion-flecha { flex: none; color: var(--azul); font-size: .9rem; transition: transform .2s; }
 .seccion.cerrada .seccion-flecha { transform: rotate(-90deg); }
 .seccion.cerrada .seccion-cuerpo { display: none; }
 .seccion-cuerpo { padding: 14px; }
@@ -897,12 +938,74 @@ body.con-aviso { padding-top: var(--alto-aviso, 52px); }
   animation: girar .8s linear infinite;
 }
 
-/* ------------------------------------------------------------ PANTALLAS GRANDES */
+/* ============================================================ PANTALLAS GRANDES
+   La app se hizo para el celular en campo y ese sigue siendo el caso
+   principal: nada de lo de abajo cambia el comportamiento, solo el reparto
+   del espacio cuando sobra.
+
+   Tres ideas:
+   1. Las barras siguen llegando de borde a borde (el color no se corta),
+      pero su CONTENIDO se alinea con el de la lista. Antes el título se
+      quedaba pegado a la izquierda del monitor mientras la lista iba
+      centrada, y parecían dos páginas distintas.
+   2. Las tarjetas se reparten en tantas columnas como quepan (auto-fill).
+      Así no hay que inventar un número de columnas por cada tamaño: dos en
+      una tableta vertical, tres en una horizontal, cuatro en un monitor.
+   3. La ficha y el detalle se quedan en ancho de lectura aunque haya sitio.
+   ============================================================================ */
+
+/* Sangría que centra el contenido dentro de una barra a todo el ancho. */
+@media (min-width: 600px) {
+  .topbar-main,
+  .estado-linea,
+  .aviso-cola,
+  .ficha-topbar,
+  .mapa-buscador,
+  .mapa-leyenda {
+    /* El +16px es la sangría interna de .vista: sin sumarla, el título de
+       la barra queda 16 px a la izquierda de la primera tarjeta y se nota. */
+    padding-left: max(16px, calc((100% - var(--ancho-app)) / 2 + 16px));
+    padding-right: max(16px, calc((100% - var(--ancho-app)) / 2 + 16px));
+  }
+
+  .vista { max-width: var(--ancho-app); margin: 0 auto; padding: 14px 16px 24px; }
+
+  /* Las pantallas completas (ficha, mapa, filtros, perfil) siguen ocupando
+     todo: son ventanas, no columnas de texto. Lo que se limita es lo de
+     adentro, más abajo. */
+  .vista.pantalla-completa { max-width: none; margin: 0; }
+  .panel-cuerpo { max-width: var(--ancho-app); margin: 0 auto; padding: 16px 16px 30px; }
+
+  .lista { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+
+  /* Sin esto cada filtro se estira hasta ocupar media pantalla. */
+  .filtros { justify-content: flex-start; }
+  .filtro { flex: 0 1 auto; min-width: 155px; padding: 10px 18px; }
+  .filtro.filtro-mas { min-width: 0; }
+  .buscador input, .mapa-buscador input { max-width: 520px; }
+
+  /* El botón + se queda junto al contenido, no contra el borde del monitor. */
+  .btn-flotante { right: max(16px, calc((100% - var(--ancho-app)) / 2 + 16px)); }
+
+  /* La barra fija de abajo también alinea su contenido. */
+  .ficha-pie {
+    padding-left: max(16px, calc((100% - var(--ancho-app)) / 2 + 16px));
+    padding-right: max(16px, calc((100% - var(--ancho-app)) / 2 + 16px));
+  }
+}
+
 @media (min-width: 720px) {
-  .vista { max-width: 780px; margin: 0 auto; }
-  #form-ficha, .detalle-cuerpo { max-width: 780px; margin: 0 auto; }
+  #form-ficha, .detalle-cuerpo { max-width: var(--ancho-lectura); margin: 0 auto; }
   .rejilla { grid-template-columns: repeat(4, 1fr); }
   .campo.ancho-medio { grid-column: span 2; }
   .campo.ancho-cuarto { grid-column: span 1; }
   .ficha-pie > .btn-principal { max-width: 400px; margin: 0 auto; display: block; }
+  #barra-progreso { max-width: var(--ancho-lectura); margin: 0 auto; }
+}
+
+/* Tableta y computador: el logo y el título pueden respirar un poco más. */
+@media (min-width: 900px) {
+  .topbar-title strong { font-size: 1.18rem; }
+  .logo-barra { height: 26px; }
+  .tarjeta { padding: 14px 16px; }
 }

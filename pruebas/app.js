@@ -524,6 +524,25 @@ $('#btn-mapa').addEventListener('click', () => { irA('mapa'); abrirMapa(); });
 $('#btn-cerrar-mapa').addEventListener('click', () => irA('pendientes'));
 $('#btn-mi-ubicacion').addEventListener('click', () => centrarEnMi());
 
+let relojBusquedaMapa = null;
+$('#buscar-mapa').addEventListener('input', (ev) => {
+  clearTimeout(relojBusquedaMapa);
+  const texto = ev.target.value;
+  // Se espera un momento: repintar 114 puntos en cada tecla se siente lento.
+  relojBusquedaMapa = setTimeout(() => {
+    APP.busquedaMapa = texto;
+    pintarMapa();
+  }, 250);
+});
+$('#buscar-mapa').addEventListener('keydown', (ev) => {
+  if (ev.key !== 'Enter') return;
+  ev.preventDefault();
+  clearTimeout(relojBusquedaMapa);
+  APP.busquedaMapa = ev.target.value;
+  pintarMapa();
+  ev.target.blur();          // en el celular, esconde el teclado
+});
+
 /** Carga Leaflet la primera vez que se pide el mapa, no antes. */
 function cargarLeaflet() {
   if (window.L) return Promise.resolve(true);
@@ -548,6 +567,17 @@ const COLOR_ESTADO = {
 };
 const COLOR_PRIORIDAD = { 'CRÍTICA': '#a3000d', 'CRITICA': '#a3000d', 'ALTA': '#d84315', 'MEDIA': '#ef8c00', 'BAJA': '#2e7d32' };
 
+/**
+ * El mapa solo distingue dos cosas: lo que falta y lo que ya se hizo.
+ *
+ * La prioridad no se pinta aquí a propósito. De un vistazo desde lejos el
+ * equipo necesita una sola respuesta —¿este punto está pendiente o no?—, y
+ * cuatro colores de prioridad encima de eso volvían el mapa un semáforo.
+ * La prioridad se ve en la tarjeta y en los filtros, que es donde se usa.
+ */
+const AZUL_POR_VISITAR = '#0b4f6c';
+const VERDE_VISITADA = '#1b7a1f';
+
 async function abrirMapa() {
   const cargo = await cargarLeaflet();
   if (!cargo) {
@@ -566,9 +596,23 @@ async function abrirMapa() {
     }).addTo(APP.mapa);
     APP.capaPuntos = L.layerGroup().addTo(APP.mapa);
     APP.mapa.setView([4.8133, -75.6961], 12);   // Pereira
+
+    // Cuando el mapa por fin conoce su tamaño real, se reencuadra. Los
+    // temporizadores de abajo son una ayuda, no una garantía: en un celular
+    // el alto cambia cuando se esconde la barra del navegador o se cierra el
+    // teclado, y un encuadre calculado antes de eso abre demasiado cerca.
+    APP.mapa.on('resize', () => { if (!APP.mapaCentrado) pintarMapa(); });
   }
-  setTimeout(() => APP.mapa.invalidateSize(), 60);
-  pintarMapa();
+  // Primero se le dice al mapa cuál es su tamaño real y SOLO DESPUÉS se
+  // encuadran los puntos. Al revés, fitBounds calcula el zoom con el tamaño
+  // anterior —cero, porque la pantalla acaba de aparecer— y el mapa abre
+  // pegadísimo a un punto en vez de mostrar Pereira entera.
+  // Dos pasadas: la pantalla del mapa acaba de aparecer y su tamaño real
+  // puede tardar un instante en asentarse (barra del navegador del celular,
+  // teclado que se cierra). La segunda pasada corrige el encuadre si la
+  // primera se calculó con un tamaño que todavía no era el definitivo.
+  setTimeout(() => { APP.mapa.invalidateSize(); pintarMapa(); }, 60);
+  setTimeout(() => { APP.mapa.invalidateSize(); pintarMapa(); }, 400);
 }
 
 function pintarMapa() {
@@ -582,23 +626,37 @@ function pintarMapa() {
     latitud: v.latitud !== '' && v.latitud != null ? v.latitud : v._estado.visita.latitud,
     longitud: v.longitud !== '' && v.longitud != null ? v.longitud : v._estado.visita.longitud
   }));
-  const conCoords = pendientes.concat(hechas)
+  const todos = pendientes.concat(hechas)
     .filter((s) => s.latitud !== '' && s.latitud != null &&
                    s.longitud !== '' && s.longitud != null);
+
+  const busqueda = (APP.busquedaMapa || '').trim();
+  // Al borrar el buscador hay que volver a mostrar todo: si no, el mapa se
+  // queda encima del último resultado con los otros 113 puntos fuera de
+  // pantalla, y parece que se hubieran perdido.
+  const seLimpio = !!APP.busquedaMapaPrevia && !busqueda;
+  APP.busquedaMapaPrevia = busqueda;
+
+  const conCoords = busqueda
+    ? filtrar(todos, busqueda,
+        ['idSolicitud', 'barrio', 'comuna', 'direccion', 'edificacion', 'responsable'])
+    : todos;
+
   let nPend = 0, nReal = 0;
   const puntos = [];
+  let unico = null;
 
   conCoords.forEach((s) => {
     const hecha = s._estado.clave === 'realizada';
     hecha ? nReal++ : nPend++;
-    const color = hecha
-      ? COLOR_ESTADO.realizada
-      : (COLOR_PRIORIDAD[(s.prioridad || '').toUpperCase()] || COLOR_ESTADO[s._estado.clave] || COLOR_ESTADO.pendiente);
+    const color = hecha ? VERDE_VISITADA : AZUL_POR_VISITAR;
 
+    // Aro blanco grueso y relleno opaco. Antes las visitadas iban al 75 %
+    // de opacidad y sobre el verde de los parques se perdían del todo.
     const m = L.circleMarker([s.latitud, s.longitud], {
-      radius: hecha ? 6 : 8,
-      color: '#fff', weight: 2,
-      fillColor: color, fillOpacity: hecha ? .75 : 1
+      radius: hecha ? 7 : 9,
+      color: '#fff', weight: 2.5, opacity: 1,
+      fillColor: color, fillOpacity: 1
     });
 
     const v = s._estado.visita;
@@ -617,13 +675,32 @@ function pintarMapa() {
           (hecha ? 'Ver la ficha' : 'Hacer la visita') + '</button>' +
       '</div>');
     puntos.push([s.latitud, s.longitud]);
+    unico = m;
     APP.capaPuntos.addLayer(m);
   });
 
   $('#mapa-resumen').textContent = nPend + ' por visitar · ' + nReal + ' visitadas';
-  if (puntos.length && !APP.mapaCentrado) {
-    APP.mapa.fitBounds(puntos, { padding: [30, 30] });
-    APP.mapaCentrado = true;
+
+  const marcador = $('#mapa-resultados');
+  marcador.textContent = busqueda
+    ? (puntos.length ? puntos.length + (puntos.length === 1 ? ' punto' : ' puntos') : 'Nada coincide')
+    : '';
+  marcador.classList.toggle('vacio', !!busqueda && !puntos.length);
+
+  // Al buscar, el mapa va a donde está el resultado. Sin búsqueda, se
+  // encuadra una sola vez para no arrancarle el mapa de las manos al
+  // geólogo cada vez que entra la sincronización.
+  if (puntos.length && (busqueda || seLimpio || !APP.mapaCentrado)) {
+    if (busqueda && puntos.length === 1) {
+      APP.mapa.setView(puntos[0], 17);
+      if (unico) unico.openPopup();
+    } else {
+      APP.mapa.fitBounds(puntos, { padding: [40, 40] });
+    }
+    // Solo se da por encuadrado si el mapa YA tenía tamaño de verdad. Si se
+    // encuadró contra un alto de cero, ese encuadre no vale y hay que dejar
+    // que la siguiente pasada lo rehaga.
+    if (!busqueda && APP.mapa.getSize().y > 100) APP.mapaCentrado = true;
   }
 
   // El botón del globo se enlaza cuando el globo se abre.
