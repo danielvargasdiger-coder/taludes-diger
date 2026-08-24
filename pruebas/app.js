@@ -15,7 +15,7 @@ const APP = {
   vistaActual: 'pendientes',
   filtro: 'pendientes',   // pendientes | realizadas
   // Filtros que arma el evaluador. Vacío = no filtra por ese criterio.
-  filtros: { prioridad: [], responsable: [], comuna: [], barrio: [], entidad: [],
+  filtros: { prioridad: [], responsable: [], evaluadores: [], comuna: [], barrio: [], entidad: [],
              sinCoords: false, cercanas: false, abiertos: [] },
   miUbicacion: null,
   sincronizando: false
@@ -756,7 +756,7 @@ $('#btn-filtros').addEventListener('click', () => { dibujarPanelFiltros(); irA('
 $('#btn-cerrar-filtros').addEventListener('click', () => irA('pendientes'));
 $('#btn-aplicar-filtros').addEventListener('click', () => { irA('pendientes'); pintarPendientes(); });
 $('#btn-limpiar-filtros').addEventListener('click', () => {
-  APP.filtros = { prioridad: [], responsable: [], comuna: [], barrio: [], entidad: [], sinCoords: false, cercanas: false, abiertos: [] };
+  APP.filtros = { prioridad: [], responsable: [], evaluadores: [], comuna: [], barrio: [], entidad: [], sinCoords: false, cercanas: false, abiertos: [] };
   APP.miUbicacion = null;
   dibujarPanelFiltros();
   pintarPendientes();
@@ -766,9 +766,26 @@ $('#btn-limpiar-filtros').addEventListener('click', () => {
  * Campos por los que se puede filtrar. El evaluador elige cuáles usar;
  * no se le imponen. Agregar uno nuevo es agregar una línea aquí.
  */
+/**
+ * Un mismo talud lo pueden ir a ver dos geólogos, y el campo EVALUADORES
+ * guarda los nombres juntos en un solo texto. Se separan para que la visita
+ * aparezca al filtrar por cualquiera de los dos, no solo por el que quedó
+ * escrito de primero.
+ */
+function evaluadoresDe(s) {
+  return String(s.evaluadores || '')
+    .split(/\s*[,;/]\s*|\s+y\s+/i)
+    .map((x) => x.trim())
+    .filter(Boolean);
+}
+
 const CAMPOS_FILTRABLES = [
   { clave: 'prioridad',   titulo: 'Prioridad',              vacio: 'SIN PRIORIDAD' },
   { clave: 'responsable', titulo: 'Responsable',            vacio: '(sin asignar)' },
+  // Quién HIZO la visita. Solo tiene sentido sobre las visitadas: una
+  // solicitud pendiente todavía no tiene evaluador, tiene responsable.
+  { clave: 'evaluadores', titulo: 'Evaluador que hizo la visita',
+    vacio: '(sin evaluador)', multiple: true, soloEn: 'realizadas' },
   { clave: 'comuna',      titulo: 'Comuna o corregimiento', vacio: '(sin comuna)' },
   { clave: 'barrio',      titulo: 'Barrio o vereda',        vacio: '(sin barrio)' },
   { clave: 'entidad',     titulo: 'Entidad',                vacio: '(sin entidad)' }
@@ -781,14 +798,18 @@ const CAMPOS_FILTRABLES = [
  * ofrecer "ALTA 12" y que al marcarlo salgan cero porque esas doce ya se
  * visitaron es desconcertante. Las opciones que quedarían en cero se ocultan.
  */
-function opcionesDe(campo, vacio) {
+function opcionesDe(campo, vacio, multiple) {
   const cuenta = {};
   (APP.filtro === 'realizadas'
     ? visitadasConDatos()
     : solicitudesConEstado().filter((s) => s._estado.clave !== 'realizada'))
     .forEach((s) => {
-      const v = String(s[campo] || '').trim() || vacio;
-      cuenta[v] = (cuenta[v] || 0) + 1;
+      // Un campo "multiple" puede aportar varios valores por registro: una
+      // visita hecha entre dos geólogos cuenta para los dos.
+      const valores = multiple
+        ? (evaluadoresDe(s).length ? evaluadoresDe(s) : [vacio])
+        : [String(s[campo] || '').trim() || vacio];
+      valores.forEach((v) => { cuenta[v] = (cuenta[v] || 0) + 1; });
     });
   return Object.keys(cuenta)
     .filter((v) => v !== '' && cuenta[v] > 0)
@@ -804,7 +825,10 @@ function dibujarPanelFiltros() {
   const estaAbierto = (c) => f.abiertos.indexOf(c) !== -1 || (f[c] && f[c].length);
 
   const grupo = (campo) => {
-    const opciones = opcionesDe(campo.clave, campo.vacio);
+    // Hay filtros que solo aplican a un estado (el evaluador, a las
+    // visitadas). Ofrecerlo en el otro solo daría una lista vacía.
+    if (campo.soloEn && campo.soloEn !== APP.filtro) return '';
+    const opciones = opcionesDe(campo.clave, campo.vacio, campo.multiple);
     if (!opciones.length) return '';
     const marcados = (f[campo.clave] || []).length;
     const abierto = estaAbierto(campo.clave);
@@ -1151,8 +1175,8 @@ function pintarChipsActivos() {
   const cont = $('#chips-activos');
   if (!cont) return;
   const activos = [];
-  ['prioridad', 'responsable', 'comuna', 'entidad'].forEach((clave) => {
-    f[clave].forEach((v) => activos.push({ clave: clave, valor: v, texto: v }));
+  ['prioridad', 'responsable', 'evaluadores', 'comuna', 'barrio', 'entidad'].forEach((clave) => {
+    (f[clave] || []).forEach((v) => activos.push({ clave: clave, valor: v, texto: v }));
   });
   if (f.sinCoords) activos.push({ clave: 'sinCoords', texto: 'Sin coordenadas' });
   if (f.cercanas) activos.push({ clave: 'cercanas', texto: 'Cerca de mí' });
@@ -1168,7 +1192,7 @@ function pintarChipsActivos() {
   cont.querySelectorAll('.chip-activo').forEach((b) => {
     b.addEventListener('click', () => {
       if (b.classList.contains('limpiar')) {
-        APP.filtros = { prioridad: [], responsable: [], comuna: [], barrio: [], entidad: [], sinCoords: false, cercanas: false, abiertos: [] };
+        APP.filtros = { prioridad: [], responsable: [], evaluadores: [], comuna: [], barrio: [], entidad: [], sinCoords: false, cercanas: false, abiertos: [] };
         APP.miUbicacion = null;
       } else {
         const a = activos[Number(b.dataset.i)];
@@ -1262,6 +1286,7 @@ function visitadasConDatos() {
       barrio: s.barrio || v.barrio || '',
       direccion: s.direccion || v.direccion || '',
       prioridad: v.prioridad || s.prioridad || '',
+      evaluadores: v.evaluadores || '',
       _estado: { clave: 'realizada', texto: 'REALIZADA', visita: v }
     });
   });
@@ -1295,6 +1320,11 @@ function pintarPendientes() {
     if (f.prioridad.length &&
         f.prioridad.indexOf((s.prioridad || 'SIN PRIORIDAD').toUpperCase()) === -1) return false;
     if (f.responsable.length && f.responsable.indexOf(s.responsable || '(sin asignar)') === -1) return false;
+    if ((f.evaluadores || []).length) {
+      const nombres = evaluadoresDe(s);
+      const lista = nombres.length ? nombres : ['(sin evaluador)'];
+      if (!lista.some((n) => f.evaluadores.indexOf(n) !== -1)) return false;
+    }
     if (f.comuna.length && f.comuna.indexOf(s.comuna || '(sin comuna)') === -1) return false;
     if ((f.barrio || []).length && f.barrio.indexOf(s.barrio || '(sin barrio)') === -1) return false;
     if (f.entidad.length && f.entidad.indexOf(s.entidad || '(sin entidad)') === -1) return false;
