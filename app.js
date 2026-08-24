@@ -1154,6 +1154,12 @@ function pintarTodo() {
   pintarPendientes();
   pintarCola();
   pintarConexion();
+  // El mapa también. Sin esto, sincronizar con el mapa abierto refrescaba
+  // la lista pero dejaba los puntos viejos en pantalla: se corregía una
+  // coordenada en la hoja, se sincronizaba, y el punto seguía donde estaba.
+  // pintarMapa() se sale sola si el mapa todavía no se ha abierto, y no
+  // mueve el encuadre: solo vuelve a dibujar los puntos.
+  pintarMapa();
 
   // El aviso de envíos pendientes solo existe cuando hay algo que enviar.
   const aviso = $('#aviso-cola');
