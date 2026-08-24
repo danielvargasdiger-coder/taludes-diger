@@ -9,10 +9,17 @@
   --azul-oscuro: #063a50;
   --azul-claro: #e7f1f6;
   --texto: #16202a;
-  --texto-suave: #5a6b7a;
+  --texto-suave: #4a5b6a;   /* más oscuro: se lee bajo el sol */
   --borde: #cdd8e0;
   --fondo: #f4f7f9;
   --blanco: #ffffff;
+
+  /* Colores del escudo institucional. Se usan como acento fino -la franja
+     bajo el logo-, no como color de fondo: el rojo institucional está muy
+     cerca del rojo de "prioridad alta" y en grande se confundirían. */
+  --inst-rojo: #d93933;
+  --inst-verde: #3f8c54;
+  --inst-amarillo: #f4bc42;
 
   --baja: #2e7d32;
   --media: #ef8c00;
@@ -24,7 +31,15 @@
 
   --radio: 10px;
   --sombra: 0 1px 3px rgba(16, 32, 44, .12);
-  --alto-tabs: 62px;
+
+  /* Anchos máximos del contenido. Son dos a propósito:
+     --ancho-app     para listas y mapas, que aprovechan la pantalla ancha.
+     --ancho-lectura para la ficha y el detalle, que NO deben ensancharse:
+                     un renglón de 1200 px obliga a barrer la pantalla con
+                     los ojos y se pierde el hilo al llenar el formulario. */
+  --ancho-app: 1180px;
+  --ancho-lectura: 780px;
+
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -32,6 +47,13 @@
 /* El atributo hidden debe ganarle a cualquier display de más abajo
    (varias vistas usan display:grid y sin esto nunca se ocultarían). */
 [hidden] { display: none !important; }
+
+html {
+  /* Reserva siempre el ancho de la barra de desplazamiento. Sin esto, al
+     abrir la ficha o el perfil la página deja de tener scroll, la barra
+     desaparece y TODO se corre 15 px hacia la derecha. */
+  scrollbar-gutter: stable;
+}
 
 html, body {
   margin: 0;
@@ -50,16 +72,46 @@ small { font-weight: 400; }
 /* ------------------------------------------------------------ BARRA SUPERIOR */
 #topbar {
   position: sticky; top: 0; z-index: 40;
-  background: var(--azul); color: #fff;
+  background: linear-gradient(135deg, var(--azul) 0%, var(--azul-oscuro) 100%);
+  color: #fff;
   padding: env(safe-area-inset-top) 0 0;
-  box-shadow: var(--sombra);
+  box-shadow: 0 2px 12px rgba(6, 58, 80, .28);
+  border-bottom: 3px solid transparent;
+  border-image: linear-gradient(90deg,
+    var(--inst-rojo) 0 33.3%, var(--inst-amarillo) 33.3% 66.6%, var(--inst-verde) 66.6%) 1;
 }
 .topbar-main {
   display: flex; align-items: center; justify-content: space-between;
   padding: 10px 14px;
 }
-.topbar-title strong { display: block; font-size: 1.02rem; }
+.topbar-title { min-width: 0; }
+.topbar-title strong { display: block; font-size: 1.06rem; letter-spacing: -.01em; }
 .topbar-title span { font-size: .76rem; opacity: .82; letter-spacing: .04em; }
+
+/* El logo va sobre blanco: es un escudo a color y sobre el azul de la barra
+   se ensuciaría. La pastilla blanca lo aísla y hace de firma institucional,
+   así que ocupa el lugar del texto "DIGER Pereira". */
+.logo-barra {
+  display: block; height: 27px; width: auto; margin-top: 6px;
+  background: #fff; border-radius: 5px; padding: 3px 6px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .25);
+}
+.topbar-acciones { display: flex; gap: 8px; flex: none; }
+
+/* Aviso de fichas sin enviar. Sustituye a la pestaña "Por enviar":
+   solo aparece cuando hay algo pendiente, en vez de ocupar un tercio
+   de la barra inferior para un estado que casi siempre está vacío. */
+.aviso-cola {
+  display: flex; width: 100%; align-items: center; justify-content: space-between;
+  gap: 10px; padding: 9px 14px; border: 0; cursor: pointer;
+  background: #6a1b9a; color: #fff;
+  font-family: inherit; font-size: .84rem; font-weight: 700; text-align: left;
+}
+.aviso-cola-ir { flex: none; opacity: .9; font-weight: 800; }
+.aviso-cola:active { background: #55157a; }
+
+/* Panel de perfil y envíos */
+.panel-cuerpo { padding: 14px 13px 30px; }
 
 .icon-btn {
   background: rgba(255,255,255,.14); color: #fff; border: 0;
@@ -68,7 +120,11 @@ small { font-weight: 400; }
   display: grid; place-items: center;
 }
 .icon-btn:active { background: rgba(255,255,255,.3); }
-#sync-icon.girando { animation: girar 1s linear infinite; display: inline-block; }
+/* Icono de sincronizar. Era el caracter tipografico ↻, que cada celular
+   dibuja distinto y se veia mas delgado que los otros dos iconos de la
+   barra. Ahora es un SVG igual que el del mapa: mismo grosor y mismo tamano. */
+#sync-icon { display: block; transform-origin: center; }
+#sync-icon.girando { animation: girar .9s linear infinite; }
 @keyframes girar { to { transform: rotate(360deg); } }
 
 .estado-linea {
@@ -79,8 +135,8 @@ small { font-weight: 400; }
 .estado-linea.oculto { display: none; }
 
 /* ------------------------------------------------------------ VISTAS */
-.vista { padding: 12px 14px 18px; }
-.vista.con-tabs { padding-bottom: calc(var(--alto-tabs) + 22px); }
+.vista { padding: 10px 13px 18px; }
+
 .vista.pantalla-completa {
   position: fixed; inset: 0; z-index: 60;
   background: var(--fondo); overflow-y: auto;
@@ -98,12 +154,18 @@ small { font-weight: 400; }
   background: #fff; border-radius: 16px; padding: 26px 22px;
   width: 100%; max-width: 420px; box-shadow: 0 8px 30px rgba(0,0,0,.28);
 }
-.escudo { font-size: 2.6rem; text-align: center; line-height: 1; }
-.ingreso-caja h1 { text-align: center; font-size: 1.3rem; color: var(--azul); margin-top: 8px; }
+.ingreso-caja h1 { text-align: center; font-size: 1.3rem; color: var(--azul); margin-top: 0; }
 .ingreso-caja h1 small { font-size: 1.1rem; }
-.entidad {
-  text-align: center; margin: 0 0 20px; font-size: .78rem;
-  letter-spacing: .12em; color: var(--texto-suave); font-weight: 600;
+.logo-ingreso {
+  display: block; width: 100%; max-width: 230px; height: auto;
+  margin: 16px auto 12px;
+}
+/* Franja con los colores del escudo. Da identidad sin repintar la app
+   entera de rojo, que chocaría con la escala de prioridades. */
+.franja-inst {
+  height: 4px; border-radius: 3px; margin: 0 auto 20px; max-width: 230px;
+  background: linear-gradient(90deg,
+    var(--inst-rojo) 0 33.3%, var(--inst-amarillo) 33.3% 66.6%, var(--inst-verde) 66.6%);
 }
 .nota-ingreso { font-size: .76rem; color: var(--texto-suave); text-align: center; margin: 14px 0 0; }
 
@@ -139,46 +201,332 @@ textarea { min-height: 96px; resize: vertical; }
   cursor: pointer; font-family: inherit; white-space: nowrap;
 }
 .btn-flotante {
-  position: fixed; right: 16px; bottom: calc(var(--alto-tabs) + 16px); z-index: 45;
+  position: fixed; right: 16px; bottom: calc(env(safe-area-inset-bottom) + 18px); z-index: 45;
   width: 58px; height: 58px; border-radius: 50%; border: 0;
-  background: var(--azul); color: #fff; font-size: 2rem; line-height: 1;
-  box-shadow: 0 4px 14px rgba(11,79,108,.45); cursor: pointer;
+  background: linear-gradient(140deg, var(--azul) 0%, var(--azul-oscuro) 100%);
+  color: #fff; font-size: 2rem; line-height: 1;
+  box-shadow: 0 6px 18px rgba(11,79,108,.42); cursor: pointer;
+  transition: transform .12s;
 }
+.btn-flotante:active { transform: scale(.92); }
 
 .msg-error { color: var(--error); font-size: .84rem; margin: 10px 0 0; font-weight: 600; }
 .msg-error:empty { display: none; }
 
 /* ------------------------------------------------------------ LISTAS */
-.buscador { margin-bottom: 10px; }
+.buscador { margin-bottom: 8px; }
+.buscador input { margin-top: 0; padding: 10px 12px; }
 .resumen {
-  font-size: .8rem; color: var(--texto-suave);
-  margin-bottom: 10px; font-weight: 600;
+  font-size: .76rem; color: var(--texto-suave);
+  margin-bottom: 8px; font-weight: 600;
 }
-.lista { display: grid; gap: 10px; }
+.resumen:empty { display: none; }
+/* minmax(0,1fr) es obligatorio: sin eso los elementos de una cuadrícula
+   no bajan del ancho de su contenido, y una dirección larga o un texto
+   con nowrap estiraban la tarjeta más allá de la pantalla. */
+.lista { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
 
 .tarjeta {
-  background: #fff; border-radius: var(--radio); padding: 13px 14px;
-  box-shadow: var(--sombra); border-left: 5px solid var(--borde);
+  min-width: 0; overflow: hidden;
+  background: #fff; border-radius: 12px; padding: 12px 14px;
+  box-shadow: 0 1px 2px rgba(16,32,44,.07), 0 3px 10px rgba(16,32,44,.05);
+  border-left: 5px solid var(--borde);
   cursor: pointer; position: relative;
+  transition: transform .12s, box-shadow .12s;
 }
-.tarjeta:active { background: #fafcfd; }
+.tarjeta:active {
+  transform: scale(.985);
+  box-shadow: 0 1px 2px rgba(16,32,44,.1);
+}
 .tarjeta.p-alta, .tarjeta.p-ALTA { border-left-color: var(--alta); }
 .tarjeta.p-media, .tarjeta.p-MEDIA { border-left-color: var(--media); }
 .tarjeta.p-baja, .tarjeta.p-BAJA { border-left-color: var(--baja); }
 .tarjeta.p-critica, .tarjeta.p-CRÍTICA, .tarjeta.p-CRITICA { border-left-color: var(--critica); }
 
-.tarjeta-cabeza { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
-.tarjeta-id { font-size: .72rem; color: var(--texto-suave); font-weight: 700; letter-spacing: .04em; }
-.tarjeta-titulo { font-weight: 700; font-size: 1rem; margin: 2px 0 3px; }
-.tarjeta-sub { font-size: .84rem; color: var(--texto-suave); }
-.tarjeta-desc {
-  font-size: .84rem; margin-top: 7px; color: var(--texto);
-  border-top: 1px dashed var(--borde); padding-top: 7px;
+.tarjeta-alto {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  margin-bottom: 3px; min-height: 18px; min-width: 0;
 }
+.tarjeta-id {
+  /* Tope al 58%: con identificadores largos (TAL-MT2ZUIVY) más el barrio,
+     el texto se comía la fila y dejaba las etiquetas pegadas al borde. */
+  flex: 1 1 auto; min-width: 0; max-width: 58%;
+  font-size: .74rem; color: var(--texto-suave);
+  font-weight: 700; letter-spacing: .02em; text-transform: uppercase;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.tarjeta-alto .chip { flex: none; }
+.tarjeta-titulo {
+  font-weight: 700; font-size: 1.02rem; line-height: 1.25;
+  overflow-wrap: anywhere;   /* direcciones largas sin espacios */
+}
+
+/* Nombre de la edificación, cuando además hay dirección. */
+.tarjeta-edif {
+  font-size: .84rem; color: var(--texto-suave); font-weight: 600; margin-top: 1px;
+}
+
+/* El motivo va completo: es lo que le dice al geólogo a qué va. */
+.tarjeta-desc {
+  font-size: .85rem; margin-top: 7px; color: var(--texto); line-height: 1.4;
+}
+
+/* Contacto y teléfono en su propia franja, con el botón de llamar
+   destacado: es la acción que más se usa antes de salir a la visita. */
+.tarjeta-contacto {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; flex-wrap: wrap;
+  margin-top: 9px; padding-top: 9px; border-top: 1px dashed var(--borde);
+}
+.contacto-nombre {
+  font-size: .84rem; font-weight: 600; color: var(--texto);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.btn-llamar {
+  flex: none; padding: 6px 12px; border-radius: 999px;
+  background: var(--azul-claro); color: var(--azul);
+  font-size: .82rem; font-weight: 800; text-decoration: none;
+}
+.btn-llamar:active { background: var(--azul); color: #fff; }
 .tarjeta-pie {
   display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
-  margin-top: 9px; font-size: .74rem; color: var(--texto-suave);
+  margin-top: 7px; font-size: .78rem; color: var(--texto-suave);
 }
+.tarjeta-pie b { color: var(--texto); }
+.tarjeta-pie:empty { display: none; }
+
+/* Filtros de estado. Llevan el conteo adentro para no necesitar
+   una segunda fila de indicadores encima. */
+.filtros { display: flex; gap: 7px; margin-bottom: 10px; }
+.filtro {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px;
+  padding: 10px 8px; border-radius: 999px;
+  border: 1.5px solid var(--borde); background: var(--blanco);
+  color: var(--texto-suave); font-size: .82rem; font-weight: 700;
+  cursor: pointer; font-family: inherit; white-space: nowrap;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.filtro b {
+  font-size: .78rem; padding: 1px 7px; border-radius: 999px;
+  background: var(--fondo); color: var(--texto-suave);
+}
+.filtro.activo {
+  background: var(--azul); border-color: var(--azul); color: #fff;
+  box-shadow: 0 2px 8px rgba(11, 79, 108, .3);
+}
+.filtro.activo b { background: rgba(255,255,255,.22); color: #fff; }
+
+/* ------------------------------------------------------------ MAPA */
+/* El mapa se arma en columna en lugar de posiciones absolutas con alturas
+   fijas. Antes la leyenda iba a 62 px y el mapa a 108 px, así que agregar
+   el buscador habría obligado a recalcular los dos números a mano. */
+#vista-mapa { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+#vista-mapa .ficha-topbar { position: static; flex: none; }
+#mapa { position: relative; inset: auto; flex: 1; min-height: 0; }
+
+/* Los mapas de OpenStreetMap son de colores fuertes (parques verdes, vías
+   naranjas, agua azul) y se comían los puntos. Bajarles el color deja el
+   mapa legible como referencia y hace que los puntos sean lo que salta. */
+.leaflet-tile-pane { filter: saturate(.32) brightness(1.07) contrast(.9); }
+
+/* Aro blanco y sombra: los puntos se despegan del fondo aunque caigan
+   sobre una vía clara o sobre una mancha verde. */
+.leaflet-overlay-pane path { filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .5)); }
+
+.mapa-buscador {
+  flex: none; display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; background: var(--blanco);
+  border-bottom: 1px solid var(--borde);
+}
+.mapa-buscador input { margin-top: 0; }
+.mapa-resultados {
+  flex: none; font-size: .76rem; font-weight: 700; color: var(--texto-suave);
+  white-space: nowrap;
+}
+.mapa-resultados.vacio { color: var(--error); }
+
+.mapa-leyenda {
+  flex: none;
+  display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
+  padding: 8px 12px; background: var(--blanco);
+  border-bottom: 1px solid var(--borde);
+  font-size: .72rem; font-weight: 600; color: var(--texto-suave);
+}
+.mapa-leyenda span { display: inline-flex; align-items: center; gap: 4px; }
+.punto { width: 11px; height: 11px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.35); }
+.punto.pendiente { background: #0b4f6c; }
+.punto.realizada { background: #1b7a1f; }
+.punto.yo { background: #1565c0; }
+
+.mapa-sin-red { padding: 40px 24px; text-align: center; color: var(--texto-suave); }
+.mapa-sin-red b { display: block; font-size: 1.05rem; color: var(--texto); margin-bottom: 8px; }
+.mapa-sin-red p { font-size: .88rem; line-height: 1.5; }
+
+.popup { min-width: 190px; font-family: inherit; }
+.popup b { display: block; font-size: .95rem; margin-bottom: 2px; }
+.popup small { display: block; color: #5a6b7a; font-size: .78rem; margin-top: 3px; }
+.popup-estado {
+  display: inline-block; margin-top: 6px; padding: 2px 8px; border-radius: 999px;
+  color: #fff; font-size: .66rem; font-weight: 800;
+}
+.popup-btn {
+  display: block; width: 100%; margin-top: 9px; padding: 9px;
+  border: 0; border-radius: 8px; background: var(--azul); color: #fff;
+  font-family: inherit; font-size: .84rem; font-weight: 700; cursor: pointer;
+}
+
+/* Campos de filtro plegables */
+.grupo-cabeza {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 12px 2px; border: 0; border-bottom: 1px solid var(--borde);
+  background: none; cursor: pointer; font-family: inherit;
+  font-size: .92rem; font-weight: 700; color: var(--texto); text-align: left;
+}
+.grupo-cabeza > span:first-child { flex: 1; }
+.grupo-marcados {
+  background: var(--azul); color: #fff; border-radius: 999px;
+  font-size: .68rem; font-weight: 800; padding: 2px 8px;
+}
+.grupo-flecha { color: var(--texto-suave); }
+.grupo-filtro.abierto .opciones-filtro { margin-top: 11px; }
+.titulo-seccion-filtros {
+  font-size: .78rem; color: var(--texto-suave); text-transform: uppercase;
+  letter-spacing: .05em; margin: 22px 0 4px;
+}
+.op-filtro.guardado { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; }
+.borrar-guardado {
+  border: 0; background: none; color: var(--error); cursor: pointer;
+  font-size: 1.05rem; line-height: 1; padding: 0 2px; font-family: inherit;
+}
+#btn-guardar-filtro { margin-top: 8px; }
+
+/* Botón de más filtros, con el número de filtros puestos. */
+.filtro-mas { flex: 0 0 auto; padding: 10px 15px; position: relative; display: flex; align-items: center; }
+.filtros-activos {
+  position: absolute; top: -4px; right: -4px;
+  background: var(--alta); color: #fff; border-radius: 999px;
+  font-size: .62rem; font-weight: 800; padding: 1px 6px; min-width: 17px;
+}
+.filtros-activos:empty { display: none; }
+
+/* Filtros puestos, visibles y quitables de a uno. */
+.chips-activos { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.chips-activos:empty { display: none; }
+.chip-activo {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 11px; border-radius: 999px; border: 0;
+  background: var(--azul-claro); color: var(--azul);
+  font-size: .76rem; font-weight: 700; font-family: inherit; cursor: pointer;
+}
+.chip-activo span { font-size: .95rem; line-height: 1; opacity: .7; }
+.chip-activo.limpiar { background: #fdecea; color: var(--error); }
+
+/* Panel de filtros */
+.ambito-filtro {
+  margin: 0 0 18px; padding: 9px 12px; border-radius: 8px;
+  background: var(--azul-claro); color: var(--azul);
+  font-size: .82rem; font-weight: 600;
+}
+.grupo-filtro { margin-bottom: 20px; }
+.grupo-filtro h3 {
+  font-size: .78rem; color: var(--texto-suave); text-transform: uppercase;
+  letter-spacing: .05em; margin-bottom: 9px;
+}
+.opciones-filtro { display: flex; flex-wrap: wrap; gap: 7px; }
+.op-filtro {
+  padding: 9px 13px; border-radius: 999px;
+  border: 1.5px solid var(--borde); background: var(--blanco);
+  color: var(--texto); font-size: .84rem; font-weight: 600;
+  cursor: pointer; font-family: inherit;
+}
+.op-filtro b { color: var(--texto-suave); font-size: .76rem; }
+.op-filtro.activa { background: var(--azul); border-color: var(--azul); color: #fff; }
+.op-filtro.activa b { color: rgba(255,255,255,.75); }
+.op-filtro.grande { width: 100%; padding: 13px; font-size: .9rem; font-weight: 700; }
+.ayuda-filtro { font-size: .78rem; color: var(--texto-suave); margin: 7px 0 0; }
+
+/* Visitas hechas alrededor. Es INFORMACIÓN, no una alerta: en zona urbana
+   dos casas vecinas están a 10 m y son taludes distintos. Va en azul y no
+   en amarillo justamente para que nadie lo lea como "no vayas". */
+.aviso-vecinas {
+  display: block; width: 100%; text-align: left; cursor: pointer;
+  margin-top: 8px; padding: 9px 11px; border: 0; border-radius: 8px;
+  background: var(--azul-claro); border-left: 3px solid var(--azul);
+  font-family: inherit; font-size: .8rem; line-height: 1.4;
+}
+.aviso-vecinas b { color: var(--azul); }
+.aviso-vecinas > b { display: block; margin-bottom: 2px; }
+.aviso-vecinas span { display: block; color: var(--texto-suave); }
+.ver-vecinas { color: var(--azul) !important; font-weight: 800; margin-top: 4px; }
+
+.nota-vecinas {
+  margin: 0 0 12px; padding: 10px 12px; border-radius: 8px;
+  background: #eef5ee; border-left: 3px solid var(--baja);
+  font-size: .85rem; line-height: 1.45;
+}
+.vecina {
+  display: flex; align-items: center; gap: 11px; width: 100%;
+  margin-bottom: 8px; padding: 11px 12px; text-align: left;
+  background: var(--blanco); border: 1px solid var(--borde);
+  border-radius: 10px; cursor: pointer; font-family: inherit;
+}
+.vecina-dist {
+  flex: none; min-width: 56px; padding: 5px 7px; border-radius: 7px;
+  background: var(--azul); color: #fff;
+  font-size: .76rem; font-weight: 800; text-align: center;
+}
+.vecina-txt { display: flex; flex-direction: column; min-width: 0; }
+.vecina-txt b { font-size: .85rem; color: var(--texto); }
+.vecina-txt small { font-size: .76rem; color: var(--texto-suave); }
+
+.tarjeta-distancia {
+  margin-top: 6px; font-size: .78rem; font-weight: 700; color: var(--azul);
+}
+
+/* ---------- Estado de cada solicitud ---------- */
+.chip.estado.pendiente   { background: var(--azul); }
+.chip.estado.en-proceso  { background: var(--media); }
+.chip.estado.por-enviar  { background: #6a1b9a; }
+.chip.estado.realizada   { background: var(--baja); }
+
+/* Una solicitud ya visitada se ve distinta: no invita a llenarla otra vez. */
+.tarjeta.est-realizada { background: #f5f9f5; border-left-color: var(--baja); }
+.tarjeta.est-realizada .tarjeta-titulo { color: var(--texto-suave); font-weight: 600; }
+
+/* Visita hecha: el visto verde reemplaza a la etiqueta "REALIZADA", que
+   se repetía en todas las tarjetas y apretaba el encabezado. */
+.visto {
+  display: inline-grid; place-items: center; flex: none;
+  width: 17px; height: 17px; border-radius: 50%;
+  background: var(--baja); color: #fff; font-size: .66rem; font-weight: 900;
+}
+
+/* El concepto técnico: es la conclusión de la visita y lo que de verdad
+   se quiere leer al consultar una solicitud ya atendida. */
+.tarjeta-concepto {
+  margin-top: 7px; padding: 8px 10px; border-radius: 8px;
+  background: #eef5ee; border-left: 3px solid var(--baja);
+  font-size: .84rem; line-height: 1.4; color: var(--texto);
+}
+
+.tarjeta-visita {
+  margin-top: 9px; padding-top: 8px; border-top: 1px dashed var(--borde);
+  font-size: .8rem;
+}
+.visita-linea {
+  display: flex; align-items: center; gap: 7px;
+  color: var(--baja); font-weight: 700;
+}
+.visita-quien { color: var(--texto-suave); margin: 2px 0 0 24px; }
+.visita-acciones { display: flex; gap: 8px; margin: 7px 0 0 24px; }
+.enlace-ficha, .enlace-pdf {
+  padding: 5px 11px; border-radius: 999px; font-size: .78rem; font-weight: 800;
+  background: var(--azul-claro); color: var(--azul); text-decoration: none;
+}
+.enlace-pdf { background: #fdecea; color: var(--error); }
+
+.tarjeta.est-por-enviar { border-left-color: #6a1b9a; }
+.tarjeta.est-en-proceso { border-left-color: var(--media); }
 
 /* ---------- Ayudas para llenar la ficha ---------- */
 
@@ -186,6 +534,7 @@ textarea { min-height: 96px; resize: vertical; }
 .seccion-faltan {
   font-size: .64rem; font-weight: 800; letter-spacing: .03em;
   padding: 3px 8px; border-radius: 999px; white-space: nowrap;
+  flex: none;
 }
 .seccion-faltan.pendiente { background: #fff3cd; color: #8a5a00; }
 .seccion-faltan.lista     { background: #e3f4e4; color: var(--baja); }
@@ -225,6 +574,37 @@ textarea { min-height: 96px; resize: vertical; }
 .detalle input { background: var(--blanco); }
 .detalle.faltante { border-left-color: var(--error); background: #fdecea; }
 .detalle.faltante input { border-color: var(--error); }
+
+/* Aviso de que ya hay visitas hechas en el mismo punto: es lo que evita
+   que dos entidades visiten el mismo talud sin saberlo. */
+.aviso-cercanas {
+  margin-top: 10px; padding: 11px 12px; border-radius: 8px;
+  background: #fff8e1; border-left: 4px solid var(--media);
+}
+.aviso-cercanas > b { display: block; color: #8a5a00; font-size: .86rem; }
+.aviso-cercanas > p { margin: 3px 0 9px; font-size: .78rem; color: var(--texto-suave); }
+
+.cercana {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  margin-top: 6px; padding: 8px 10px; text-align: left;
+  background: var(--blanco); border: 1px solid var(--borde);
+  border-radius: 8px; cursor: pointer; font-family: inherit;
+}
+.cercana:active { background: var(--azul-claro); }
+.cercana-dist {
+  flex: none; min-width: 52px; padding: 4px 6px; border-radius: 6px;
+  background: var(--media); color: #fff;
+  font-size: .72rem; font-weight: 800; text-align: center;
+}
+.cercana-txt { display: flex; flex-direction: column; min-width: 0; }
+.cercana-txt b { font-size: .82rem; color: var(--texto); }
+.cercana-txt small { font-size: .72rem; color: var(--texto-suave); }
+
+.opcional { font-weight: 400; color: var(--texto-suave); font-size: .78rem; }
+
+.nota-entidad {
+  margin: 4px 0 0; font-size: .78rem; color: var(--texto-suave); text-align: center;
+}
 
 /* Aviso de versión nueva. Va arriba del todo para que no se pase por alto,
    pero no bloquea: el geólogo decide cuándo actualizar. */
@@ -319,6 +699,7 @@ body.con-aviso { padding-top: var(--alto-aviso, 52px); }
 
 .chip {
   display: inline-block; padding: 3px 9px; border-radius: 999px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.14);
   font-size: .68rem; font-weight: 800; letter-spacing: .05em; color: #fff;
   white-space: nowrap;
 }
@@ -335,29 +716,6 @@ body.con-aviso { padding-top: var(--alto-aviso, 52px); }
   background: #fff; border-radius: var(--radio); border: 1.5px dashed var(--borde);
 }
 .vacio-icono { font-size: 2.4rem; display: block; margin-bottom: 8px; opacity: .5; }
-
-/* ------------------------------------------------------------ TABS */
-#tabs {
-  position: fixed; bottom: 0; left: 0; right: 0; z-index: 50;
-  display: grid; grid-template-columns: repeat(3, 1fr);
-  background: #fff; border-top: 1px solid var(--borde);
-  padding-bottom: env(safe-area-inset-bottom);
-}
-.tab {
-  background: none; border: 0; padding: 8px 4px 9px; cursor: pointer;
-  font-size: .7rem; font-weight: 700; color: var(--texto-suave);
-  font-family: inherit; display: grid; gap: 1px; justify-items: center;
-  position: relative; min-height: var(--alto-tabs);
-}
-.tab .tab-icono { font-size: 1.3rem; line-height: 1.1; }
-.tab.activo { color: var(--azul); }
-.tab-badge {
-  position: absolute; top: 4px; right: 50%; transform: translateX(26px);
-  background: var(--azul); color: #fff; border-radius: 999px;
-  font-size: .64rem; padding: 1px 6px; min-width: 18px;
-}
-.tab-badge:empty { display: none; }
-.tab-badge.alerta { background: var(--alta); }
 
 /* ------------------------------------------------------------ FICHA */
 .ficha-topbar {
@@ -392,8 +750,13 @@ body.con-aviso { padding-top: var(--alto-aviso, 52px); }
   border-radius: 6px; display: grid; place-items: center;
   font-size: .82rem; font-weight: 800; flex: none;
 }
-.seccion-titulo { flex: 1; font-size: .88rem; font-weight: 800; color: var(--azul); letter-spacing: .02em; }
-.seccion-flecha { color: var(--azul); font-size: .9rem; transition: transform .2s; }
+/* min-width:0 es lo que permite que el título se parta en dos renglones.
+   Sin eso un elemento de una fila flex no baja del ancho de su texto, y en
+   una pantalla de 320 px los títulos largos empujaban la flecha de desplegar
+   fuera de la tarjeta: quedaba recortada y no había forma de ver que la
+   sección se abre y se cierra. */
+.seccion-titulo { flex: 1 1 auto; min-width: 0; font-size: .88rem; font-weight: 800; color: var(--azul); letter-spacing: .02em; }
+.seccion-flecha { flex: none; color: var(--azul); font-size: .9rem; transition: transform .2s; }
 .seccion.cerrada .seccion-flecha { transform: rotate(-90deg); }
 .seccion.cerrada .seccion-cuerpo { display: none; }
 .seccion-cuerpo { padding: 14px; }
@@ -412,6 +775,16 @@ body.con-aviso { padding-top: var(--alto-aviso, 52px); }
 .campo { margin-bottom: 15px; }
 .campo-etiqueta { font-size: .84rem; font-weight: 700; display: block; margin-bottom: 6px; }
 .campo-etiqueta .req { color: var(--error); }
+/* Valor que no se puede cambiar: se ve como dato, no como campo. */
+.valor-fijo {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin-top: 5px; padding: 12px;
+  border: 1.5px dashed var(--borde); border-radius: var(--radio);
+  background: var(--fondo); color: var(--texto);
+  font-size: 16px; font-weight: 700;
+}
+.candado { flex: none; font-size: .9rem; opacity: .55; }
+
 .campo-ayuda { font-size: .76rem; color: var(--texto-suave); margin: 0 0 7px; }
 .campo.faltante .campo-etiqueta { color: var(--error); }
 .campo.faltante input, .campo.faltante textarea { border-color: var(--error); }
@@ -456,6 +829,10 @@ body.con-aviso { padding-top: var(--alto-aviso, 52px); }
 .gps-coords input { padding: 9px; font-size: .9rem; }
 .gps-estado { font-size: .78rem; color: var(--texto-suave); margin-top: 8px; }
 .gps-estado.ok { color: var(--ok); font-weight: 600; }
+/* Una lectura de ±40 m con un radio de aviso de 10 m no sirve: el color
+   se lo dice al geólogo antes de que guarde la ficha. */
+.gps-estado.regular { color: #8a5a00; font-weight: 600; }
+.gps-estado.malo { color: var(--error); font-weight: 600; }
 
 /* Valoración (sección 6) */
 .valoracion-fila { border: 1.5px solid var(--borde); border-radius: var(--radio); padding: 11px 12px; margin-bottom: 10px; background: #fbfdfe; }
@@ -539,7 +916,7 @@ body.con-aviso { padding-top: var(--alto-aviso, 52px); }
 
 /* ------------------------------------------------------------ TOAST / CARGANDO */
 #toast {
-  position: fixed; left: 50%; bottom: calc(var(--alto-tabs) + 22px);
+  position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 24px);
   transform: translateX(-50%) translateY(20px);
   background: #16202a; color: #fff; padding: 11px 18px; border-radius: 999px;
   font-size: .86rem; font-weight: 600; z-index: 200; max-width: 90vw; text-align: center;
@@ -561,12 +938,74 @@ body.con-aviso { padding-top: var(--alto-aviso, 52px); }
   animation: girar .8s linear infinite;
 }
 
-/* ------------------------------------------------------------ PANTALLAS GRANDES */
+/* ============================================================ PANTALLAS GRANDES
+   La app se hizo para el celular en campo y ese sigue siendo el caso
+   principal: nada de lo de abajo cambia el comportamiento, solo el reparto
+   del espacio cuando sobra.
+
+   Tres ideas:
+   1. Las barras siguen llegando de borde a borde (el color no se corta),
+      pero su CONTENIDO se alinea con el de la lista. Antes el título se
+      quedaba pegado a la izquierda del monitor mientras la lista iba
+      centrada, y parecían dos páginas distintas.
+   2. Las tarjetas se reparten en tantas columnas como quepan (auto-fill).
+      Así no hay que inventar un número de columnas por cada tamaño: dos en
+      una tableta vertical, tres en una horizontal, cuatro en un monitor.
+   3. La ficha y el detalle se quedan en ancho de lectura aunque haya sitio.
+   ============================================================================ */
+
+/* Sangría que centra el contenido dentro de una barra a todo el ancho. */
+@media (min-width: 600px) {
+  .topbar-main,
+  .estado-linea,
+  .aviso-cola,
+  .ficha-topbar,
+  .mapa-buscador,
+  .mapa-leyenda {
+    /* El +16px es la sangría interna de .vista: sin sumarla, el título de
+       la barra queda 16 px a la izquierda de la primera tarjeta y se nota. */
+    padding-left: max(16px, calc((100% - var(--ancho-app)) / 2 + 16px));
+    padding-right: max(16px, calc((100% - var(--ancho-app)) / 2 + 16px));
+  }
+
+  .vista { max-width: var(--ancho-app); margin: 0 auto; padding: 14px 16px 24px; }
+
+  /* Las pantallas completas (ficha, mapa, filtros, perfil) siguen ocupando
+     todo: son ventanas, no columnas de texto. Lo que se limita es lo de
+     adentro, más abajo. */
+  .vista.pantalla-completa { max-width: none; margin: 0; }
+  .panel-cuerpo { max-width: var(--ancho-app); margin: 0 auto; padding: 16px 16px 30px; }
+
+  .lista { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+
+  /* Sin esto cada filtro se estira hasta ocupar media pantalla. */
+  .filtros { justify-content: flex-start; }
+  .filtro { flex: 0 1 auto; min-width: 155px; padding: 10px 18px; }
+  .filtro.filtro-mas { min-width: 0; }
+  .buscador input, .mapa-buscador input { max-width: 520px; }
+
+  /* El botón + se queda junto al contenido, no contra el borde del monitor. */
+  .btn-flotante { right: max(16px, calc((100% - var(--ancho-app)) / 2 + 16px)); }
+
+  /* La barra fija de abajo también alinea su contenido. */
+  .ficha-pie {
+    padding-left: max(16px, calc((100% - var(--ancho-app)) / 2 + 16px));
+    padding-right: max(16px, calc((100% - var(--ancho-app)) / 2 + 16px));
+  }
+}
+
 @media (min-width: 720px) {
-  .vista { max-width: 780px; margin: 0 auto; }
-  #form-ficha, .detalle-cuerpo { max-width: 780px; margin: 0 auto; }
+  #form-ficha, .detalle-cuerpo { max-width: var(--ancho-lectura); margin: 0 auto; }
   .rejilla { grid-template-columns: repeat(4, 1fr); }
   .campo.ancho-medio { grid-column: span 2; }
   .campo.ancho-cuarto { grid-column: span 1; }
   .ficha-pie > .btn-principal { max-width: 400px; margin: 0 auto; display: block; }
+  #barra-progreso { max-width: var(--ancho-lectura); margin: 0 auto; }
+}
+
+/* Tableta y computador: el logo y el título pueden respirar un poco más. */
+@media (min-width: 900px) {
+  .topbar-title strong { font-size: 1.18rem; }
+  .logo-barra { height: 26px; }
+  .tarjeta { padding: 14px 16px; }
 }

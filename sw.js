@@ -5,7 +5,13 @@
  * Si publicas una versión nueva de la app, sube el número de VERSION
  * para que los celulares descarten la copia vieja.
  */
-const VERSION = 'taludes-v9';
+/**
+ * PREFIJO separa las cachés de produccion y de pruebas. Tienen que ser
+ * distintos y que ninguno empiece igual que el otro: al activarse, cada
+ * service worker borra solo las cachés de SU prefijo.
+ */
+const PREFIJO = 'pruebas';        // gemelo de pruebas: caché aparte de producción
+const VERSION = PREFIJO + '-v34';
 
 const ARCHIVOS = [
   './',
@@ -15,6 +21,7 @@ const ARCHIVOS = [
   './ficha-schema.js',
   './app.js',
   './manifest.json',
+  './logo-app.png',
   './icon-192.png',
   './icon-512.png'
 ];
@@ -23,7 +30,17 @@ self.addEventListener('install', (ev) => {
   // Se descarga la versión nueva pero NO se activa todavía: se queda
   // esperando a que el geólogo acepte el aviso. Así nunca se le cambia
   // la app debajo de los pies mientras está llenando una ficha.
-  ev.waitUntil(caches.open(VERSION).then((c) => c.addAll(ARCHIVOS)));
+  //
+  // cache:'reload' es imprescindible: GitHub Pages manda los archivos con
+  // Cache-Control max-age=600, así que sin esto el navegador entregaría
+  // desde SU caché las copias viejas, y como la caché de cada versión es
+  // inmutable, quedarían congeladas para siempre. Ese fue el motivo real
+  // de que una actualización recién subida no se viera.
+  ev.waitUntil(
+    caches.open(VERSION).then((c) =>
+      c.addAll(ARCHIVOS.map((u) => new Request(u, { cache: 'reload' })))
+    )
+  );
 });
 
 // La app pide activarla cuando el geólogo toca "Actualizar".
@@ -34,7 +51,9 @@ self.addEventListener('message', (ev) => {
 self.addEventListener('activate', (ev) => {
   ev.waitUntil(
     caches.keys()
-      .then((claves) => Promise.all(claves.filter((k) => k !== VERSION).map((k) => caches.delete(k))))
+      .then((claves) => Promise.all(claves
+        .filter((k) => k.indexOf(PREFIJO + '-') === 0 && k !== VERSION)
+        .map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
