@@ -15,11 +15,15 @@ const APP = {
   vistaActual: 'pendientes',
   filtro: 'pendientes',   // pendientes | realizadas
   // Filtros que arma el evaluador. Vacío = no filtra por ese criterio.
-  filtros: { prioridad: [], responsable: [], evaluadores: [], comuna: [], barrio: [], entidad: [],
-             sinCoords: false, cercanas: false, abiertos: [] },
+  // Se llena en la línea de abajo para no repetir la forma en cuatro sitios.
+  filtros: null,
   miUbicacion: null,
   sincronizando: false
 };
+
+// filtrosVacios() se declara más abajo; las declaraciones de función se
+// elevan, así que a esta altura ya se puede llamar.
+APP.filtros = filtrosVacios();
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
@@ -756,7 +760,7 @@ $('#btn-filtros').addEventListener('click', () => { dibujarPanelFiltros(); irA('
 $('#btn-cerrar-filtros').addEventListener('click', () => irA('pendientes'));
 $('#btn-aplicar-filtros').addEventListener('click', () => { irA('pendientes'); pintarPendientes(); });
 $('#btn-limpiar-filtros').addEventListener('click', () => {
-  APP.filtros = { prioridad: [], responsable: [], evaluadores: [], comuna: [], barrio: [], entidad: [], sinCoords: false, cercanas: false, abiertos: [] };
+  APP.filtros = filtrosVacios();
   APP.miUbicacion = null;
   dibujarPanelFiltros();
   pintarPendientes();
@@ -779,11 +783,39 @@ function evaluadoresDe(s) {
     .filter(Boolean);
 }
 
+/** La forma que debe tener SIEMPRE APP.filtros. Un solo sitio que cambiar. */
+function filtrosVacios() {
+  return { prioridad: [], evaluadores: [], comuna: [], barrio: [], entidad: [],
+           sinCoords: false, cercanas: false, abiertos: [] };
+}
+
+/**
+ * Ajusta un filtro guardado a la forma actual.
+ *
+ * Los filtros guardados viven en el celular y sobreviven a las versiones de
+ * la app: uno guardado antes de que existiera "evaluador" no trae esa clave,
+ * y al marcar una opción el panel se topaba con un undefined y se caía. Las
+ * claves que ya no existen (como "responsable") se descartan aquí.
+ */
+function normalizarFiltros(guardado) {
+  const base = filtrosVacios();
+  const g = guardado || {};
+  Object.keys(base).forEach((k) => {
+    if (Array.isArray(base[k])) base[k] = Array.isArray(g[k]) ? g[k].slice() : [];
+    else if (typeof base[k] === 'boolean') base[k] = !!g[k];
+  });
+  return base;
+}
+
 const CAMPOS_FILTRABLES = [
   { clave: 'prioridad',   titulo: 'Prioridad',              vacio: 'SIN PRIORIDAD' },
-  { clave: 'responsable', titulo: 'Responsable',            vacio: '(sin asignar)' },
   // Quién HIZO la visita. Solo tiene sentido sobre las visitadas: una
-  // solicitud pendiente todavía no tiene evaluador, tiene responsable.
+  // solicitud pendiente todavía no tiene evaluador.
+  //
+  // El filtro por RESPONSABLE (a quién está asignada la solicitud) se quitó
+  // a propósito: eran dos filtros de persona seguidos y se confundían. El
+  // nombre del responsable sigue viéndose en la tarjeta y el buscador de
+  // arriba sigue encontrándolo si se escribe.
   { clave: 'evaluadores', titulo: 'Evaluador que hizo la visita',
     vacio: '(sin evaluador)', multiple: true, soloEn: 'realizadas' },
   { clave: 'comuna',      titulo: 'Comuna o corregimiento', vacio: '(sin comuna)' },
@@ -898,7 +930,7 @@ function dibujarPanelFiltros() {
       if (ev.target.classList.contains('borrar-guardado')) return;
       const g = filtrosGuardados()[Number(b.dataset.guardado)];
       if (!g) return;
-      APP.filtros = Object.assign({ abiertos: [] }, JSON.parse(JSON.stringify(g.filtros)));
+      APP.filtros = normalizarFiltros(g.filtros);
       dibujarPanelFiltros();
       actualizarConteoFiltros();
     });
@@ -971,7 +1003,10 @@ function actualizarConteoFiltros() {
   const antes = $('#lista-pendientes').innerHTML;
   pintarPendientes();
   const n = document.querySelectorAll('#lista-pendientes .tarjeta').length;
-  $('#filtros-resultado').textContent = n + (n === 1 ? ' solicitud' : ' solicitudes');
+  // En "Visitadas" lo que se cuenta son visitas, no solicitudes.
+  $('#filtros-resultado').textContent = n + (APP.filtro === 'realizadas'
+    ? (n === 1 ? ' visita' : ' visitas')
+    : (n === 1 ? ' solicitud' : ' solicitudes'));
   $('#lista-pendientes').innerHTML = antes;
 }
 
@@ -1175,7 +1210,7 @@ function pintarChipsActivos() {
   const cont = $('#chips-activos');
   if (!cont) return;
   const activos = [];
-  ['prioridad', 'responsable', 'evaluadores', 'comuna', 'barrio', 'entidad'].forEach((clave) => {
+  ['prioridad', 'evaluadores', 'comuna', 'barrio', 'entidad'].forEach((clave) => {
     (f[clave] || []).forEach((v) => activos.push({ clave: clave, valor: v, texto: v }));
   });
   if (f.sinCoords) activos.push({ clave: 'sinCoords', texto: 'Sin coordenadas' });
@@ -1192,7 +1227,7 @@ function pintarChipsActivos() {
   cont.querySelectorAll('.chip-activo').forEach((b) => {
     b.addEventListener('click', () => {
       if (b.classList.contains('limpiar')) {
-        APP.filtros = { prioridad: [], responsable: [], evaluadores: [], comuna: [], barrio: [], entidad: [], sinCoords: false, cercanas: false, abiertos: [] };
+        APP.filtros = filtrosVacios();
         APP.miUbicacion = null;
       } else {
         const a = activos[Number(b.dataset.i)];
@@ -1319,7 +1354,6 @@ function pintarPendientes() {
 
     if (f.prioridad.length &&
         f.prioridad.indexOf((s.prioridad || 'SIN PRIORIDAD').toUpperCase()) === -1) return false;
-    if (f.responsable.length && f.responsable.indexOf(s.responsable || '(sin asignar)') === -1) return false;
     if ((f.evaluadores || []).length) {
       const nombres = evaluadoresDe(s);
       const lista = nombres.length ? nombres : ['(sin evaluador)'];
