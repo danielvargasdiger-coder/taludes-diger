@@ -717,11 +717,14 @@ async function pintarTablero() {
 
   // ------------------------------------------------------------ calidad
   const sinCoord = vis.length - conCoord.length;
+  // Coordenada que existe pero cae fuera de Risaralda: casi siempre es un
+  // decimal que se perdió al escribirla. Se avisa para poder corregirla.
+  const coordRaras = conCoord.filter((v) => !coordPlausible(v.latitud, v.longitud)).length;
   const sinPrioridad = vis.filter((v) => !(v.prioridad || '').trim()).length;
   const sinFoto = vis.length - conFoto;
   const pendientesLista = conEstado.filter((s) => s._estado.clave !== 'realizada').length;
 
-  if (sinCoord || sinPrioridad || sinFoto || pendientesLista) {
+  if (sinCoord || coordRaras || sinPrioridad || sinFoto || pendientesLista) {
     html += '<div class="t-bloque t-pendientes"><h3>Qué falta por cerrar</h3><ul>' +
       (pendientesLista && !hayFiltroTablero()
         ? '<li><b>' + pendientesLista + '</b> solicitudes sin visitar.</li>' : '') +
@@ -729,6 +732,9 @@ async function pintarTablero() {
                       'no se pueden ordenar por urgencia.</li>' : '') +
       (sinCoord ? '<li><b>' + sinCoord + '</b> visitas sin coordenada: no salen en el mapa ' +
                   'ni sirven para avisar de trabajo cercano.</li>' : '') +
+      (coordRaras ? '<li><b>' + coordRaras + '</b> visitas con una coordenada fuera de ' +
+                    'Risaralda: casi siempre es un decimal que se perdió al escribirla. ' +
+                    'Revísalas en la hoja.</li>' : '') +
       (sinFoto ? '<li><b>' + sinFoto + '</b> visitas sin fotos.</li>' : '') +
       '</ul></div>';
   }
@@ -799,8 +805,12 @@ async function pintarMapaTablero(visitas) {
     );
   });
 
-  if (puntos.length === 1) APP.mapaT.setView(puntos[0], 16);
-  else if (puntos.length) APP.mapaT.fitBounds(puntos, { padding: [30, 30] });
+  // Igual que en el mapa principal: los puntos imposibles no encuadran.
+  const buenos = puntos.filter((p) => coordPlausible(p[0], p[1]));
+  const encuadre = buenos.length ? buenos : puntos;
+
+  if (encuadre.length === 1) APP.mapaT.setView(encuadre[0], 16);
+  else if (encuadre.length) APP.mapaT.fitBounds(encuadre, { padding: [30, 30] });
   else APP.mapaT.setView([4.8133, -75.6961], 11);   // Risaralda
 
   APP.mapaT.on('popupopen', (ev) => {
@@ -1092,6 +1102,21 @@ function cargarLeaflet() {
   });
 }
 
+/**
+ * ¿Esta coordenada puede estar en Risaralda?
+ *
+ * El departamento va de 4,68 a 5,52 de latitud y de -76,28 a -75,42 de
+ * longitud. Se deja un margen generoso -no se trata de recortar el mapa
+ * sino de descartar disparates- porque el caso real que hay que atajar no
+ * es un punto unos kilómetros afuera: es un 480004983 donde debía ir un
+ * 4,80004983, que es lo que dejó el mapa en zoom 0 mostrando el planeta.
+ */
+function coordPlausible(lat, lon) {
+  const y = parseFloat(lat), x = parseFloat(lon);
+  if (isNaN(y) || isNaN(x)) return false;
+  return y > 4.4 && y < 5.8 && x > -76.6 && x < -75.2;
+}
+
 const COLOR_ESTADO = {
   realizada: '#2e7d32',
   'por-enviar': '#6a1b9a',
@@ -1223,12 +1248,18 @@ function pintarMapa() {
   // Al buscar, el mapa va a donde está el resultado. Sin búsqueda, se
   // encuadra una sola vez para no arrancarle el mapa de las manos al
   // geólogo cada vez que entra la sincronización.
+  // Para encuadrar se usan solo los puntos plausibles: uno disparatado
+  // arrastraría el encuadre al otro lado del mundo y no se vería ninguno.
+  // El marcador raro SÍ se dibujó: no se esconde nada, solo no manda.
+  const paraEncuadrar = puntos.filter((p) => coordPlausible(p[0], p[1]));
+  const encuadre = paraEncuadrar.length ? paraEncuadrar : puntos;
+
   if (puntos.length && (busqueda || seLimpio || !APP.mapaCentrado)) {
     if (busqueda && puntos.length === 1) {
       APP.mapa.setView(puntos[0], 17);
       if (unico) unico.openPopup();
     } else {
-      APP.mapa.fitBounds(puntos, { padding: [40, 40] });
+      APP.mapa.fitBounds(encuadre, { padding: [40, 40] });
     }
     // Solo se da por encuadrado si el mapa YA tenía tamaño de verdad. Si se
     // encuadró contra un alto de cero, ese encuadre no vale y hay que dejar
