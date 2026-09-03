@@ -26,6 +26,7 @@
         <svg id="sync-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 5V2L7.5 6.5 12 11V8a5 5 0 1 1-4.9 6h-2.05A7 7 0 1 0 12 5z"/></svg>
       </button>
       <button id="btn-mapa" class="icon-btn" title="Ver en el mapa"><svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><path fill="currentColor" d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></button>
+      <button id="btn-tablero" class="icon-btn" title="Tablero de control"><svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><path fill="currentColor" d="M4 20V10h3.5v10H4zm6.25 0V4h3.5v16h-3.5zM16.5 20v-6H20v6h-3.5z"/></svg></button>
       <button id="btn-perfil" class="icon-btn" title="Mi perfil">&#9776;</button>
     </div>
   </div>
@@ -47,21 +48,17 @@
          alt="Alcaldía de Pereira - DIGER">
     <div class="franja-inst"></div>
 
-    <label>Código de acceso <span class="opcional">(opcional)</span>
-      <input type="password" id="in-codigo" inputmode="numeric" autocomplete="off" placeholder="Solo si la DIGER te lo dio">
+    <label>Código de acceso <span class="req">*</span>
+      <input type="password" id="in-codigo" inputmode="numeric" autocomplete="off"
+             placeholder="Los 6 dígitos de tu entidad">
     </label>
-    <p class="nota-entidad">Sin código entras igual: registras tus visitas y
-      consultas las ya realizadas. El código solo sirve para el trabajo del
-      grupo de DIGER.</p>
+    <p class="nota-entidad">El código dice a qué entidad perteneces: no hay que
+      escribirla. Si no lo tienes, pídelo en la DIGER.</p>
     <label>Nombre completo <span class="req">*</span>
       <input type="text" id="in-nombre" autocomplete="name" placeholder="Ej: Ana María Restrepo">
     </label>
     <label>Tarjeta profesional (TP) <span class="req">*</span>
       <input type="text" id="in-tp" autocomplete="off" placeholder="Ej: 25202-123456 CPG">
-    </label>
-    <label>Entidad <span class="req">*</span>
-      <input type="text" id="in-entidad" autocomplete="organization"
-             placeholder="Ej: Secretaría de Infraestructura de Pereira">
     </label>
 
     <button id="btn-ingresar" class="btn-principal">Ingresar</button>
@@ -112,6 +109,18 @@
       <button id="btn-salir" class="btn-secundario">Cambiar de usuario / salir</button>
     </div>
   </div>
+</section>
+
+<!-- ============================ TABLERO ============================ -->
+<section id="vista-tablero" class="vista pantalla-completa" hidden>
+  <div class="ficha-topbar">
+    <button id="btn-cerrar-tablero" class="icon-btn">&larr;</button>
+    <div class="ficha-topbar-titulo">
+      <strong>Tablero de control</strong>
+      <span id="tablero-corte"></span>
+    </div>
+  </div>
+  <div class="panel-cuerpo" id="cuerpo-tablero"></div>
 </section>
 
 <!-- ============================ MAPA ============================ -->

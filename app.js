@@ -319,6 +319,141 @@ function precalentarGps(cb) {
     .catch(() => {});
 }
 
+// ---------------------------------------------------------------- TABLERO
+/**
+ * Tablero de control.
+ *
+ * Se arma con lo que la app YA tiene descargado, no con una consulta nueva:
+ * así abre al instante y sirve igual sin señal, con el corte de la última
+ * sincronización. Los gráficos son barras de HTML, sin librerías: una
+ * librería de gráficas pesa más que toda la app y habría que descargarla
+ * justo cuando el geólogo está en campo sin datos.
+ */
+function cuentaPor(lista, saca, vacio) {
+  const c = {};
+  lista.forEach((x) => {
+    const v = (saca(x) || '').toString().trim() || vacio;
+    c[v] = (c[v] || 0) + 1;
+  });
+  return Object.keys(c).map((k) => ({ etiqueta: k, n: c[k] }))
+    .sort((a, b) => b.n - a.n);
+}
+
+/** Barras horizontales. El ancho es relativo al valor más alto del grupo. */
+function barras(datos, color, tope) {
+  if (!datos.length) return '<p class="tablero-vacio">Todavía no hay datos.</p>';
+  const max = Math.max.apply(null, datos.map((d) => d.n)) || 1;
+  return '<div class="barras">' + datos.slice(0, tope || 8).map((d) =>
+    '<div class="barra-fila">' +
+      '<span class="barra-et" title="' + esc(d.etiqueta) + '">' + esc(d.etiqueta) + '</span>' +
+      '<span class="barra-riel">' +
+        '<span class="barra-valor" style="width:' + Math.max(4, Math.round(d.n / max * 100)) +
+          '%;background:' + (typeof color === 'function' ? color(d.etiqueta) : color) + '"></span>' +
+      '</span>' +
+      '<b class="barra-n">' + d.n + '</b>' +
+    '</div>').join('') + '</div>';
+}
+
+/** Columnas por día, para ver el ritmo de trabajo de la última quincena. */
+function columnasPorDia(visitas) {
+  const dias = [];
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(hoy); d.setDate(d.getDate() - i);
+    dias.push({ iso: d.toISOString().slice(0, 10), d: d });
+  }
+  const c = {};
+  visitas.forEach((v) => {
+    const k = String(v.fechaVisita || '').slice(0, 10);
+    if (k) c[k] = (c[k] || 0) + 1;
+  });
+  const max = Math.max.apply(null, dias.map((x) => c[x.iso] || 0)) || 1;
+  return '<div class="columnas">' + dias.map((x) => {
+    const n = c[x.iso] || 0;
+    return '<div class="col-dia" title="' + x.iso + ': ' + n + '">' +
+      '<span class="col-n">' + (n || '') + '</span>' +
+      '<span class="col-riel"><span class="col-valor" style="height:' +
+        (n ? Math.max(6, Math.round(n / max * 100)) : 0) + '%"></span></span>' +
+      '<span class="col-et">' + x.d.getDate() + '</span>' +
+    '</div>';
+  }).join('') + '</div>';
+}
+
+const COLOR_PRIORIDAD_BARRA = {
+  'CRÍTICA': '#a3000d', 'CRITICA': '#a3000d', 'ALTA': '#d84315',
+  'MEDIA': '#ef8c00', 'BAJA': '#2e7d32'
+};
+
+async function pintarTablero() {
+  const cont = $('#cuerpo-tablero');
+  if (!cont || $('#vista-tablero').hidden) return;
+
+  const vis = APP.historial;
+  const conLista = !(APP.perfil && APP.perfil.verSolicitudes === false);
+  const conEstado = solicitudesConEstado();
+  const atendidas = conEstado.filter((s) => s._estado.clave === 'realizada').length;
+  const pendientes = conEstado.length - atendidas;
+  const conFoto = vis.filter((v) => v.tieneFotos).length;
+  const avance = conEstado.length ? Math.round(atendidas / conEstado.length * 100) : 0;
+
+  const tarjeta = (n, t, c) =>
+    '<div class="t-tarjeta"><b style="color:' + c + '">' + n + '</b><span>' + t + '</span></div>';
+
+  let html = '<div class="t-cifras">';
+  if (conLista) {
+    html += tarjeta(conEstado.length, 'solicitudes asignadas', '#0b4f6c') +
+            tarjeta(atendidas, 'ya atendidas', '#2e7d32') +
+            tarjeta(pendientes, 'por visitar', pendientes ? '#d84315' : '#2e7d32');
+  }
+  html += tarjeta(vis.length, 'visitas registradas', '#0b4f6c') +
+          tarjeta(conFoto, 'con fotos', '#6a1b9a') +
+          '</div>';
+
+  if (conLista) {
+    html += '<div class="t-bloque"><h3>Avance de las solicitudes</h3>' +
+      '<div class="t-avance"><span style="width:' + avance + '%"></span></div>' +
+      '<p class="t-nota"><b>' + avance + '%</b> atendido · ' + atendidas + ' de ' +
+        conEstado.length + '. Faltan ' + pendientes + '.</p></div>';
+  }
+
+  html += '<div class="t-bloque"><h3>Visitas de los últimos 14 días</h3>' +
+    columnasPorDia(vis) + '</div>';
+
+  html += '<div class="t-rejilla">' +
+    '<div class="t-bloque"><h3>Quién ha evaluado</h3>' +
+      barras(cuentaPor(vis, (v) => v.evaluadores, '(sin evaluador)'), '#0b4f6c') + '</div>' +
+    '<div class="t-bloque"><h3>Entidad que registra</h3>' +
+      barras(cuentaPor(vis, (v) => v.entidad, '(sin entidad)'), '#3f8c54') + '</div>' +
+    '<div class="t-bloque"><h3>Barrios con más visitas</h3>' +
+      barras(cuentaPor(vis, (v) => v.barrio, '(sin barrio)'), '#8a5a00') + '</div>';
+
+  if (conLista) {
+    const pend = conEstado.filter((s) => s._estado.clave !== 'realizada');
+    html += '<div class="t-bloque"><h3>Prioridad de lo que falta</h3>' +
+      barras(cuentaPor(pend, (s) => (s.prioridad || '').toUpperCase(), 'SIN PRIORIDAD'),
+             (et) => COLOR_PRIORIDAD_BARRA[et] || '#8896a0') + '</div>';
+  }
+  html += '</div>';
+
+  const sinCoord = vis.filter((v) => v.latitud === '' || v.latitud == null).length;
+  if (sinCoord || (conLista && pendientes)) {
+    html += '<div class="t-bloque t-pendientes"><h3>Qué falta por cerrar</h3><ul>' +
+      (conLista && pendientes ? '<li><b>' + pendientes + '</b> solicitudes sin visitar.</li>' : '') +
+      (sinCoord ? '<li><b>' + sinCoord + '</b> visitas sin coordenada: no salen en el mapa ' +
+                  'ni sirven para avisar de trabajo cercano.</li>' : '') +
+      (vis.length - conFoto ? '<li><b>' + (vis.length - conFoto) + '</b> visitas sin fotos.</li>' : '') +
+      '</ul></div>';
+  }
+  cont.innerHTML = html;
+
+  let corte = '';
+  try {
+    const iso = await DB.leerKV('ultimaSync');
+    if (iso) corte = 'Datos al ' + fechaBonita(iso);
+  } catch (e) { /* sin dato de corte, no es grave */ }
+  $('#tablero-corte').textContent = corte || 'Sincroniza para actualizar';
+}
+
 /**
  * Visitas ya realizadas cerca de un punto, sin importar qué entidad las hizo.
  * Es la defensa contra que dos secretarías visiten el mismo talud.
@@ -415,7 +550,8 @@ function pedirCodigoDeNuevo() {
   // Se conserva lo que ya había escrito para que solo teclee el código.
   $('#in-nombre').value = nombre || '';
   $('#in-tp').value = tp || '';
-  $('#in-entidad').value = entidadPrevia || '';
+  // La entidad no se escribe; se muestra solo para que sepa con cuál venía.
+  if (entidadPrevia) $('#msg-ingreso').textContent = '';
   $('#in-codigo').value = '';
 
   $('#msg-ingreso').innerHTML =
@@ -447,20 +583,23 @@ $('#btn-ingresar').addEventListener('click', async () => {
   const codigo = $('#in-codigo').value.trim();
   const nombre = $('#in-nombre').value.trim();
   const tp = $('#in-tp').value.trim();
-  const entidad = $('#in-entidad').value.trim();
   const msg = $('#msg-ingreso');
 
-  // El código es opcional; identificarse no lo es.
-  if (!nombre || !tp || !entidad) {
-    msg.textContent = 'Completa tu nombre, tu tarjeta profesional y tu entidad.';
+  // La entidad ya no se escribe: la deduce el servidor a partir del código.
+  if (!codigo) {
+    msg.textContent = 'Escribe el código de acceso de tu entidad.';
+    return;
+  }
+  if (!nombre || !tp) {
+    msg.textContent = 'Completa tu nombre y tu tarjeta profesional.';
     return;
   }
   msg.textContent = '';
-  APP.perfil = { codigo, nombre, tp, entidad };
+  APP.perfil = { codigo, nombre, tp, entidad: '' };
 
-  cargando(true, codigo ? 'Verificando código…' : 'Entrando…');
+  cargando(true, 'Verificando código…');
   try {
-    const r = await api('verificar', { entidad: entidad });
+    const r = await api('verificar', {});
     APP.perfil.entidad = r.entidad || CONFIG.ENTIDAD;
     // Si el servidor todavía no informa este dato, se asume que sí ve
     // solicitudes: así una versión vieja del servidor no deja a la DIGER
@@ -509,9 +648,12 @@ function irA(vista) {
   $('#vista-cola').hidden = vista !== 'cola';
   $('#vista-filtros').hidden = vista !== 'filtros';
   $('#vista-mapa').hidden = vista !== 'mapa';
+  $('#vista-tablero').hidden = vista !== 'tablero';
   $('#btn-nueva-no-programada').style.display = vista === 'pendientes' ? '' : 'none';
 }
 
+$('#btn-tablero').addEventListener('click', () => { irA('tablero'); pintarTablero(); });
+$('#btn-cerrar-tablero').addEventListener('click', () => irA('pendientes'));
 $('#btn-perfil').addEventListener('click', () => irA('cola'));
 $('#btn-cerrar-cola').addEventListener('click', () => irA('pendientes'));
 $('#aviso-cola').addEventListener('click', () => irA('cola'));
@@ -536,6 +678,7 @@ $('#buscar-mapa').addEventListener('input', (ev) => {
   relojBusquedaMapa = setTimeout(() => {
     APP.busquedaMapa = texto;
     pintarMapa();
+  pintarTablero();
   }, 250);
 });
 $('#buscar-mapa').addEventListener('keydown', (ev) => {
