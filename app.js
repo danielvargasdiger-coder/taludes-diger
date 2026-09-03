@@ -880,6 +880,9 @@ async function api(accion, carga = {}, msTimeout = 45000) {
     catch (e) { throw new Error('El servidor respondió algo inesperado. Revisa que la app web esté publicada para "Cualquier usuario".'); }
     if (!json.ok) {
       const err = new Error(json.error || 'Error del servidor');
+      // El servidor contestó: hubo señal. Sirve para saber que el problema
+      // es de ESTA ficha y no de la conexión (ver enviarCola).
+      err.delServidor = true;
       // El código dejó de servir (lo cambiaron o le quitaron el acceso a la
       // entidad). Hay que avisarlo: si no, el geólogo seguiría llenando
       // fichas creyendo que se están enviando.
@@ -1663,6 +1666,9 @@ async function enviarCola(silencioso) {
       APP.cola = APP.cola.filter((x) => x.idLocal !== item.idLocal);
       await DB.borrar('borradores', item.clave);
     } catch (e) {
+      // Cada intento parte de cero: si antes fallo y ahora funciona, el
+      // motivo viejo no se queda pegado en la tarjeta.
+      if (item.error) { delete item.error; await DB.guardar('cola', item); }
       cargando(false);
 
       // El servidor dice que esa solicitud ya quedó registrada: la ficha no
@@ -1681,6 +1687,19 @@ async function enviarCola(silencioso) {
       // El código dejó de servir: no tiene sentido reintentar, hay que
       // reingresar. La ficha se queda en la cola, intacta.
       if (e.codigoInvalido) throw e;
+
+      // El servidor contestó, o sea que hay señal: el problema es de ESTA
+      // ficha. Se anota el motivo, se deja en la cola -no se pierde nada- y
+      // se sigue con las demás. Antes se cortaba aquí, y una ficha
+      // rechazada tapaba para siempre a todas las que venían detrás.
+      if (e.delServidor) {
+        item.error = e.message;
+        await DB.guardar('cola', item);
+        if (!silencioso) {
+          toast('La ficha ' + item.idSolicitud + ' no se pudo enviar: ' + e.message, 'error');
+        }
+        continue;
+      }
 
       if (!silencioso) toast('No se pudo enviar la ficha ' + item.idSolicitud + ': ' + e.message, 'error');
       break; // sin conexión estable: deja el resto para el próximo intento
@@ -2110,12 +2129,19 @@ function pintarCola() {
         '<div class="tarjeta-id">SOLICITUD ' + esc(c.idSolicitud) + '</div>' +
         '<div class="tarjeta-titulo">' + esc(c.datos.direccion_referencia || '') + '</div>' +
         '<div class="tarjeta-sub">' + esc(c.datos.barrio_vereda || '') + '</div>' +
-      '</div><span class="chip pendiente-envio">POR ENVIAR</span></div>' +
+      '</div><span class="chip ' + (c.error ? 'chip-rechazada' : 'pendiente-envio') + '">' +
+        (c.error ? 'RECHAZADA' : 'POR ENVIAR') + '</span></div>' +
       '<div class="tarjeta-pie">' +
         '<span>' + fechaBonita(c.datos.fecha_hora_visita) + '</span>' +
         '<span>· ' + fotos + ' foto(s)</span>' +
         (c.idServidor ? '<span>· subiendo (' + c.fotosSubidas + '/' + fotos + ')</span>' : '') +
       '</div>' +
+      // El motivo a la vista: sin esto la ficha se queda ahi sin explicacion
+      // y no hay forma de saber que hacer con ella.
+      (c.error
+        ? '<p class="cola-motivo"><b>No la aceptó el servidor:</b> ' + esc(c.error) +
+          '</p>'
+        : '') +
       '<button type="button" class="btn-eliminar-cola" data-id="' + esc(c.idLocal) + '">' +
         'Eliminar del celular</button>' +
     '</div>';
