@@ -1576,11 +1576,19 @@ function pintarPendientes() {
                 (e.visita.entidad ? ' · ' + esc(e.visita.entidad) : '') + '</div>' +
               '<div class="visita-acciones">' +
                 '<span class="enlace-ficha">Ver ficha completa</span>' +
-                (e.visita.pdfUrl
-                  ? '<a class="enlace-pdf" target="_blank" rel="noopener" ' +
-                    'href="' + esc(enlacePdf(e.visita.pdfUrl)) + '" ' +
-                    'onclick="event.stopPropagation()">PDF</a>'
-                  : '') +
+                // La ficha en linea siempre muestra el dato de hoy; el PDF
+                // quedo congelado el dia que se cerro la visita. Si la
+                // copia guardada en el celular es de antes de esta version
+                // no trae fichaUrl, y ahi sirve el PDF como respaldo.
+                (e.visita.fichaUrl
+                  ? '<a class="enlace-hoja" target="_blank" rel="noopener" ' +
+                    'href="' + esc(e.visita.fichaUrl) + '" ' +
+                    'onclick="event.stopPropagation()">FICHA</a>'
+                  : e.visita.pdfUrl
+                    ? '<a class="enlace-pdf" target="_blank" rel="noopener" ' +
+                      'href="' + esc(enlacePdf(e.visita.pdfUrl)) + '" ' +
+                      'onclick="event.stopPropagation()">PDF</a>'
+                    : '') +
               '</div>'
             : '') +
         '</div>'
@@ -2560,9 +2568,23 @@ async function abrirDetalle(idVisita) {
   }
 
   let html = '';
-  if (h.pdfUrl) {
+  if (h.fichaUrl || h.pdfUrl) {
+    // El boton principal es la ficha en linea: se arma en el momento, asi
+    // que refleja cualquier correccion que se haya hecho en la base. Desde
+    // ahi el navegador imprime o guarda en PDF. El PDF de Drive queda como
+    // segunda opcion porque es una foto fija del dia que se cerro.
     html += '<div class="detalle-seccion"><div class="detalle-acciones">' +
-      '<a class="btn-pdf" href="' + esc(enlacePdf(h.pdfUrl)) + '" target="_blank" rel="noopener">&#128196; Abrir el PDF de la ficha</a>' +
+      (h.fichaUrl
+        ? '<a class="btn-pdf" href="' + esc(h.fichaUrl) + '" target="_blank" rel="noopener">' +
+          '&#128196; Abrir la ficha completa</a>' +
+          '<p class="nota-ficha">Se abre en el navegador con los datos de hoy. ' +
+          'Desde ahi puedes imprimirla, guardarla en PDF o copiar el enlace ' +
+          'para mandarlo.</p>'
+        : '') +
+      (h.pdfUrl
+        ? '<a class="btn-pdf alterno" href="' + esc(enlacePdf(h.pdfUrl)) + '" target="_blank" rel="noopener">' +
+          (h.fichaUrl ? 'Ver el PDF que se genero al cerrar la visita' : '&#128196; Abrir el PDF de la ficha') + '</a>'
+        : '') +
       '</div></div>';
   }
 
