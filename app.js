@@ -927,6 +927,16 @@ function pedirCodigoDeNuevo() {
 // ---------------------------------------------------------------- INGRESO
 async function iniciar() {
   APP.perfil = JSON.parse(localStorage.getItem(CLAVE_PERFIL) || 'null');
+
+  // Perfil guardado antes de que el municipio fuera propiedad de la entidad.
+  // Sin esto, a quien ya tiene la sesión abierta le aparecería el desplegable
+  // de municipios en vez de su municipio fijo, hasta volver a ingresar.
+  // La regla vieja era: quien tiene solicitudes propias trabaja en Pereira.
+  if (APP.perfil && APP.perfil.municipio === undefined) {
+    APP.perfil.municipio = APP.perfil.verSolicitudes ? 'Pereira' : '';
+    localStorage.setItem(CLAVE_PERFIL, JSON.stringify(APP.perfil));
+  }
+
   APP.cola = (await DB.todos('cola')) || [];
   APP.solicitudes = (await DB.leerKV('solicitudes')) || [];
   APP.historial = (await DB.leerKV('historial')) || [];
@@ -966,6 +976,9 @@ $('#btn-ingresar').addEventListener('click', async () => {
     // solicitudes: así una versión vieja del servidor no deja a la DIGER
     // sin su lista mientras se actualiza.
     APP.perfil.verSolicitudes = r.verSolicitudes !== false;
+    // Municipio fijo de la entidad: con valor, la ficha no lo pregunta.
+    // Vacío (o servidor viejo que no lo manda) = se escoge de la lista.
+    APP.perfil.municipio = r.municipio || '';
     localStorage.setItem(CLAVE_PERFIL, JSON.stringify(APP.perfil));
     toast('Ingresaste como ' + APP.perfil.entidad, 'ok');
     cargando(false);
@@ -2140,9 +2153,9 @@ function datosIniciales(s) {
   return {
     codigo_evaluacion: String(s.idSolicitud),
     fecha_hora_visita: ahoraLocal(),
-    // Ver el caso 'municipio' en dibujarCampo(): DIGER Pereira lo deja fijo
-    // en Pereira; a quien no tiene solicitudes propias se lo pregunta.
-    municipio: APP.perfil.verSolicitudes ? 'Pereira' : '',
+    // Ver el caso 'municipio' en dibujarCampo(): si la entidad trabaja en un
+    // solo municipio viene fijo; si no, lo escoge quien llena la ficha.
+    municipio: APP.perfil.municipio || '',
     barrio_vereda: s.barrio || '',
     direccion_referencia: [s.direccion, s.edificacion].filter(Boolean).join(' — '),
     coordenadas: { y: s.latitud || '', x: s.longitud || '', z: '', precision: null, fuente: s.latitud ? 'base' : '' },
@@ -2336,14 +2349,17 @@ function dibujarCampo(campo) {
     }
 
     case 'municipio': {
-      // DIGER Pereira solo trabaja en Pereira: se fija solo, igual que el
-      // código de evaluación, y no se pregunta. Quien no tiene solicitudes
-      // propias (hoy, CARDER) cubre todo el departamento: elige de la lista.
-      if (APP.perfil.verSolicitudes) {
-        if (valor !== 'Pereira') setValor(campo.id, 'Pereira');
+      // Lo decide la ENTIDAD, no el hecho de tener solicitudes propias.
+      // Quien trabaja en un solo municipio (DIGER Pereira, Secretaría de
+      // Infraestructura) lo trae fijo y no se le pregunta; quien cubre el
+      // departamento (CARDER) escoge de la lista.
+      const fijo = APP.perfil.municipio;
+      if (fijo) {
+        if (valor !== fijo) setValor(campo.id, fijo);
         div.innerHTML = etiqueta +
-          '<div class="valor-fijo">Pereira' +
-            '<span class="candado" title="DIGER Pereira solo trabaja en Pereira">&#128274;</span>' +
+          '<div class="valor-fijo">' + esc(fijo) +
+            '<span class="candado" title="' + esc(APP.perfil.entidad) +
+              ' solo trabaja en ' + esc(fijo) + '">&#128274;</span>' +
           '</div>';
         break;
       }
