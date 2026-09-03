@@ -1556,13 +1556,39 @@ async function sincronizar(silencioso = false) {
     // 1) Primero sube lo que está pendiente, para no perder trabajo.
     if (APP.cola.length) await enviarCola(silencioso);
 
-    // 2) Luego baja el catálogo actualizado.
+    // 2) ¿Cambió algo desde la última vez?
+    //
+    // El catálogo pesa unos 140 KB y antes se bajaba cada 10 minutos aunque
+    // nadie hubiera tocado nada: en campo eso es batería y datos gastados en
+    // balde. Esta consulta pesa unos pocos bytes.
+    //
+    // Solo se hace en la sincronización AUTOMÁTICA. Cuando el geólogo toca
+    // el botón espera datos frescos, y ahorrarle la descarga sería
+    // desobedecerlo: ahí siempre se baja todo.
+    // Se exige tener datos en mano para poder saltarse la descarga: si la
+    // copia local quedó vacía (se limpió el navegador, falló IndexedDB) la
+    // marca sola haría que la app se quedara en blanco creyendo que está al día.
+    if (silencioso && APP.historial.length) {
+      const marca = await DB.leerKV('marcaCambio');
+      if (marca) {
+        try {
+          const c = await api('hay_cambios');
+          if (c.cambio && c.cambio === marca) return;   // nada nuevo, no se baja
+        } catch (e) {
+          // Si la consulta falla se sigue de largo y se baja el catálogo:
+          // más vale gastar datos que quedarse con información vieja.
+        }
+      }
+    }
+
+    // 3) Baja el catálogo actualizado.
     const r = await api('catalogo');
     APP.solicitudes = r.solicitudes || [];
     APP.historial = r.historial || [];
     await DB.guardarKV('solicitudes', APP.solicitudes);
     await DB.guardarKV('historial', APP.historial);
     await DB.guardarKV('ultimaSync', new Date().toISOString());
+    if (r.cambio) await DB.guardarKV('marcaCambio', r.cambio);
     pintarTodo();
     if (!silencioso) toast('Actualizado: ' + pendientes().length + ' pendientes', 'ok');
   } catch (e) {
