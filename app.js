@@ -948,6 +948,18 @@ async function iniciar() {
   window.addEventListener('online', () => { pintarConexion(); sincronizar(true); });
   window.addEventListener('offline', pintarConexion);
   setInterval(() => { if (navigator.onLine) sincronizar(true); }, CONFIG.MINUTOS_AUTOSYNC * 60000);
+
+  // Al volver a la app se refresca. Es el momento en que alguien acaba de
+  // corregir algo en la hoja y entra a comprobarlo: esperar hasta diez
+  // minutos a la sincronización automática se siente como que no funcionó.
+  // Se pone un mínimo de un minuto entre refrescos para que cambiar de
+  // pestaña varias veces seguidas no dispare una descarga cada vez.
+  document.addEventListener('visibilitychange', async () => {
+    if (document.hidden || !navigator.onLine || !APP.perfil) return;
+    const ultima = await DB.leerKV('ultimaSync');
+    if (ultima && Date.now() - new Date(ultima).getTime() < 60000) return;
+    sincronizar(true);
+  });
 }
 
 $('#btn-ingresar').addEventListener('click', async () => {
@@ -1556,39 +1568,24 @@ async function sincronizar(silencioso = false) {
     // 1) Primero sube lo que está pendiente, para no perder trabajo.
     if (APP.cola.length) await enviarCola(silencioso);
 
-    // 2) ¿Cambió algo desde la última vez?
+    // 2) Baja el catálogo actualizado, siempre.
     //
-    // El catálogo pesa unos 140 KB y antes se bajaba cada 10 minutos aunque
-    // nadie hubiera tocado nada: en campo eso es batería y datos gastados en
-    // balde. Esta consulta pesa unos pocos bytes.
+    // Se intentó ahorrarse esta descarga (unos 140 KB) preguntando antes
+    // "¿cambió algo?" contra la fecha de modificación que reporta Drive.
+    // NO sirve: esa fecha tarda en moverse cuando alguien edita la hoja a
+    // mano, así que la app respondía "no hay novedad" y se quedaba
+    // mostrando datos viejos después de corregir algo en el Sheet.
     //
-    // Solo se hace en la sincronización AUTOMÁTICA. Cuando el geólogo toca
-    // el botón espera datos frescos, y ahorrarle la descarga sería
-    // desobedecerlo: ahí siempre se baja todo.
-    // Se exige tener datos en mano para poder saltarse la descarga: si la
-    // copia local quedó vacía (se limpió el navegador, falló IndexedDB) la
-    // marca sola haría que la app se quedara en blanco creyendo que está al día.
-    if (silencioso && APP.historial.length) {
-      const marca = await DB.leerKV('marcaCambio');
-      if (marca) {
-        try {
-          const c = await api('hay_cambios');
-          if (c.cambio && c.cambio === marca) return;   // nada nuevo, no se baja
-        } catch (e) {
-          // Si la consulta falla se sigue de largo y se baja el catálogo:
-          // más vale gastar datos que quedarse con información vieja.
-        }
-      }
-    }
-
-    // 3) Baja el catálogo actualizado.
+    // Aquí eso pesa más que los datos móviles: la hoja se edita a mano todos
+    // los días -corregir coordenadas, reasignar solicitudes, borrar pruebas-
+    // y esos cambios tienen que verse. Si algún día vuelve a intentarse,
+    // tendrá que ser con una señal que sí refleje las ediciones manuales.
     const r = await api('catalogo');
     APP.solicitudes = r.solicitudes || [];
     APP.historial = r.historial || [];
     await DB.guardarKV('solicitudes', APP.solicitudes);
     await DB.guardarKV('historial', APP.historial);
     await DB.guardarKV('ultimaSync', new Date().toISOString());
-    if (r.cambio) await DB.guardarKV('marcaCambio', r.cambio);
     pintarTodo();
     if (!silencioso) toast('Actualizado: ' + pendientes().length + ' pendientes', 'ok');
   } catch (e) {
