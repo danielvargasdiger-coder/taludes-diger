@@ -93,17 +93,22 @@ small { font-weight: 400; }
    Se esconde el texto y queda el logo, que ya dice de quien es la app. */
 @media (max-width: 420px) {
   .topbar-title strong { display: none; }
-  .logo-barra { margin-top: 0; }
+  .logos-barra { margin-top: 0; }
 }
 
-/* El logo va sobre blanco: es un escudo a color y sobre el azul de la barra
-   se ensuciaría. La pastilla blanca lo aísla y hace de firma institucional,
-   así que ocupa el lugar del texto "DIGER Pereira". */
+/* Los logos van sobre blanco: son escudos a color y sobre el azul de la
+   barra se ensuciarían. La pastilla blanca los aísla y hace de firma
+   institucional, así que ocupan el lugar del texto "DIGER Pereira". Van
+   los dos juntos porque la app la usan las dos entidades por igual. */
+.logos-barra { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
 .logo-barra {
-  display: block; height: 27px; width: auto; margin-top: 6px;
+  display: block; height: 27px; width: auto;
   background: #fff; border-radius: 5px; padding: 3px 6px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, .25);
 }
+/* El logo de CARDER es vertical (angosto y alto): a la misma altura que el
+   de DIGER se vería diminuto, así que se le da un poco más de aire. */
+.logo-barra-carder { height: 30px; padding: 2px 5px; }
 .topbar-acciones { display: flex; gap: 8px; flex: none; }
 
 /* Aviso de fichas sin enviar. Sustituye a la pestaña "Por enviar":
@@ -164,14 +169,19 @@ small { font-weight: 400; }
 }
 .ingreso-caja h1 { text-align: center; font-size: 1.3rem; color: var(--azul); margin-top: 0; }
 .ingreso-caja h1 small { font-size: 1.1rem; }
-.logo-ingreso {
-  display: block; width: 100%; max-width: 230px; height: auto;
-  margin: 16px auto 12px;
+/* Los dos logos, del mismo alto para que se lean como una pareja aunque
+   uno sea ancho (DIGER) y el otro angosto (CARDER): esta app la usan las
+   dos entidades por igual. */
+.logos-ingreso {
+  display: flex; align-items: center; justify-content: center;
+  gap: 22px; flex-wrap: wrap; margin: 18px auto 12px;
 }
+.logo-ingreso { display: block; width: auto; height: 62px; max-width: 100%; }
+.logo-ingreso-carder { height: 80px; }
 /* Franja con los colores del escudo. Da identidad sin repintar la app
    entera de rojo, que chocaría con la escala de prioridades. */
 .franja-inst {
-  height: 4px; border-radius: 3px; margin: 0 auto 20px; max-width: 230px;
+  height: 4px; border-radius: 3px; margin: 0 auto 20px; max-width: 260px;
   background: linear-gradient(90deg,
     var(--inst-rojo) 0 33.3%, var(--inst-amarillo) 33.3% 66.6%, var(--inst-verde) 66.6%);
 }
@@ -180,14 +190,18 @@ small { font-weight: 400; }
 label { display: block; margin-bottom: 13px; font-size: .84rem; font-weight: 600; color: var(--texto); }
 
 input[type=text], input[type=password], input[type=search],
-input[type=number], input[type=datetime-local], textarea {
+input[type=number], input[type=datetime-local], textarea, select {
   width: 100%; margin-top: 5px; padding: 12px 12px;
   border: 1.5px solid var(--borde); border-radius: var(--radio);
   font-size: 16px; font-family: inherit; color: var(--texto);
   background: #fff; font-weight: 400;
 }
-input:focus, textarea:focus { outline: none; border-color: var(--azul); box-shadow: 0 0 0 3px var(--azul-claro); }
+input:focus, textarea:focus, select:focus { outline: none; border-color: var(--azul); box-shadow: 0 0 0 3px var(--azul-claro); }
 textarea { min-height: 96px; resize: vertical; }
+select { appearance: none; -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%234a5b6a' d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center; padding-right: 34px;
+}
 
 /* ------------------------------------------------------------ BOTONES */
 .btn-principal {
@@ -1072,5 +1086,6 @@ body.con-aviso { padding-top: var(--alto-aviso, 52px); }
 @media (min-width: 900px) {
   .topbar-title strong { font-size: 1.18rem; }
   .logo-barra { height: 26px; }
+  .logo-barra-carder { height: 29px; }
   .tarjeta { padding: 14px 16px; }
 }

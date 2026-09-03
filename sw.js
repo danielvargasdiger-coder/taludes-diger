@@ -11,7 +11,7 @@
  * service worker borra solo las cachés de SU prefijo.
  */
 const PREFIJO = 'taludes';        // en el gemelo de pruebas: 'pruebas'
-const VERSION = PREFIJO + '-v40';
+const VERSION = PREFIJO + '-v41';
 
 const ARCHIVOS = [
   './',
@@ -22,6 +22,8 @@ const ARCHIVOS = [
   './app.js',
   './manifest.json',
   './logo-app.png',
+  './logo-carder.png',
+  './logo-carder-compacto.png',
   './icon-192.png',
   './icon-512.png'
 ];

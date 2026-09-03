@@ -1765,6 +1765,9 @@ function datosIniciales(s) {
   return {
     codigo_evaluacion: String(s.idSolicitud),
     fecha_hora_visita: ahoraLocal(),
+    // Ver el caso 'municipio' en dibujarCampo(): DIGER Pereira lo deja fijo
+    // en Pereira; a quien no tiene solicitudes propias se lo pregunta.
+    municipio: APP.perfil.verSolicitudes ? 'Pereira' : '',
     barrio_vereda: s.barrio || '',
     direccion_referencia: [s.direccion, s.edificacion].filter(Boolean).join(' — '),
     coordenadas: { y: s.latitud || '', x: s.longitud || '', z: '', precision: null, fuente: s.latitud ? 'base' : '' },
@@ -1954,6 +1957,27 @@ function dibujarCampo(campo) {
     case 'textarea': {
       div.innerHTML = etiqueta + '<textarea>' + esc(valor || '') + '</textarea>';
       div.querySelector('textarea').addEventListener('input', (e) => setValor(campo.id, e.target.value));
+      break;
+    }
+
+    case 'municipio': {
+      // DIGER Pereira solo trabaja en Pereira: se fija solo, igual que el
+      // código de evaluación, y no se pregunta. Quien no tiene solicitudes
+      // propias (hoy, CARDER) cubre todo el departamento: elige de la lista.
+      if (APP.perfil.verSolicitudes) {
+        if (valor !== 'Pereira') setValor(campo.id, 'Pereira');
+        div.innerHTML = etiqueta +
+          '<div class="valor-fijo">Pereira' +
+            '<span class="candado" title="DIGER Pereira solo trabaja en Pereira">&#128274;</span>' +
+          '</div>';
+        break;
+      }
+      div.innerHTML = etiqueta + '<select><option value="">Selecciona el municipio</option>' +
+        campo.opciones.map((m) =>
+          '<option value="' + esc(m) + '"' + (m === valor ? ' selected' : '') + '>' + esc(m) + '</option>'
+        ).join('') +
+        '</select>';
+      div.querySelector('select').addEventListener('change', (e) => setValor(campo.id, e.target.value));
       break;
     }
 

@@ -53,6 +53,11 @@ const FICHA_SCHEMA = {
       campos: [
         { id: 'codigo_evaluacion', etiqueta: 'Código de evaluación', tipo: 'texto', soloLectura: true, ancho: 'medio' },
         { id: 'fecha_hora_visita', etiqueta: 'Fecha/hora visita', tipo: 'fecha_hora', requerido: true, ancho: 'medio' },
+        // DIGER Pereira solo trabaja en Pereira: se fija solo, sin preguntar.
+        // CARDER cubre todo el departamento: elige entre los 14 municipios.
+        // Cual de las dos formas se ve lo decide app.js segun la entidad.
+        { id: 'municipio', etiqueta: 'Municipio', tipo: 'municipio', requerido: true,
+          opciones: ['Apía', 'Balboa', 'Belén de Umbría', 'Dosquebradas', 'Guática', 'La Celia', 'La Virginia', 'Marsella', 'Mistrató', 'Pereira', 'Pueblo Rico', 'Quinchía', 'Santa Rosa de Cabal', 'Santuario'], ancho: 'completo' },
         { id: 'barrio_vereda', etiqueta: 'Barrio / Vereda', tipo: 'texto', requerido: true, ancho: 'medio' },
         { id: 'direccion_referencia', etiqueta: 'Dirección o referencia', tipo: 'texto', requerido: true, ancho: 'medio' },
         { id: 'coordenadas', etiqueta: 'Coordenadas / Altitud (grados decimales)', tipo: 'gps', requerido: true, ancho: 'completo' },
