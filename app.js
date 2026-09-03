@@ -107,20 +107,6 @@ function ahoraLocal() {
 }
 
 /**
- * Abre el PDF en el visor de Drive, sin descargarlo.
- *
- * Se reconstruye el enlace desde el id en vez de usar el que guarda Drive
- * (.../view?usp=drivesdk): ese parámetro es el que hace que Android se lo
- * pase a la app de Drive, que intenta abrirlo con la cuenta del usuario y
- * falla aunque el archivo sea público. Sin él, el visor abre en el navegador.
- */
-function enlacePdf(url) {
-  const u = String(url || '');
-  const m = u.match(/[-\w]{25,}/);
-  return m ? 'https://drive.google.com/file/d/' + m[0] + '/view' : u;
-}
-
-/**
  * Enlace de Drive que el navegador SÍ muestra dentro de una etiqueta de imagen.
  *
  * El que devuelve Drive (uc?id=...) dejó de servir para incrustar: responde
@@ -1576,19 +1562,14 @@ function pintarPendientes() {
                 (e.visita.entidad ? ' · ' + esc(e.visita.entidad) : '') + '</div>' +
               '<div class="visita-acciones">' +
                 '<span class="enlace-ficha">Ver ficha completa</span>' +
-                // La ficha en linea siempre muestra el dato de hoy; el PDF
-                // quedo congelado el dia que se cerro la visita. Si la
-                // copia guardada en el celular es de antes de esta version
-                // no trae fichaUrl, y ahi sirve el PDF como respaldo.
+                // La ficha reemplazo al PDF: es el unico enlace que se
+                // muestra. Solo falta si la copia guardada en el celular es
+                // de antes de esta version (se corrige solo al sincronizar).
                 (e.visita.fichaUrl
                   ? '<a class="enlace-hoja" target="_blank" rel="noopener" ' +
                     'href="' + esc(e.visita.fichaUrl) + '" ' +
                     'onclick="event.stopPropagation()">FICHA</a>'
-                  : e.visita.pdfUrl
-                    ? '<a class="enlace-pdf" target="_blank" rel="noopener" ' +
-                      'href="' + esc(enlacePdf(e.visita.pdfUrl)) + '" ' +
-                      'onclick="event.stopPropagation()">PDF</a>'
-                    : '') +
+                  : '') +
               '</div>'
             : '') +
         '</div>'
@@ -2568,23 +2549,16 @@ async function abrirDetalle(idVisita) {
   }
 
   let html = '';
-  if (h.fichaUrl || h.pdfUrl) {
-    // El boton principal es la ficha en linea: se arma en el momento, asi
-    // que refleja cualquier correccion que se haya hecho en la base. Desde
-    // ahi el navegador imprime o guarda en PDF. El PDF de Drive queda como
-    // segunda opcion porque es una foto fija del dia que se cerro.
+  if (h.fichaUrl) {
+    // La ficha reemplazo al PDF: se arma en el momento, asi que refleja
+    // cualquier correccion que se haya hecho en la base. Desde ahi el
+    // navegador imprime o guarda en PDF, no hace falta generarlo aparte.
     html += '<div class="detalle-seccion"><div class="detalle-acciones">' +
-      (h.fichaUrl
-        ? '<a class="btn-pdf" href="' + esc(h.fichaUrl) + '" target="_blank" rel="noopener">' +
-          '&#128196; Abrir la ficha completa</a>' +
-          '<p class="nota-ficha">Se abre en el navegador con los datos de hoy. ' +
-          'Desde ahi puedes imprimirla, guardarla en PDF o copiar el enlace ' +
-          'para mandarlo.</p>'
-        : '') +
-      (h.pdfUrl
-        ? '<a class="btn-pdf alterno" href="' + esc(enlacePdf(h.pdfUrl)) + '" target="_blank" rel="noopener">' +
-          (h.fichaUrl ? 'Ver el PDF que se genero al cerrar la visita' : '&#128196; Abrir el PDF de la ficha') + '</a>'
-        : '') +
+      '<a class="btn-pdf" href="' + esc(h.fichaUrl) + '" target="_blank" rel="noopener">' +
+        '&#128196; Abrir la ficha completa</a>' +
+      '<p class="nota-ficha">Se abre en el navegador con los datos de hoy. ' +
+        'Desde ahi puedes imprimirla, guardarla en PDF o copiar el enlace ' +
+        'para mandarlo.</p>' +
       '</div></div>';
   }
 
