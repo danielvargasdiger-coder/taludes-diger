@@ -366,6 +366,49 @@ select { appearance: none; -webkit-appearance: none;
   padding-left: 2px;
 }
 
+/* Chips de lo que hay filtrado. Importan sobre todo para barrio y dia, que
+   solo se ponen tocando una grafica y no tienen desplegable arriba. */
+.t-chips { display: flex; flex-wrap: wrap; gap: 7px; margin: 0 0 10px; }
+.t-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: var(--azul-claro); color: var(--azul); border: 1px solid #bcd6e3;
+  border-radius: 999px; padding: 6px 8px 6px 12px;
+  font: 600 .78rem inherit; font-family: inherit; cursor: pointer;
+}
+.t-chip b { font-weight: 800; }
+.t-chip i { font-style: normal; font-size: 1.05rem; line-height: 1; opacity: .7; }
+.t-chip:active { background: #d6e8f1; }
+
+/* ---- graficas tocables ----
+   Cada barra, tajada y columna filtra el tablero por su valor. Se marcan
+   como boton de verdad (no un div con onclick) para que funcionen con
+   teclado y las lea un lector de pantalla. */
+.barra-fila.tocable, .col-dia.tocable {
+  border: 0; background: none; font: inherit; color: inherit;
+  text-align: left; cursor: pointer; padding: 2px 4px; margin: -2px -4px;
+  border-radius: 7px; width: calc(100% + 8px);
+}
+.barra-fila.tocable:hover, .col-dia.tocable:hover { background: var(--azul-claro); }
+.barra-fila.activa, .col-dia.activa { background: var(--azul-claro); }
+.barra-fila.activa .barra-et { color: var(--azul); font-weight: 800; }
+
+.col-dia.tocable { display: grid; justify-items: center; gap: 3px; width: 100%; }
+.col-dia.activa .col-valor { background: var(--critica); }
+.col-dia.activa .col-et { color: var(--azul); font-weight: 800; }
+
+.rosq-arco.tocable { cursor: pointer; }
+.rosq-arco.tocable:hover { opacity: .82; }
+.rosq-item {
+  display: grid; grid-template-columns: 12px minmax(0, 1fr) auto auto;
+  gap: 8px; align-items: center; width: 100%;
+  border: 0; background: none; font: inherit; color: inherit;
+  text-align: left; padding: 3px 5px; margin: 0 -5px; border-radius: 7px;
+}
+.rosq-item.tocable { cursor: pointer; }
+.rosq-item.tocable:hover { background: var(--azul-claro); }
+.rosq-item.activa { background: var(--azul-claro); }
+.rosq-item.activa span { font-weight: 800; color: var(--azul); }
+
 /* Rosquilla de prioridad: SVG a mano, sin libreria de graficas. */
 .rosquilla-caja { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
 .rosquilla { width: 140px; height: 140px; flex: none; }
@@ -376,10 +419,7 @@ select { appearance: none; -webkit-appearance: none;
   text-anchor: middle; font: 600 10px system-ui, sans-serif; fill: var(--texto-suave);
 }
 .rosquilla-leyenda { list-style: none; margin: 0; padding: 0; flex: 1; min-width: 150px; }
-.rosquilla-leyenda li {
-  display: grid; grid-template-columns: 12px minmax(0, 1fr) auto auto;
-  gap: 8px; align-items: center; font-size: .82rem; padding: 3px 0;
-}
+.rosquilla-leyenda li { font-size: .82rem; }
 .rosquilla-leyenda i { width: 12px; height: 12px; border-radius: 3px; display: block; }
 .rosquilla-leyenda span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rosquilla-leyenda b { font-weight: 800; }
@@ -390,9 +430,13 @@ select { appearance: none; -webkit-appearance: none;
 
 /* Mapa dentro del tablero. Mas bajo que el de la pestana del mapa: aqui es
    una grafica mas, no la herramienta de campo. */
+/* position + z-index crean un contexto de apilamiento propio. Sin esto,
+   los paneles internos de Leaflet (que llegan a z-index 800) se montan
+   sobre la barra azul de arriba al bajar por el tablero. */
 .mapa-tablero {
   height: 300px; border-radius: var(--radio); overflow: hidden;
   border: 1px solid var(--borde); background: var(--fondo);
+  position: relative; z-index: 0;
 }
 .mapa-sin-red-chico {
   display: grid; place-items: center; height: 100%; padding: 20px;

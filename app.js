@@ -129,6 +129,21 @@ function fechaBonita(iso) {
 }
 
 /**
+ * Solo día y mes, para los chips del tablero: "26 ago".
+ *
+ * Se parte el texto en vez de usar Date porque llega un día suelto
+ * (2026-08-26) y el navegador lo leería como UTC, mostrando el día
+ * anterior en nuestra zona horaria.
+ */
+function fechaCorta(iso) {
+  const p = String(iso || '').split('-');
+  if (p.length !== 3) return String(iso || '');
+  const d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+  if (isNaN(d)) return String(iso);
+  return d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' });
+}
+
+/**
  * Deja un número escribible desde cualquier teclado de celular.
  * Muchos teclados en español ponen coma como separador decimal y
  * <input type="number"> la rechaza en silencio: por eso los campos
@@ -323,13 +338,40 @@ function precalentarGps(cb) {
 
 /** La forma que debe tener SIEMPRE APP.filtroT. Un solo sitio que cambiar. */
 function filtroTableroVacio() {
-  return { periodo: 'todo', entidad: '', municipio: '', prioridad: '', evaluador: '' };
+  return { periodo: 'todo', entidad: '', municipio: '', prioridad: '',
+           evaluador: '', barrio: '', dia: '' };
 }
+
+/**
+ * Como se llama cada filtro cuando se muestra en un chip.
+ *
+ * barrio y dia NO tienen desplegable arriba -son demasiados valores para una
+ * lista-: solo se ponen tocando su barra o su columna. Por eso los chips
+ * importan: son la unica senal de que estan puestos.
+ */
+const NOMBRE_FILTRO_T = {
+  periodo: 'Periodo', entidad: 'Entidad', municipio: 'Municipio',
+  prioridad: 'Prioridad', evaluador: 'Evaluador', barrio: 'Barrio', dia: 'Día'
+};
 
 function hayFiltroTablero() {
   const f = APP.filtroT || {};
-  return !!(f.entidad || f.municipio || f.prioridad || f.evaluador ||
-            (f.periodo && f.periodo !== 'todo'));
+  return Object.keys(NOMBRE_FILTRO_T).some((k) => {
+    return k === 'periodo' ? (f.periodo && f.periodo !== 'todo') : !!f[k];
+  });
+}
+
+/**
+ * Pone o quita un filtro desde una grafica.
+ *
+ * Tocar lo que ya esta filtrado lo quita: es lo que uno espera al volver a
+ * tocar algo que ya esta marcado, y evita tener que ir al boton de limpiar
+ * para deshacer un toque.
+ */
+function alternarFiltroTablero(clave, valor) {
+  if (!APP.filtroT) APP.filtroT = filtroTableroVacio();
+  APP.filtroT[clave] = (APP.filtroT[clave] === valor) ? '' : valor;
+  pintarTablero();
 }
 
 const DIAS_PERIODO = { '7': 7, '30': 30, '90': 90 };
@@ -362,6 +404,8 @@ function visitasDelTablero() {
   // Una visita puede tener varios evaluadores en el mismo campo: se busca
   // dentro de la lista, no por igualdad exacta (ver evaluadoresDe).
   if (f.evaluador) vis = vis.filter((v) => evaluadoresDe(v).indexOf(f.evaluador) !== -1);
+  if (f.barrio) vis = vis.filter((v) => (v.barrio || '(sin barrio)') === f.barrio);
+  if (f.dia) vis = vis.filter((v) => String(v.fechaVisita || '').slice(0, 10) === f.dia);
   return vis;
 }
 
@@ -388,19 +432,31 @@ function cuentaPorVarios(lista, sacaVarios, vacio) {
     .sort((a, b) => b.n - a.n);
 }
 
-/** Barras horizontales. El ancho es relativo al valor más alto del grupo. */
-function barras(datos, color, tope) {
+/**
+ * Barras horizontales. El ancho es relativo al valor más alto del grupo.
+ *
+ * Con `clave`, cada barra es un boton que filtra el tablero por ese valor.
+ * La que ya esta filtrada se marca, y volver a tocarla quita el filtro.
+ */
+function barras(datos, color, tope, clave) {
   if (!datos.length) return '<p class="tablero-vacio">Nada que mostrar con este filtro.</p>';
   const max = Math.max.apply(null, datos.map((d) => d.n)) || 1;
-  return '<div class="barras">' + datos.slice(0, tope || 8).map((d) =>
-    '<div class="barra-fila">' +
+  const activo = clave ? (APP.filtroT || {})[clave] : '';
+  return '<div class="barras">' + datos.slice(0, tope || 8).map((d) => {
+    const marcada = clave && d.etiqueta === activo;
+    const etiqueta = clave ? 'button type="button"' : 'div';
+    const cierre = clave ? 'button' : 'div';
+    return '<' + etiqueta + ' class="barra-fila' + (clave ? ' tocable' : '') +
+        (marcada ? ' activa' : '') + '"' +
+        (clave ? ' data-fchart="' + clave + '" data-fvalor="' + esc(d.etiqueta) + '"' : '') + '>' +
       '<span class="barra-et" title="' + esc(d.etiqueta) + '">' + esc(d.etiqueta) + '</span>' +
       '<span class="barra-riel">' +
         '<span class="barra-valor" style="width:' + Math.max(4, Math.round(d.n / max * 100)) +
           '%;background:' + (typeof color === 'function' ? color(d.etiqueta) : color) + '"></span>' +
       '</span>' +
       '<b class="barra-n">' + d.n + '</b>' +
-    '</div>').join('') + '</div>';
+    '</' + cierre + '>';
+  }).join('') + '</div>';
 }
 
 /** Columnas por día, para ver el ritmo de trabajo de la última quincena. */
@@ -417,14 +473,26 @@ function columnasPorDia(visitas) {
     if (k) c[k] = (c[k] || 0) + 1;
   });
   const max = Math.max.apply(null, dias.map((x) => c[x.iso] || 0)) || 1;
+  const activo = (APP.filtroT || {}).dia;
   return '<div class="columnas">' + dias.map((x) => {
     const n = c[x.iso] || 0;
-    return '<div class="col-dia" title="' + x.iso + ': ' + n + '">' +
-      '<span class="col-n">' + (n || '') + '</span>' +
+    // Un dia sin visitas no se puede tocar: filtrar por el dejaria el
+    // tablero en blanco y no dice nada que no diga ya la columna vacia.
+    if (!n) {
+      return '<div class="col-dia" title="' + x.iso + ': sin visitas">' +
+        '<span class="col-n"></span>' +
+        '<span class="col-riel"><span class="col-valor" style="height:0"></span></span>' +
+        '<span class="col-et">' + x.d.getDate() + '</span></div>';
+    }
+    return '<button type="button" class="col-dia tocable' +
+        (x.iso === activo ? ' activa' : '') + '"' +
+        ' data-fchart="dia" data-fvalor="' + x.iso + '"' +
+        ' title="' + x.iso + ': ' + n + '">' +
+      '<span class="col-n">' + n + '</span>' +
       '<span class="col-riel"><span class="col-valor" style="height:' +
-        (n ? Math.max(6, Math.round(n / max * 100)) : 0) + '%"></span></span>' +
+        Math.max(6, Math.round(n / max * 100)) + '%"></span></span>' +
       '<span class="col-et">' + x.d.getDate() + '</span>' +
-    '</div>';
+    '</button>';
   }).join('') + '</div>';
 }
 
@@ -435,23 +503,34 @@ function columnasPorDia(visitas) {
  * radio: cada uno pinta solo su tajada y se rota para empezar donde
  * terminó el anterior. En el hueco del centro va el total.
  */
-function rosquilla(datos, color, centroN, centroT) {
+function rosquilla(datos, color, centroN, centroT, clave) {
   const total = datos.reduce((s, d) => s + d.n, 0);
   if (!total) return '<p class="tablero-vacio">Nada que mostrar con este filtro.</p>';
 
+  const activo = clave ? (APP.filtroT || {})[clave] : '';
+  const tocable = clave ? ' data-fchart="' + clave + '"' : '';
   const R = 54, GROSOR = 22, CIRC = 2 * Math.PI * R;
   let giro = -90;   // arranca arriba, no a la derecha
   const arcos = datos.map((d) => {
     const frac = d.n / total;
+    const marcada = clave && d.etiqueta === activo;
+    // La tajada filtrada se engorda un poco: se nota cual esta activa sin
+    // tener que leer la leyenda.
+    const grosor = marcada ? GROSOR + 6 : GROSOR;
     const arco = '<circle cx="70" cy="70" r="' + R + '" fill="none"' +
+      ' class="rosq-arco' + (clave ? ' tocable' : '') + '"' + tocable +
+      (clave ? ' data-fvalor="' + esc(d.etiqueta) + '"' : '') +
       ' stroke="' + (typeof color === 'function' ? color(d.etiqueta) : color) + '"' +
-      ' stroke-width="' + GROSOR + '"' +
+      ' stroke-width="' + grosor + '"' +
       ' stroke-dasharray="' + (frac * CIRC).toFixed(2) + ' ' + CIRC.toFixed(2) + '"' +
       ' transform="rotate(' + giro.toFixed(2) + ' 70 70)"><title>' +
       esc(d.etiqueta) + ': ' + d.n + '</title></circle>';
     giro += frac * 360;
     return arco;
   }).join('');
+
+  const item = clave ? 'button type="button"' : 'span';
+  const itemCierre = clave ? 'button' : 'span';
 
   return '<div class="rosquilla-caja">' +
     '<svg class="rosquilla" viewBox="0 0 140 140" role="img" aria-label="Distribución por prioridad">' +
@@ -460,10 +539,14 @@ function rosquilla(datos, color, centroN, centroT) {
       '<text x="70" y="84" class="rosq-t">' + esc(centroT) + '</text>' +
     '</svg>' +
     '<ul class="rosquilla-leyenda">' + datos.map((d) =>
-      '<li><i style="background:' + (typeof color === 'function' ? color(d.etiqueta) : color) + '"></i>' +
-      '<span>' + esc(d.etiqueta) + '</span>' +
-      '<b>' + d.n + '</b>' +
-      '<em>' + Math.round(d.n / total * 100) + '%</em></li>').join('') +
+      '<li><' + item + ' class="rosq-item' + (clave ? ' tocable' : '') +
+        (clave && d.etiqueta === activo ? ' activa' : '') + '"' + tocable +
+        (clave ? ' data-fvalor="' + esc(d.etiqueta) + '"' : '') + '>' +
+        '<i style="background:' + (typeof color === 'function' ? color(d.etiqueta) : color) + '"></i>' +
+        '<span>' + esc(d.etiqueta) + '</span>' +
+        '<b>' + d.n + '</b>' +
+        '<em>' + Math.round(d.n / total * 100) + '%</em>' +
+      '</' + itemCierre + '></li>').join('') +
     '</ul></div>';
 }
 
@@ -485,6 +568,30 @@ function selectorTablero(clave, titulo, opciones, valorActual, etiquetaTodos) {
         esc(o.etiqueta) + ' (' + o.n + ')</option>').join('') +
     '</select></label>';
 }
+
+/**
+ * Clics dentro del tablero: chips, boton de limpiar y graficas.
+ *
+ * Va colgado UNA sola vez del contenedor, que no se reemplaza entre
+ * repintados (solo cambia su contenido). Colgarlo dentro de pintarTablero
+ * sumaba un oyente por repintado, y con dos el mismo clic alternaba el
+ * filtro dos veces: parecia que las graficas no respondian.
+ */
+document.getElementById('cuerpo-tablero').addEventListener('click', (ev) => {
+  if (ev.target.closest('#t-limpiar')) {
+    APP.filtroT = filtroTableroVacio();
+    pintarTablero();
+    return;
+  }
+  const quitar = ev.target.closest('[data-quitar]');
+  if (quitar) {
+    APP.filtroT[quitar.dataset.quitar] = quitar.dataset.quitar === 'periodo' ? 'todo' : '';
+    pintarTablero();
+    return;
+  }
+  const punto = ev.target.closest('[data-fchart]');
+  if (punto) alternarFiltroTablero(punto.dataset.fchart, punto.dataset.fvalor);
+});
 
 async function pintarTablero() {
   const cont = $('#cuerpo-tablero');
@@ -522,7 +629,20 @@ async function pintarTablero() {
   '</div>';
 
   if (hayFiltroTablero()) {
-    html += '<p class="t-filtrando">Mostrando <b>' + vis.length + '</b> de ' +
+    // Los chips son la unica forma de ver que hay un filtro de barrio o de
+    // dia puesto: esos dos solo se ponen tocando una grafica, no tienen
+    // desplegable arriba.
+    const chips = Object.keys(NOMBRE_FILTRO_T).map((k) => {
+      const v = f[k];
+      if (!v || (k === 'periodo' && v === 'todo')) return '';
+      const texto = k === 'periodo' ? 'Últimos ' + v + ' días'
+                  : k === 'dia' ? fechaCorta(v) : v;
+      return '<button type="button" class="t-chip" data-quitar="' + k + '">' +
+        '<span>' + esc(NOMBRE_FILTRO_T[k]) + ': <b>' + esc(texto) + '</b></span>' +
+        '<i aria-hidden="true">&times;</i></button>';
+    }).join('');
+    html += '<div class="t-chips">' + chips + '</div>' +
+      '<p class="t-filtrando">Mostrando <b>' + vis.length + '</b> de ' +
       todas.length + ' visitas.</p>';
   }
 
@@ -581,17 +701,18 @@ async function pintarTablero() {
   html += '<div class="t-rejilla">' +
     '<div class="t-bloque"><h3>Prioridad</h3>' +
       rosquilla(cuentaPor(vis, (v) => (v.prioridad || '').toUpperCase(), 'SIN PRIORIDAD'),
-                colorPrioridad, vis.length, vis.length === 1 ? 'visita' : 'visitas') + '</div>' +
+                colorPrioridad, vis.length, vis.length === 1 ? 'visita' : 'visitas',
+                'prioridad') + '</div>' +
     '<div class="t-bloque"><h3>Ritmo de los últimos 14 días</h3>' +
       columnasPorDia(vis) + '</div>' +
     '<div class="t-bloque"><h3>Por entidad</h3>' +
-      barras(cuentaPor(vis, (v) => v.entidad, '(sin entidad)'), '#3f8c54') + '</div>' +
+      barras(cuentaPor(vis, (v) => v.entidad, '(sin entidad)'), '#3f8c54', 8, 'entidad') + '</div>' +
     '<div class="t-bloque"><h3>Por municipio</h3>' +
-      barras(cuentaPor(vis, (v) => v.municipio, '(sin municipio)'), '#0b4f6c') + '</div>' +
+      barras(cuentaPor(vis, (v) => v.municipio, '(sin municipio)'), '#0b4f6c', 8, 'municipio') + '</div>' +
     '<div class="t-bloque"><h3>Barrios con más visitas</h3>' +
-      barras(cuentaPor(vis, (v) => v.barrio, '(sin barrio)'), '#8a5a00') + '</div>' +
+      barras(cuentaPor(vis, (v) => v.barrio, '(sin barrio)'), '#8a5a00', 8, 'barrio') + '</div>' +
     '<div class="t-bloque"><h3>Quién ha evaluado</h3>' +
-      barras(cuentaPorVarios(vis, evaluadoresDe, '(sin evaluador)'), '#6a1b9a') + '</div>' +
+      barras(cuentaPorVarios(vis, evaluadoresDe, '(sin evaluador)'), '#6a1b9a', 8, 'evaluador') + '</div>' +
   '</div>';
 
   // ------------------------------------------------------------ calidad
@@ -621,12 +742,6 @@ async function pintarTablero() {
       pintarTablero();
     });
   });
-  const limpiar = cont.querySelector('#t-limpiar');
-  if (limpiar) limpiar.addEventListener('click', () => {
-    APP.filtroT = filtroTableroVacio();
-    pintarTablero();
-  });
-
   pintarMapaTablero(conCoord);
 
   let corte = '';
