@@ -1602,7 +1602,7 @@ async function enviarCola(silencioso) {
         await DB.guardar('cola', item);
       }
 
-      if (!silencioso) cargando(true, 'Generando el PDF…');
+      if (!silencioso) cargando(true, 'Cerrando la visita…');
       await api('finalizar_visita', { idVisita: item.idServidor }, 90000);
 
       await DB.borrar('cola', item.idLocal);
