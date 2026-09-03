@@ -339,6 +339,72 @@ select { appearance: none; -webkit-appearance: none;
 .filtro.activo b { background: rgba(255,255,255,.22); color: #fff; }
 
 /* ------------------------------------------------------------ TABLERO */
+
+/* Barra de filtros. Es lo que convierte el tablero en algo con lo que se
+   pueden responder preguntas, en vez de una foto fija: todo lo de abajo
+   -cifras, mapa y graficas- se recalcula con lo que se escoja aqui. */
+.t-filtros {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px; align-items: end;
+  background: #fff; border: 1px solid var(--borde); border-radius: var(--radio);
+  padding: 13px 14px; box-shadow: var(--sombra); margin-bottom: 13px;
+}
+.t-filtro { margin: 0; display: block; min-width: 0; }
+.t-filtro > span {
+  display: block; font-size: .72rem; font-weight: 800; color: var(--azul);
+  text-transform: uppercase; letter-spacing: .03em; margin-bottom: 4px;
+}
+.t-filtro select { margin-top: 0; padding: 9px 30px 9px 10px; font-size: .88rem; }
+.t-limpiar {
+  border: 1.5px solid var(--borde); background: #fff; color: var(--texto);
+  border-radius: var(--radio); padding: 10px 14px; font: 700 .84rem inherit;
+  cursor: pointer; font-family: inherit; white-space: nowrap;
+}
+.t-limpiar:active { background: var(--fondo); }
+.t-filtrando {
+  margin: -4px 0 13px; font-size: .82rem; color: var(--texto-suave);
+  padding-left: 2px;
+}
+
+/* Rosquilla de prioridad: SVG a mano, sin libreria de graficas. */
+.rosquilla-caja { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.rosquilla { width: 140px; height: 140px; flex: none; }
+.rosq-n {
+  text-anchor: middle; font: 800 26px system-ui, sans-serif; fill: var(--texto);
+}
+.rosq-t {
+  text-anchor: middle; font: 600 10px system-ui, sans-serif; fill: var(--texto-suave);
+}
+.rosquilla-leyenda { list-style: none; margin: 0; padding: 0; flex: 1; min-width: 150px; }
+.rosquilla-leyenda li {
+  display: grid; grid-template-columns: 12px minmax(0, 1fr) auto auto;
+  gap: 8px; align-items: center; font-size: .82rem; padding: 3px 0;
+}
+.rosquilla-leyenda i { width: 12px; height: 12px; border-radius: 3px; display: block; }
+.rosquilla-leyenda span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rosquilla-leyenda b { font-weight: 800; }
+.rosquilla-leyenda em {
+  font-style: normal; font-size: .74rem; color: var(--texto-suave); min-width: 34px;
+  text-align: right;
+}
+
+/* Mapa dentro del tablero. Mas bajo que el de la pestana del mapa: aqui es
+   una grafica mas, no la herramienta de campo. */
+.mapa-tablero {
+  height: 300px; border-radius: var(--radio); overflow: hidden;
+  border: 1px solid var(--borde); background: var(--fondo);
+}
+.mapa-sin-red-chico {
+  display: grid; place-items: center; height: 100%; padding: 20px;
+  text-align: center; font-size: .82rem; color: var(--texto-suave); line-height: 1.5;
+}
+.t-leyenda {
+  display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px;
+  font-size: .74rem; color: var(--texto-suave); font-weight: 600;
+}
+.t-leyenda span { display: inline-flex; align-items: center; gap: 5px; }
+.t-leyenda i { width: 10px; height: 10px; border-radius: 50%; display: block; }
+
 .t-cifras {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 10px; margin-bottom: 16px;

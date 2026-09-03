@@ -311,10 +311,61 @@ function precalentarGps(cb) {
  *
  * Se arma con lo que la app YA tiene descargado, no con una consulta nueva:
  * así abre al instante y sirve igual sin señal, con el corte de la última
- * sincronización. Los gráficos son barras de HTML, sin librerías: una
+ * sincronización. Los gráficos son HTML y SVG a mano, sin librerías: una
  * librería de gráficas pesa más que toda la app y habría que descargarla
  * justo cuando el geólogo está en campo sin datos.
+ *
+ * Todo el tablero cuelga de un filtro: se elige periodo, entidad, municipio,
+ * prioridad o evaluador y TODO se recalcula -cifras, mapa y gráficas- sobre
+ * ese subconjunto. Es lo que permite responder preguntas concretas ("¿qué
+ * lleva CARDER en Dosquebradas este mes?") sin salir de la pantalla.
  */
+
+/** La forma que debe tener SIEMPRE APP.filtroT. Un solo sitio que cambiar. */
+function filtroTableroVacio() {
+  return { periodo: 'todo', entidad: '', municipio: '', prioridad: '', evaluador: '' };
+}
+
+function hayFiltroTablero() {
+  const f = APP.filtroT || {};
+  return !!(f.entidad || f.municipio || f.prioridad || f.evaluador ||
+            (f.periodo && f.periodo !== 'todo'));
+}
+
+const DIAS_PERIODO = { '7': 7, '30': 30, '90': 90 };
+
+/**
+ * Las visitas que el tablero está mirando ahora mismo.
+ *
+ * El periodo se compara contra la fecha de la VISITA, no contra la de
+ * registro: lo que interesa es cuándo se fue a campo.
+ */
+function visitasDelTablero() {
+  const f = APP.filtroT || filtroTableroVacio();
+  let vis = APP.historial.slice();
+
+  const dias = DIAS_PERIODO[f.periodo];
+  if (dias) {
+    const desde = new Date();
+    desde.setHours(0, 0, 0, 0);
+    desde.setDate(desde.getDate() - (dias - 1));
+    vis = vis.filter((v) => {
+      const d = new Date(v.fechaVisita);
+      return v.fechaVisita && !isNaN(d) && d >= desde;
+    });
+  }
+  if (f.entidad) vis = vis.filter((v) => (v.entidad || '') === f.entidad);
+  if (f.municipio) vis = vis.filter((v) => (v.municipio || '(sin municipio)') === f.municipio);
+  if (f.prioridad) {
+    vis = vis.filter((v) => ((v.prioridad || '').toUpperCase() || 'SIN PRIORIDAD') === f.prioridad);
+  }
+  // Una visita puede tener varios evaluadores en el mismo campo: se busca
+  // dentro de la lista, no por igualdad exacta (ver evaluadoresDe).
+  if (f.evaluador) vis = vis.filter((v) => evaluadoresDe(v).indexOf(f.evaluador) !== -1);
+  return vis;
+}
+
+/** Valores distintos con su conteo, de mayor a menor. */
 function cuentaPor(lista, saca, vacio) {
   const c = {};
   lista.forEach((x) => {
@@ -325,9 +376,21 @@ function cuentaPor(lista, saca, vacio) {
     .sort((a, b) => b.n - a.n);
 }
 
+/** Igual que cuentaPor pero cuando un registro puede caer en varios grupos. */
+function cuentaPorVarios(lista, sacaVarios, vacio) {
+  const c = {};
+  lista.forEach((x) => {
+    const vs = sacaVarios(x);
+    if (!vs.length) c[vacio] = (c[vacio] || 0) + 1;
+    else vs.forEach((v) => { c[v] = (c[v] || 0) + 1; });
+  });
+  return Object.keys(c).map((k) => ({ etiqueta: k, n: c[k] }))
+    .sort((a, b) => b.n - a.n);
+}
+
 /** Barras horizontales. El ancho es relativo al valor más alto del grupo. */
 function barras(datos, color, tope) {
-  if (!datos.length) return '<p class="tablero-vacio">Todavía no hay datos.</p>';
+  if (!datos.length) return '<p class="tablero-vacio">Nada que mostrar con este filtro.</p>';
   const max = Math.max.apply(null, datos.map((d) => d.n)) || 1;
   return '<div class="barras">' + datos.slice(0, tope || 8).map((d) =>
     '<div class="barra-fila">' +
@@ -365,72 +428,206 @@ function columnasPorDia(visitas) {
   }).join('') + '</div>';
 }
 
+/**
+ * Rosquilla en SVG puro: un arco por grupo, sin librerías.
+ *
+ * Se dibuja con stroke-dasharray sobre círculos concéntricos del mismo
+ * radio: cada uno pinta solo su tajada y se rota para empezar donde
+ * terminó el anterior. En el hueco del centro va el total.
+ */
+function rosquilla(datos, color, centroN, centroT) {
+  const total = datos.reduce((s, d) => s + d.n, 0);
+  if (!total) return '<p class="tablero-vacio">Nada que mostrar con este filtro.</p>';
+
+  const R = 54, GROSOR = 22, CIRC = 2 * Math.PI * R;
+  let giro = -90;   // arranca arriba, no a la derecha
+  const arcos = datos.map((d) => {
+    const frac = d.n / total;
+    const arco = '<circle cx="70" cy="70" r="' + R + '" fill="none"' +
+      ' stroke="' + (typeof color === 'function' ? color(d.etiqueta) : color) + '"' +
+      ' stroke-width="' + GROSOR + '"' +
+      ' stroke-dasharray="' + (frac * CIRC).toFixed(2) + ' ' + CIRC.toFixed(2) + '"' +
+      ' transform="rotate(' + giro.toFixed(2) + ' 70 70)"><title>' +
+      esc(d.etiqueta) + ': ' + d.n + '</title></circle>';
+    giro += frac * 360;
+    return arco;
+  }).join('');
+
+  return '<div class="rosquilla-caja">' +
+    '<svg class="rosquilla" viewBox="0 0 140 140" role="img" aria-label="Distribución por prioridad">' +
+      arcos +
+      '<text x="70" y="66" class="rosq-n">' + centroN + '</text>' +
+      '<text x="70" y="84" class="rosq-t">' + esc(centroT) + '</text>' +
+    '</svg>' +
+    '<ul class="rosquilla-leyenda">' + datos.map((d) =>
+      '<li><i style="background:' + (typeof color === 'function' ? color(d.etiqueta) : color) + '"></i>' +
+      '<span>' + esc(d.etiqueta) + '</span>' +
+      '<b>' + d.n + '</b>' +
+      '<em>' + Math.round(d.n / total * 100) + '%</em></li>').join('') +
+    '</ul></div>';
+}
+
 const COLOR_PRIORIDAD_BARRA = {
   'CRÍTICA': '#a3000d', 'CRITICA': '#a3000d', 'ALTA': '#d84315',
   'MEDIA': '#ef8c00', 'BAJA': '#2e7d32'
 };
+const colorPrioridad = (et) => COLOR_PRIORIDAD_BARRA[et] || '#8896a0';
+
+/** Un desplegable del filtro. Se omite solo si no hay entre qué escoger. */
+function selectorTablero(clave, titulo, opciones, valorActual, etiquetaTodos) {
+  if (opciones.length < 2) return '';
+  return '<label class="t-filtro"><span>' + esc(titulo) + '</span>' +
+    '<select data-filtro="' + clave + '">' +
+      '<option value="">' + esc(etiquetaTodos) + '</option>' +
+      opciones.map((o) =>
+        '<option value="' + esc(o.etiqueta) + '"' +
+        (o.etiqueta === valorActual ? ' selected' : '') + '>' +
+        esc(o.etiqueta) + ' (' + o.n + ')</option>').join('') +
+    '</select></label>';
+}
 
 async function pintarTablero() {
   const cont = $('#cuerpo-tablero');
   if (!cont || $('#vista-tablero').hidden) return;
+  if (!APP.filtroT) APP.filtroT = filtroTableroVacio();
 
-  const vis = APP.historial;
+  const f = APP.filtroT;
+  const todas = APP.historial;
+  const vis = visitasDelTablero();
   const conLista = !(APP.perfil && APP.perfil.verSolicitudes === false);
-  const conEstado = solicitudesConEstado();
-  const atendidas = conEstado.filter((s) => s._estado.clave === 'realizada').length;
-  const pendientes = conEstado.length - atendidas;
+
+  // Las opciones de cada desplegable salen de TODAS las visitas, no de las
+  // ya filtradas: si salieran de las filtradas, al escoger una entidad
+  // desaparecerían las demás y no habría cómo volver a cambiarla.
+  const opEntidad = cuentaPor(todas, (v) => v.entidad, '(sin entidad)');
+  const opMunicipio = cuentaPor(todas, (v) => v.municipio, '(sin municipio)');
+  const opPrioridad = cuentaPor(todas, (v) => (v.prioridad || '').toUpperCase(), 'SIN PRIORIDAD');
+  const opEvaluador = cuentaPorVarios(todas, evaluadoresDe, '(sin evaluador)');
+
+  // ------------------------------------------------------------ filtros
+  let html = '<div class="t-filtros">' +
+    '<label class="t-filtro"><span>Periodo</span><select data-filtro="periodo">' +
+      [['todo', 'Todo el histórico'], ['7', 'Últimos 7 días'],
+       ['30', 'Últimos 30 días'], ['90', 'Últimos 90 días']].map(([v, t]) =>
+        '<option value="' + v + '"' + (f.periodo === v ? ' selected' : '') + '>' + t + '</option>'
+      ).join('') +
+    '</select></label>' +
+    selectorTablero('entidad', 'Entidad', opEntidad, f.entidad, 'Todas') +
+    selectorTablero('municipio', 'Municipio', opMunicipio, f.municipio, 'Todos') +
+    selectorTablero('prioridad', 'Prioridad', opPrioridad, f.prioridad, 'Todas') +
+    selectorTablero('evaluador', 'Evaluador', opEvaluador, f.evaluador, 'Todos') +
+    (hayFiltroTablero()
+      ? '<button type="button" id="t-limpiar" class="t-limpiar">Quitar filtros</button>'
+      : '') +
+  '</div>';
+
+  if (hayFiltroTablero()) {
+    html += '<p class="t-filtrando">Mostrando <b>' + vis.length + '</b> de ' +
+      todas.length + ' visitas.</p>';
+  }
+
+  // ------------------------------------------------------------ cifras
+  const conMov = vis.filter((v) => String(v.hayMovimiento || '').trim().toLowerCase().indexOf('s') === 0).length;
+  const criticas = vis.filter((v) => {
+    const p = (v.prioridad || '').toUpperCase();
+    return p.indexOf('CRÍTICA') === 0 || p.indexOf('CRITICA') === 0 || p.indexOf('ALTA') === 0;
+  }).length;
   const conFoto = vis.filter((v) => v.tieneFotos).length;
-  const avance = conEstado.length ? Math.round(atendidas / conEstado.length * 100) : 0;
+  const evaluadores = cuentaPorVarios(vis, evaluadoresDe, '(sin evaluador)')
+    .filter((x) => x.etiqueta !== '(sin evaluador)').length;
+  const municipios = cuentaPor(vis, (v) => v.municipio, '')
+    .filter((x) => x.etiqueta).length;
 
   const tarjeta = (n, t, c) =>
     '<div class="t-tarjeta"><b style="color:' + c + '">' + n + '</b><span>' + t + '</span></div>';
 
-  let html = '<div class="t-cifras">';
-  if (conLista) {
-    html += tarjeta(conEstado.length, 'solicitudes asignadas', '#0b4f6c') +
-            tarjeta(atendidas, 'ya atendidas', '#2e7d32') +
-            tarjeta(pendientes, 'por visitar', pendientes ? '#d84315' : '#2e7d32');
-  }
-  html += tarjeta(vis.length, 'visitas registradas', '#0b4f6c') +
-          tarjeta(conFoto, 'con fotos', '#6a1b9a') +
-          '</div>';
+  html += '<div class="t-cifras">' +
+    tarjeta(vis.length, 'visitas', '#0b4f6c') +
+    tarjeta(criticas, 'críticas o altas', criticas ? '#a3000d' : '#2e7d32') +
+    tarjeta(conMov, 'con movimiento en masa', '#d84315') +
+    tarjeta(conFoto, 'con fotos', '#6a1b9a') +
+    tarjeta(evaluadores, evaluadores === 1 ? 'evaluador' : 'evaluadores', '#3f8c54') +
+    (municipios > 1 ? tarjeta(municipios, 'municipios', '#0b4f6c') : '') +
+    '</div>';
 
-  if (conLista) {
-    html += '<div class="t-bloque"><h3>Avance de las solicitudes</h3>' +
+  // ------------------------------------------------------------ avance
+  const conEstado = conLista ? solicitudesConEstado() : [];
+  // Sin solicitudes asignadas no hay avance que mostrar: una barra en 0 de 0
+  // parece un error, no un dato.
+  if (conEstado.length && !hayFiltroTablero()) {
+    const atendidas = conEstado.filter((s) => s._estado.clave === 'realizada').length;
+    const pendientes = conEstado.length - atendidas;
+    const avance = Math.round(atendidas / conEstado.length * 100);
+    html += '<div class="t-bloque"><h3>Avance de las solicitudes asignadas</h3>' +
       '<div class="t-avance"><span style="width:' + avance + '%"></span></div>' +
       '<p class="t-nota"><b>' + avance + '%</b> atendido · ' + atendidas + ' de ' +
         conEstado.length + '. Faltan ' + pendientes + '.</p></div>';
   }
 
-  html += '<div class="t-bloque"><h3>Visitas de los últimos 14 días</h3>' +
-    columnasPorDia(vis) + '</div>';
+  // ------------------------------------------------------------ mapa
+  const conCoord = vis.filter((v) => v.latitud !== '' && v.latitud != null &&
+                                     v.longitud !== '' && v.longitud != null);
+  html += '<div class="t-bloque"><h3>Dónde están</h3>' +
+    '<div id="mapa-tablero" class="mapa-tablero"></div>' +
+    '<div class="t-leyenda">' +
+      ['CRÍTICA', 'ALTA', 'MEDIA', 'BAJA', 'SIN PRIORIDAD'].map((p) =>
+        '<span><i style="background:' + colorPrioridad(p) + '"></i>' + esc(p) + '</span>').join('') +
+    '</div>' +
+    '<p class="t-nota">' + conCoord.length + ' de ' + vis.length +
+      ' visitas tienen coordenada. Toca un punto para abrir su ficha.</p>' +
+  '</div>';
 
+  // ------------------------------------------------------------ gráficas
   html += '<div class="t-rejilla">' +
-    '<div class="t-bloque"><h3>Quién ha evaluado</h3>' +
-      barras(cuentaPor(vis, (v) => v.evaluadores, '(sin evaluador)'), '#0b4f6c') + '</div>' +
-    '<div class="t-bloque"><h3>Entidad que registra</h3>' +
+    '<div class="t-bloque"><h3>Prioridad</h3>' +
+      rosquilla(cuentaPor(vis, (v) => (v.prioridad || '').toUpperCase(), 'SIN PRIORIDAD'),
+                colorPrioridad, vis.length, vis.length === 1 ? 'visita' : 'visitas') + '</div>' +
+    '<div class="t-bloque"><h3>Ritmo de los últimos 14 días</h3>' +
+      columnasPorDia(vis) + '</div>' +
+    '<div class="t-bloque"><h3>Por entidad</h3>' +
       barras(cuentaPor(vis, (v) => v.entidad, '(sin entidad)'), '#3f8c54') + '</div>' +
+    '<div class="t-bloque"><h3>Por municipio</h3>' +
+      barras(cuentaPor(vis, (v) => v.municipio, '(sin municipio)'), '#0b4f6c') + '</div>' +
     '<div class="t-bloque"><h3>Barrios con más visitas</h3>' +
-      barras(cuentaPor(vis, (v) => v.barrio, '(sin barrio)'), '#8a5a00') + '</div>';
+      barras(cuentaPor(vis, (v) => v.barrio, '(sin barrio)'), '#8a5a00') + '</div>' +
+    '<div class="t-bloque"><h3>Quién ha evaluado</h3>' +
+      barras(cuentaPorVarios(vis, evaluadoresDe, '(sin evaluador)'), '#6a1b9a') + '</div>' +
+  '</div>';
 
-  if (conLista) {
-    const pend = conEstado.filter((s) => s._estado.clave !== 'realizada');
-    html += '<div class="t-bloque"><h3>Prioridad de lo que falta</h3>' +
-      barras(cuentaPor(pend, (s) => (s.prioridad || '').toUpperCase(), 'SIN PRIORIDAD'),
-             (et) => COLOR_PRIORIDAD_BARRA[et] || '#8896a0') + '</div>';
-  }
-  html += '</div>';
+  // ------------------------------------------------------------ calidad
+  const sinCoord = vis.length - conCoord.length;
+  const sinPrioridad = vis.filter((v) => !(v.prioridad || '').trim()).length;
+  const sinFoto = vis.length - conFoto;
+  const pendientesLista = conEstado.filter((s) => s._estado.clave !== 'realizada').length;
 
-  const sinCoord = vis.filter((v) => v.latitud === '' || v.latitud == null).length;
-  if (sinCoord || (conLista && pendientes)) {
+  if (sinCoord || sinPrioridad || sinFoto || pendientesLista) {
     html += '<div class="t-bloque t-pendientes"><h3>Qué falta por cerrar</h3><ul>' +
-      (conLista && pendientes ? '<li><b>' + pendientes + '</b> solicitudes sin visitar.</li>' : '') +
+      (pendientesLista && !hayFiltroTablero()
+        ? '<li><b>' + pendientesLista + '</b> solicitudes sin visitar.</li>' : '') +
+      (sinPrioridad ? '<li><b>' + sinPrioridad + '</b> visitas sin prioridad asignada: ' +
+                      'no se pueden ordenar por urgencia.</li>' : '') +
       (sinCoord ? '<li><b>' + sinCoord + '</b> visitas sin coordenada: no salen en el mapa ' +
                   'ni sirven para avisar de trabajo cercano.</li>' : '') +
-      (vis.length - conFoto ? '<li><b>' + (vis.length - conFoto) + '</b> visitas sin fotos.</li>' : '') +
+      (sinFoto ? '<li><b>' + sinFoto + '</b> visitas sin fotos.</li>' : '') +
       '</ul></div>';
   }
+
   cont.innerHTML = html;
+
+  // ------------------------------------------------------------ eventos
+  cont.querySelectorAll('[data-filtro]').forEach((sel) => {
+    sel.addEventListener('change', () => {
+      APP.filtroT[sel.dataset.filtro] = sel.value;
+      pintarTablero();
+    });
+  });
+  const limpiar = cont.querySelector('#t-limpiar');
+  if (limpiar) limpiar.addEventListener('click', () => {
+    APP.filtroT = filtroTableroVacio();
+    pintarTablero();
+  });
+
+  pintarMapaTablero(conCoord);
 
   let corte = '';
   try {
@@ -438,6 +635,69 @@ async function pintarTablero() {
     if (iso) corte = 'Datos al ' + fechaBonita(iso);
   } catch (e) { /* sin dato de corte, no es grave */ }
   $('#tablero-corte').textContent = corte || 'Sincroniza para actualizar';
+}
+
+/**
+ * Mapa del tablero. Es OTRO mapa, aparte del de la pestaña principal.
+ *
+ * Aquí los puntos se pintan por PRIORIDAD, no por visitada/por visitar: en
+ * el tablero todas están visitadas, y lo que se quiere ver de un vistazo es
+ * dónde se concentra lo crítico. El mapa de la pestaña principal sigue
+ * mostrando lo otro, que es lo que sirve en campo.
+ */
+async function pintarMapaTablero(visitas) {
+  const caja = document.getElementById('mapa-tablero');
+  if (!caja) return;
+
+  const hayRed = await cargarLeaflet();
+  if (!hayRed || !window.L) {
+    caja.innerHTML = '<div class="mapa-sin-red-chico">El mapa necesita internet. ' +
+      'El resto del tablero funciona sin señal.</div>';
+    return;
+  }
+
+  // El div se recrea en cada repintado, así que el mapa anterior ya no
+  // existe: se descarta para que Leaflet no quede hablándole a un nodo
+  // que ya no está en la página.
+  if (APP.mapaT) { try { APP.mapaT.remove(); } catch (e) { /* ya no estaba */ } }
+
+  APP.mapaT = L.map(caja, { zoomControl: true, scrollWheelZoom: false });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '&copy; OpenStreetMap'
+  }).addTo(APP.mapaT);
+
+  const puntos = [];
+  visitas.forEach((v) => {
+    const lat = parseFloat(v.latitud), lon = parseFloat(v.longitud);
+    if (isNaN(lat) || isNaN(lon)) return;
+    const p = (v.prioridad || '').toUpperCase() || 'SIN PRIORIDAD';
+    puntos.push([lat, lon]);
+    L.circleMarker([lat, lon], {
+      radius: 7, color: '#fff', weight: 2, opacity: 1,
+      fillColor: colorPrioridad(p), fillOpacity: 1
+    }).addTo(APP.mapaT).bindPopup(
+      '<b>' + esc(v.idSolicitud || v.idVisita) + '</b><br>' +
+      esc(v.barrio || '') + (v.municipio ? ' · ' + esc(v.municipio) : '') + '<br>' +
+      '<small>' + esc(p) + ' · ' + esc(v.entidad || '') + '</small><br>' +
+      '<button type="button" class="popup-btn" data-visita="' + esc(v.idVisita) + '">' +
+      'Ver la ficha</button>'
+    );
+  });
+
+  if (puntos.length === 1) APP.mapaT.setView(puntos[0], 16);
+  else if (puntos.length) APP.mapaT.fitBounds(puntos, { padding: [30, 30] });
+  else APP.mapaT.setView([4.8133, -75.6961], 11);   // Risaralda
+
+  APP.mapaT.on('popupopen', (ev) => {
+    const btn = ev.popup.getElement().querySelector('[data-visita]');
+    if (btn) btn.addEventListener('click', () => {
+      APP.mapaT.closePopup();
+      abrirDetalle(btn.dataset.visita);
+    });
+  });
+
+  // El div acaba de aparecer: sin esto Leaflet lo mide en cero y no pinta.
+  setTimeout(() => APP.mapaT && APP.mapaT.invalidateSize(), 80);
 }
 
 /**
