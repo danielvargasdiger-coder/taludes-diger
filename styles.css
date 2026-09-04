@@ -891,6 +891,15 @@ body.con-aviso { padding-top: var(--alto-aviso, 52px); }
 .chip.critica, .chip.CRITICA, .chip.CRÍTICA { background: var(--critica); }
 .chip.gris { background: var(--texto-suave); }
 .chip.borrador { background: #6a1b9a; }
+/* Aviso de que NO se pudo guardar en el celular. Va fijo encima del boton
+   de enviar y no se quita solo: perder una ficha ya llena es lo peor que
+   puede pasar en campo, asi que esto tiene que verse si o si. */
+.aviso-guardado {
+  margin: 0 0 10px; padding: 11px 13px; border-radius: var(--radio);
+  background: #fdecea; color: #8c1d18; border: 1.5px solid var(--error);
+  font-size: .84rem; line-height: 1.45; font-weight: 600;
+}
+
 .chip.pendiente-envio { background: #8d6e00; }
 /* Ficha que el servidor no acepto. Rojo, no amarillo: no es que este
    esperando turno, es que necesita que alguien haga algo. */

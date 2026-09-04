@@ -2222,6 +2222,7 @@ async function abrirFicha(solicitud) {
   $('#ficha-subtitulo').textContent = [solicitud.direccion, solicitud.barrio].filter(Boolean).join(' · ') ||
     'Ficha nueva no programada';
   $('#msg-validacion').textContent = '';
+  avisoGuardado('');
 
   dibujarFormulario();
   $('#vista-ficha').hidden = false;
@@ -2245,19 +2246,54 @@ function datosIniciales(s) {
 }
 
 $('#btn-cerrar-ficha').addEventListener('click', async () => {
-  await guardarBorrador(true);
+  const guardo = await guardarBorrador(true);
+  if (!guardo && !confirm(
+      'No se pudo guardar el borrador en este celular.\n\n' +
+      'Si sales ahora puedes perder lo que llevas escrito.\n\n' +
+      '¿Salir de todas formas?')) return;
   $('#vista-ficha').hidden = true;
   pintarTodo();
 });
 
 $('#btn-guardar-borrador').addEventListener('click', () => guardarBorrador());
 
+/**
+ * Muestra -o quita- el aviso de que no se está pudiendo guardar.
+ *
+ * Es un aviso fijo, no un toast: un mensaje que se desvanece a los tres
+ * segundos no sirve para algo que hay que atender antes de seguir llenando.
+ */
+function avisoGuardado(mensaje) {
+  const el = $('#aviso-guardado');
+  if (!el) return;
+  el.hidden = !mensaje;
+  if (mensaje) el.innerHTML = mensaje;
+}
+
+/**
+ * Guarda el borrador en el celular. Devuelve si lo logró.
+ *
+ * Lo importante aquí es que un fallo NO pase desapercibido. La causa más
+ * probable es que se acabó el espacio -el borrador lleva las fotos en
+ * base64- y por eso el aviso dice qué hacer para liberarlo.
+ */
 async function guardarBorrador(silencioso) {
-  if (!APP.solicitudActual) return;
+  if (!APP.solicitudActual) return true;
   const clave = 'sol-' + APP.solicitudActual.idSolicitud;
-  await DB.guardar('borradores', { clave, datos: APP.datos, guardado: new Date().toISOString() });
+  try {
+    await DB.guardar('borradores', { clave, datos: APP.datos, guardado: new Date().toISOString() });
+  } catch (e) {
+    avisoGuardado('<b>No se está pudiendo guardar en este celular.</b> ' +
+      'Lo que escribas ahora se puede perder. Suele ser falta de espacio: ' +
+      'envía o elimina las fichas que tengas pendientes y vuelve a intentar. ' +
+      '<br><small>' + esc(e && e.message ? e.message : e) + '</small>');
+    toast('No se pudo guardar el borrador', 'error');
+    return false;
+  }
   APP.solicitudActual._tieneBorrador = true;
+  avisoGuardado('');            // volvió a funcionar: se quita el aviso
   if (!silencioso) toast('Borrador guardado en el celular', 'ok');
+  return true;
 }
 
 // ---------------------------------------------------------------- FICHA: DIBUJAR
@@ -2770,7 +2806,10 @@ function setValor(id, valor) {
   if (esCampoFiltro(id)) reaccionarAFiltro(id);
 
   clearTimeout(setValor._temp);
-  setValor._temp = setTimeout(() => guardarBorrador(true), 1200); // autoguardado
+  // El .catch() no sobra: sin él, un fallo aquí dentro del setTimeout queda
+  // como promesa rechazada sin dueño y no se entera nadie. guardarBorrador
+  // ya avisa por su cuenta; esto solo evita el error suelto en la consola.
+  setValor._temp = setTimeout(() => { guardarBorrador(true).catch(() => {}); }, 1200);
 }
 
 function reaccionarAFiltro(id) {
@@ -2997,8 +3036,20 @@ $('#btn-enviar-ficha').addEventListener('click', async () => {
     fotosSubidas: 0
   };
 
-  await DB.guardar('cola', item);
+  try {
+    await DB.guardar('cola', item);
+  } catch (e) {
+    // La ficha NO se pone en la cola: se queda abierta con lo escrito
+    // intacto, que es preferible a cerrarla creyendo que quedó guardada.
+    avisoGuardado('<b>No se pudo poner la ficha en la cola de envío.</b> ' +
+      'No se ha perdido nada: sigue aquí. Suele ser falta de espacio en el ' +
+      'celular; envía o elimina las fichas pendientes y vuelve a intentar.' +
+      '<br><small>' + esc(e && e.message ? e.message : e) + '</small>');
+    toast('No se pudo guardar la ficha', 'error');
+    return;
+  }
   APP.cola.push(item);
+  avisoGuardado('');
 
   $('#vista-ficha').hidden = true;
   APP.solicitudActual = null;
