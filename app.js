@@ -1714,7 +1714,10 @@ function recolectarFotos(datos) {
   FICHA_SCHEMA.secciones.forEach((sec) => sec.campos.forEach((campo) => {
     if (campo.tipo !== 'fotos') return;
     (datos[campo.id] || []).forEach((f, i) => {
-      lista.push({ campo: campo.id, indice: i, nombre: f.nombre, dataUrl: f.dataUrl, mini: f.mini || '' });
+      // f.mini solo existe en fichas hechas con una versión anterior; si
+      // está, se sigue subiendo para no dejarla a medias.
+      lista.push({ campo: campo.id, indice: i, nombre: f.nombre,
+                   dataUrl: f.dataUrl, mini: f.mini || '' });
     });
   }));
   return lista;
@@ -2754,11 +2757,16 @@ function dibujarCampo(campo) {
             }
             cargando(true, 'Procesando foto…');
             try {
-              // Dos versiones: la de archivo (Drive) y una liviana para el PDF.
+              // Una sola versión por foto.
+              //
+              // Antes se guardaba también una miniatura, para incrustarla en
+              // el PDF. Desde que la ficha en línea reemplazó al PDF nadie la
+              // lee: la página pide la foto grande y Drive la redimensiona al
+              // vuelo. La miniatura solo ocupaba ~30% más de espacio en el
+              // celular y ~30% más de datos móviles al subirla.
               actuales.push({
                 nombre: arch.name || 'foto.jpg',
-                dataUrl: await comprimirImagen(arch, CONFIG.ANCHO_MAX_FOTO, CONFIG.CALIDAD_FOTO),
-                mini: await comprimirImagen(arch, CONFIG.ANCHO_MINIATURA, CONFIG.CALIDAD_MINIATURA)
+                dataUrl: await comprimirImagen(arch, CONFIG.ANCHO_MAX_FOTO, CONFIG.CALIDAD_FOTO)
               });
             } catch (err) {
               toast('No se pudo procesar la foto', 'error');
