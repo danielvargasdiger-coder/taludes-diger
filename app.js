@@ -2573,11 +2573,36 @@ function dibujarCampo(campo) {
             (c.fuente === 'base' ? 'Coordenada de la solicitud. Captura el GPS para mayor precisión.'
               : c.y ? 'Coordenadas registradas.' : 'Sin coordenadas todavía.') +
           '</p>' +
+          '<div class="coord-rara" hidden></div>' +
           '<div class="cercanas"></div>' +
         '</div>';
 
       const estado = div.querySelector('.gps-estado');
       const cajaCercanas = div.querySelector('.cercanas');
+      const cajaRara = div.querySelector('.coord-rara');
+
+      /**
+       * Avisa si la coordenada no puede estar en Risaralda.
+       *
+       * Estas casillas se pueden escribir a mano, y de ahí salió el error
+       * que ya nos costó una vez: un 480004983 donde iba 4,80004983 dejó el
+       * mapa en zoom 0 sin mostrar ninguna visita. Se avisa aquí, que es
+       * donde se comete, en vez de descubrirlo días después.
+       *
+       * Es un aviso, NO un bloqueo: si por lo que sea la coordenada fuera
+       * correcta, el geólogo sigue con su ficha. Nunca se le impide
+       * registrar una visita que ya hizo.
+       */
+      const revisarCoordenada = () => {
+        const v = APP.datos[campo.id] || {};
+        if (!v.y || !v.x || coordPlausible(v.y, v.x)) { cajaRara.hidden = true; return; }
+        cajaRara.hidden = false;
+        cajaRara.innerHTML =
+          '<b>&#9888; Esta coordenada no parece estar en Risaralda.</b>' +
+          '<p>Suele ser un punto decimal en el lugar equivocado. Debería verse ' +
+          'parecido a <b>4.8123456</b> en latitud y <b>-75.7012345</b> en longitud ' +
+          '(la longitud va en negativo). Revísala antes de enviar.</p>';
+      };
 
       /** Avisa si ya hay visitas registradas en este mismo punto. */
       const revisarCercanas = () => {
@@ -2628,6 +2653,7 @@ function dibujarCampo(campo) {
           if (limpio !== i.value) i.value = limpio;
           sincronizaCampos();
           revisarCercanas();
+          revisarCoordenada();
         });
       });
 
@@ -2645,6 +2671,7 @@ function dibujarCampo(campo) {
           ' · precisión ±' + p.precision + ' m' +
           (p.lecturas > 1 ? ' (mejor de ' + p.lecturas + ' lecturas)' : '');
         revisarCercanas();
+        revisarCoordenada();
       };
 
       const oyenteGps = (sola) => ({
@@ -2689,6 +2716,7 @@ function dibujarCampo(campo) {
       } : oyenteGps(true));
 
       revisarCercanas();   // la solicitud puede traer coordenadas de entrada
+      revisarCoordenada();
       break;
     }
 

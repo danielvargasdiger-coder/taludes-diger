@@ -894,6 +894,16 @@ body.con-aviso { padding-top: var(--alto-aviso, 52px); }
 /* Aviso de que NO se pudo guardar en el celular. Va fijo encima del boton
    de enviar y no se quita solo: perder una ficha ya llena es lo peor que
    puede pasar en campo, asi que esto tiene que verse si o si. */
+/* Aviso de coordenada imposible, junto a las casillas donde se escribe.
+   Amarillo y no rojo: es una advertencia, no un bloqueo -si de verdad la
+   coordenada es correcta, el geologo sigue con su ficha igual. */
+.coord-rara {
+  margin-top: 10px; padding: 10px 12px; border-radius: var(--radio);
+  background: #fff6e0; border: 1.5px solid var(--media); color: #6b4a00;
+  font-size: .82rem; line-height: 1.45;
+}
+.coord-rara p { margin: 5px 0 0; }
+
 .aviso-guardado {
   margin: 0 0 10px; padding: 11px 13px; border-radius: var(--radio);
   background: #fdecea; color: #8c1d18; border: 1.5px solid var(--error);
