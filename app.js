@@ -1615,6 +1615,18 @@ async function sincronizar(silencioso = false) {
     // y esos cambios tienen que verse. Si algún día vuelve a intentarse,
     // tendrá que ser con una señal que sí refleje las ediciones manuales.
     const r = await api('catalogo');
+
+    // La configuración de la entidad puede haber cambiado desde que se
+    // ingresó (que es cuando se consultaba por única vez). Pasó de verdad:
+    // a CARDER se le asignaron solicitudes y los celulares siguieron
+    // escondiendo la pestaña "Por visitar", porque el dato guardado decía
+    // que no tenía lista. Ahora se refresca en cada sincronización.
+    if (APP.perfil && r.verSolicitudes !== undefined) {
+      APP.perfil.verSolicitudes = r.verSolicitudes !== false;
+      APP.perfil.municipio = r.municipio || '';
+      localStorage.setItem(CLAVE_PERFIL, JSON.stringify(APP.perfil));
+    }
+
     APP.solicitudes = r.solicitudes || [];
     APP.historial = r.historial || [];
     await DB.guardarKV('solicitudes', APP.solicitudes);
