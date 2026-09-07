@@ -40,6 +40,7 @@ const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 const SUFIJO = (typeof CONFIG !== 'undefined' && CONFIG.ESPACIO) ? '-' + CONFIG.ESPACIO : '';
 const NOMBRE_BD = 'taludes-diger' + SUFIJO;
 const CLAVE_PERFIL = 'perfil' + SUFIJO;
+const CLAVE_COPIA_FOTO = 'copiaFoto' + SUFIJO;
 const CLAVE_FILTROS = 'filtros' + SUFIJO;
 
 const DB = {
@@ -2764,6 +2765,10 @@ function dibujarCampo(campo) {
               '<input type="file" accept="image/*" multiple hidden>' +
             '</label>' +
           '</div>' +
+          '<label class="fotos-copia">' +
+            '<input type="checkbox" class="chk-copia"' + (guardarCopiaActiva() ? ' checked' : '') + '>' +
+            ' Guardar también una copia en el celular' +
+          '</label>' +
           '<div class="fotos-grid"></div>' +
           '<p class="fotos-conteo"></p>' +
         '</div>';
@@ -2785,7 +2790,17 @@ function dibujarCampo(campo) {
         }));
       };
 
+      const chkCopia = div.querySelector('.chk-copia');
+      if (chkCopia) {
+        chkCopia.addEventListener('change', () => {
+          try { localStorage.setItem(CLAVE_COPIA_FOTO, chkCopia.checked ? '1' : '0'); } catch (err) {}
+        });
+      }
+
       div.querySelectorAll('input[type=file]').forEach((entrada) => {
+        // Solo la foto recién tomada con la cámara se guarda en el celular.
+        // La que se escoge de la galería ya está ahí.
+        const esCamara = entrada.hasAttribute('capture');
         entrada.addEventListener('change', async (e) => {
           const archivos = Array.from(e.target.files || []);
           e.target.value = '';
@@ -2796,6 +2811,9 @@ function dibujarCampo(campo) {
               break;
             }
             cargando(true, 'Procesando foto…');
+            if (esCamara && chkCopia && chkCopia.checked) {
+              guardarCopiaEnCelular(arch, actuales.length + 1);
+            }
             try {
               // Una sola versión por foto.
               //
@@ -2893,6 +2911,55 @@ function abrirSeccion(idSeccion) {
  * una versión de archivo (la que queda en Drive) y una miniatura
  * liviana que es la que se incrusta en el PDF.
  */
+/**
+ * ¿Hay que dejar copia de las fotos en el celular? Encendido por defecto.
+ *
+ * Los técnicos pidieron esto: una foto tomada DESDE la app no queda en el
+ * carrete. Es así en cualquier página web —el navegador recibe la imagen
+ * pero no puede escribir en la galería—, no es un fallo de la app.
+ */
+function guardarCopiaActiva() {
+  try {
+    return localStorage.getItem(CLAVE_COPIA_FOTO) !== '0';
+  } catch (e) {
+    return true;
+  }
+}
+
+/**
+ * Baja al celular una copia de la foto recién tomada.
+ *
+ * Se guarda el archivo ORIGINAL de la cámara, no la versión reducida que
+ * se envía al servidor: en el celular queda la foto con toda su calidad.
+ *
+ * Cae en la carpeta de Descargas. En Android la galería la indexa y
+ * aparece en el carrete; en iPhone queda en Archivos, y desde ahí se
+ * puede mandar a Fotos. Si el navegador no deja descargar, no se avisa
+ * nada: es una comodidad, no puede estorbar el trabajo en campo.
+ */
+function guardarCopiaEnCelular(archivo, numero) {
+  try {
+    const sol = (APP.solicitudActual && APP.solicitudActual.idSolicitud) || 'visita';
+    const f = new Date();
+    const dos = (n) => String(n).padStart(2, '0');
+    const sello = f.getFullYear() + dos(f.getMonth() + 1) + dos(f.getDate()) +
+                  '-' + dos(f.getHours()) + dos(f.getMinutes());
+    const ext = (archivo.name && archivo.name.indexOf('.') !== -1)
+      ? archivo.name.slice(archivo.name.lastIndexOf('.'))
+      : '.jpg';
+    const url = URL.createObjectURL(archivo);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'talud-' + String(sol).replace(/[^\w-]/g, '') + '-' + sello + '-' + numero + ext;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) {
+    // Silencio a propósito: la ficha es lo importante.
+  }
+}
+
 function comprimirImagen(archivo, anchoMax, calidad) {
   return new Promise((ok, fallo) => {
     const lector = new FileReader();

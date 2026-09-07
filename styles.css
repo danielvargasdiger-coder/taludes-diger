@@ -1081,6 +1081,15 @@ body.con-aviso { padding-top: var(--alto-aviso, 52px); }
 }
 .fotos-conteo { font-size: .76rem; color: var(--texto-suave); margin-top: 8px; }
 
+/* Casilla para dejar copia de la foto en el celular. Va debajo de los dos
+   botones, que es donde el geologo esta mirando al tomar la foto. */
+.fotos-copia {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 10px; font-size: .82rem; color: var(--texto-suave);
+  cursor: pointer; user-select: none;
+}
+.fotos-copia input { width: 17px; height: 17px; accent-color: var(--azul); flex: 0 0 auto; }
+
 /* Responsables */
 .responsable-caja { border: 1.5px solid var(--borde); border-radius: var(--radio); padding: 12px; margin-bottom: 10px; background: #fbfdfe; }
 .responsable-caja h4 { margin: 0 0 9px; font-size: .8rem; color: var(--azul); letter-spacing: .04em; }
