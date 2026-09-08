@@ -1374,3 +1374,44 @@ body.con-aviso { padding-top: var(--alto-aviso, 52px); }
   .mapa-leyenda > * { flex: none; }
   .filtro-mapa { font-size: .7rem; padding: 6px 9px; }
 }
+
+/* ---------------------------------------------------------------------
+   COMPARTIR LA APP
+   El QR apunta a producción y se dibuja con currentColor, así que sirve
+   igual si algún día la app tiene fondo oscuro.
+   --------------------------------------------------------------------- */
+.bloque-compartir { text-align: center; }
+.compartir-nota {
+  font-size: .82rem; line-height: 1.45; color: var(--texto-suave);
+  margin: 0 0 12px; max-width: 34ch; margin-left: auto; margin-right: auto;
+}
+
+.qr-caja {
+  display: inline-block; padding: 12px; border-radius: 12px;
+  background: #fff; border: 1px solid var(--borde);
+  /* El QR necesita fondo claro y buen contraste para que la cámara lo lea:
+     por eso el blanco va fijo y no sigue el tema. */
+  color: #101c24; line-height: 0;
+}
+.qr-caja svg { width: 176px; height: 176px; display: block; }
+
+.qr-url {
+  font-size: .72rem; color: var(--texto-suave); margin: 10px 0 14px;
+  word-break: break-all; user-select: all;
+}
+
+.compartir-botones {
+  display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
+  margin-bottom: 10px;
+}
+.compartir-botones > * {
+  flex: 1 1 130px; min-width: 0; margin: 0;
+  /* Los <a> tienen que verse y medir igual que los <button> de al lado. */
+  display: inline-flex; align-items: center; justify-content: center;
+  text-decoration: none; min-height: 42px;
+}
+#btn-instalar { margin-top: 4px; }
+
+/* El aviso de "copiado" no roba el foco ni mueve la pantalla: solo cambia
+   el texto del propio botón un momento. */
+#btn-copiar.copiado { background: var(--verde, #1b7a1f); color: #fff; border-color: transparent; }

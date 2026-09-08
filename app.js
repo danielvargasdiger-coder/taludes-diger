@@ -1060,6 +1060,7 @@ async function iniciar() {
   APP.verEnMapa = ['todas', 'pendiente', 'realizada'].indexOf(vistaMapa) !== -1
     ? vistaMapa : 'todas';
   await recuperarBorradores();
+  pintarCompartir();     // deja el QR y los botones listos desde el arranque
 
   if (APP.perfil) entrarApp();
   else $('#vista-ingreso').hidden = false;
@@ -1168,7 +1169,139 @@ function irA(vista) {
 
 $('#btn-tablero').addEventListener('click', () => { irA('tablero'); pintarTablero(); });
 $('#btn-cerrar-tablero').addEventListener('click', () => irA('pendientes'));
-$('#btn-perfil').addEventListener('click', () => irA('cola'));
+$('#btn-perfil').addEventListener('click', () => { irA('cola'); pintarCompartir(); });
+
+// ------------------------------------------------------ COMPARTIR LA APP
+/**
+ * La dirección va escrita aquí, no sacada de `location`, porque el código
+ * QR del index.html está dibujado para EXACTAMENTE esta dirección. Si una
+ * cambia sin la otra, el QR llevaría a un sitio equivocado y nadie se
+ * daría cuenta hasta que alguien lo escanee en campo.
+ *
+ * Abrir esto desde el gemelo de pruebas comparte igual producción, que es
+ * lo correcto: nadie quiere repartir el entorno de pruebas.
+ */
+const URL_PARA_COMPARTIR = 'https://danielvargasdiger-coder.github.io/taludes-diger/';
+const MENSAJE_COMPARTIR =
+  'App de Evaluación de Taludes — DIGER Pereira.\n' +
+  'Ábrela en el celular y agrégala a la pantalla de inicio:\n' + URL_PARA_COMPARTIR;
+
+/**
+ * El navegador avisa cuando la app se puede instalar, y no siempre lo
+ * hace: pide que ya se haya usado un poco. Por eso se guarda el aviso y
+ * el botón aparece cuando llega, no antes.
+ */
+let invitacionInstalar = null;
+
+window.addEventListener('beforeinstallprompt', (ev) => {
+  ev.preventDefault();          // sin esto Chrome saca su propio cartel encima
+  invitacionInstalar = ev;
+  pintarCompartir();
+});
+window.addEventListener('appinstalled', () => {
+  invitacionInstalar = null;
+  pintarCompartir();
+});
+
+function yaEstaInstalada() {
+  return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+         window.navigator.standalone === true;
+}
+
+function esIPhoneOIPad() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+function pintarCompartir() {
+  const url = $('#qr-url');
+  if (!url) return;
+  url.textContent = URL_PARA_COMPARTIR;
+  $('#btn-whatsapp').href = 'https://wa.me/?text=' + encodeURIComponent(MENSAJE_COMPARTIR);
+  // "Compartir…" abre el menú del propio celular. Solo existe en móviles.
+  $('#btn-compartir').hidden = !navigator.share;
+
+  const boton = $('#btn-instalar');
+  const ayuda = $('#instalar-ayuda');
+
+  if (yaEstaInstalada()) {
+    boton.hidden = true;
+    ayuda.hidden = false;
+    ayuda.textContent = 'Esta app ya está instalada en este celular.';
+  } else if (invitacionInstalar) {
+    boton.hidden = false;
+    ayuda.hidden = true;
+  } else {
+    // Sin invitación del navegador no hay forma de instalar con un botón:
+    // se explica dónde está, que es justo lo que nadie encuentra solo.
+    boton.hidden = true;
+    ayuda.hidden = false;
+    ayuda.textContent = esIPhoneOIPad()
+      // Sin el símbolo ⋮: muchas fuentes de celular no lo traen y sale un
+      // cuadrito. Descrito con palabras se entiende y siempre se ve.
+      ? 'En iPhone: toca Compartir (el cuadrito con la flecha hacia arriba) y luego «Añadir a pantalla de inicio».'
+      : 'Para instalarla: abre el menú del navegador (los tres puntitos, arriba a la derecha) y toca «Instalar aplicación» o «Añadir a pantalla de inicio».';
+  }
+}
+
+$('#btn-instalar').addEventListener('click', async () => {
+  if (!invitacionInstalar) return;
+  invitacionInstalar.prompt();
+  try { await invitacionInstalar.userChoice; } catch (e) { /* la cerró sin decidir */ }
+  invitacionInstalar = null;    // el navegador solo la ofrece una vez
+  pintarCompartir();
+});
+
+$('#btn-compartir').addEventListener('click', async () => {
+  try {
+    await navigator.share({
+      title: 'Evaluación de Taludes',
+      text: MENSAJE_COMPARTIR,
+      url: URL_PARA_COMPARTIR
+    });
+  } catch (e) { /* canceló el menú: no es un error */ }
+});
+
+$('#btn-copiar').addEventListener('click', async () => {
+  const b = $('#btn-copiar');
+  const copio = await copiarTexto(URL_PARA_COMPARTIR);
+  b.textContent = copio ? '¡Copiado!' : 'No se pudo copiar';
+  b.classList.toggle('copiado', copio);
+  setTimeout(() => {
+    b.textContent = 'Copiar el enlace';
+    b.classList.remove('copiado');
+  }, 2000);
+});
+
+/**
+ * Copiar al portapapeles.
+ *
+ * El camino moderno solo funciona en páginas seguras y con permiso; el de
+ * respaldo funciona en navegadores viejos, que en los celulares de campo
+ * los hay. Si fallan los dos se avisa, en vez de decir que se copió.
+ */
+async function copiarTexto(texto) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(texto);
+      return true;
+    }
+  } catch (e) { /* se intenta con el de abajo */ }
+  try {
+    const t = document.createElement('textarea');
+    t.value = texto;
+    t.setAttribute('readonly', '');
+    t.style.position = 'fixed';
+    t.style.opacity = '0';
+    document.body.appendChild(t);
+    t.select();
+    const copio = document.execCommand('copy');
+    document.body.removeChild(t);
+    return copio;
+  } catch (e) {
+    return false;
+  }
+}
 $('#btn-cerrar-cola').addEventListener('click', () => irA('pendientes'));
 $('#aviso-cola').addEventListener('click', () => irA('cola'));
 
