@@ -94,6 +94,7 @@ small { font-weight: 400; }
 @media (max-width: 420px) {
   .topbar-title strong { display: none; }
   .logos-barra { margin-top: 0; }
+
 }
 
 /* Los logos van sobre blanco: son escudos a color y sobre el azul de la
@@ -321,13 +322,23 @@ select { appearance: none; -webkit-appearance: none;
    una segunda fila de indicadores encima. */
 .filtros { display: flex; gap: 7px; margin-bottom: 10px; }
 .filtro {
-  flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px;
+  /* min-width: 0 es lo que impide que la fila se desborde.
+     Por defecto un elemento flex no se encoge por debajo de su contenido, y
+     con nowrap eso significaba que al agregar la tercera pestaña la fila
+     medía más que la pantalla: el botón de filtros quedaba fuera y toda la
+     página se corría de lado en el celular. Con esto, si no caben, se
+     aprietan y recortan el texto en vez de romper el ancho. */
+  flex: 1 1 auto; min-width: 0;
+  display: flex; align-items: center; justify-content: center; gap: 5px;
   padding: 10px 8px; border-radius: 999px;
   border: 1.5px solid var(--borde); background: var(--blanco);
   color: var(--texto-suave); font-size: .82rem; font-weight: 700;
   cursor: pointer; font-family: inherit; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
   transition: background .15s, color .15s, border-color .15s;
 }
+/* El número nunca se recorta: es el dato, el rótulo es el adorno. */
+.filtro b { flex: 0 0 auto; }
 .filtro b {
   font-size: .78rem; padding: 1px 7px; border-radius: 999px;
   background: var(--fondo); color: var(--texto-suave);
@@ -1268,3 +1279,61 @@ body.con-aviso { padding-top: var(--alto-aviso, 52px); }
   display: block; margin-top: 4px; color: var(--media);
   font-size: .74rem; font-weight: 600; line-height: 1.35;
 }
+
+/* ---- Celular angosto: la fila de pestañas -------------------------------
+   Va al FINAL del archivo a propósito. Estas reglas tienen la misma
+   especificidad que las reglas base de .filtro, así que más arriba las base
+   las pisarían y el rótulo de las pestañas saldría recortado. */
+@media (max-width: 430px) {
+  .filtros { gap: 5px; }
+  .filtro { font-size: .72rem; padding: 9px 5px; gap: 4px; }
+  .filtro b { font-size: .7rem; padding: 1px 5px; min-width: 15px; }
+  .filtro-mas { padding: 9px 9px; }
+  .orden-lista { padding: 0 2px 8px; gap: 5px; }
+  .orden-txt { font-size: .72rem; }
+  .orden-op { padding: 5px 9px; font-size: .72rem; }
+}
+
+/* Pantallas muy angostas (360 px y menos). */
+@media (max-width: 360px) {
+  .filtro { font-size: .68rem; padding: 9px 4px; }
+  .vista { padding-left: 10px; padding-right: 10px; }
+}
+
+/* ---- Índice de secciones de la ficha ------------------------------------
+   Los mismos estados que el rótulo de cada sección, en pequeño: completa,
+   faltan campos, no aplica, o a la espera de la pregunta 1. */
+.indice-secciones {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  padding: 9px 13px; background: var(--blanco);
+  border-bottom: 1px solid var(--borde);
+  position: sticky; top: 0; z-index: 5;
+}
+.ind-sec {
+  flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%;
+  border: 1.5px solid var(--borde); background: var(--blanco);
+  color: var(--texto-suave); font: 700 .8rem inherit; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.ind-sec.lista     { background: #e3f4e4; border-color: var(--baja); color: var(--baja); }
+.ind-sec.pendiente { background: #fff3cd; border-color: var(--media); color: #8a5a00; }
+.ind-sec.omitida   { background: var(--fondo); border-color: var(--borde);
+                     color: var(--borde); text-decoration: line-through; }
+.ind-sec.espera    { background: var(--blanco); border-style: dashed; }
+
+@media (max-width: 430px) {
+  .indice-secciones { gap: 5px; padding: 8px 10px; }
+  .ind-sec { width: 28px; height: 28px; font-size: .76rem; }
+}
+
+/* ---- Ficha atascada en la cola ------------------------------------------
+   La tarjeta se veía igual el primer día que el quinto; así una visita
+   podía quedarse olvidada en un celular sin que nadie lo notara. */
+.tarjeta-estancada { border-left: 4px solid var(--alta); }
+.cola-estancada {
+  margin: 8px 0 0; padding: 8px 10px; border-radius: 8px;
+  background: #fdecea; color: var(--alta);
+  font-size: .78rem; line-height: 1.4;
+}
+.aviso-cola.estancada { background: var(--alta); }

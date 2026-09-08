@@ -1894,9 +1894,15 @@ function pintarTodo() {
   // El aviso de envíos pendientes solo existe cuando hay algo que enviar.
   const aviso = $('#aviso-cola');
   if (APP.cola.length) {
-    $('#aviso-cola-txt').textContent = APP.cola.length === 1
-      ? '1 ficha sin enviar'
-      : APP.cola.length + ' fichas sin enviar';
+    // Si alguna lleva días atascada se dice AQUÍ, en la barra de arriba:
+    // es lo único que el geólogo ve sin entrar a "Mi perfil y envíos".
+    const viejas = APP.cola.filter((c) => diasEnLaCola(c) >= 2);
+    const masDias = viejas.reduce((m, c) => Math.max(m, diasEnLaCola(c)), 0);
+
+    $('#aviso-cola-txt').textContent =
+      (APP.cola.length === 1 ? '1 ficha sin enviar' : APP.cola.length + ' fichas sin enviar') +
+      (viejas.length ? ' · una lleva ' + masDias + ' días' : '');
+    aviso.classList.toggle('estancada', viejas.length > 0);
     aviso.hidden = false;
   } else {
     aviso.hidden = true;
@@ -2357,6 +2363,15 @@ function pintarPendientes() {
   });
 }
 
+/** Días completos que lleva una ficha esperando salir de este celular. */
+function diasEnLaCola(item) {
+  const desde = item && item.creado;
+  if (!desde) return 0;
+  const t = new Date(desde).getTime();
+  if (isNaN(t)) return 0;
+  return Math.floor((Date.now() - t) / 86400000);
+}
+
 function pintarCola() {
   const cont = $('#lista-cola');
   $('#resumen-cola').textContent = APP.cola.length
@@ -2370,7 +2385,8 @@ function pintarCola() {
 
   cont.innerHTML = APP.cola.map((c) => {
     const fotos = recolectarFotos(c.datos).length;
-    return '<div class="tarjeta p-media">' +
+    const dias = diasEnLaCola(c);
+    return '<div class="tarjeta p-media' + (dias >= 2 ? ' tarjeta-estancada' : '') + '">' +
       '<div class="tarjeta-cabeza"><div>' +
         '<div class="tarjeta-id">SOLICITUD ' + esc(c.idSolicitud) + '</div>' +
         '<div class="tarjeta-titulo">' + esc(c.datos.direccion_referencia || '') + '</div>' +
@@ -2386,6 +2402,15 @@ function pintarCola() {
       // y no hay forma de saber que hacer con ella.
       (c.error
         ? '<p class="cola-motivo"><b>No la aceptó el servidor:</b> ' + esc(c.error) +
+          '</p>'
+        : '') +
+      // Una ficha lleva días sin salir y la tarjeta se veía igual el
+      // primer día que el quinto. Así no se queda olvidada en el celular.
+      (dias >= 2
+        ? '<p class="cola-estancada"><b>&#9888; Lleva ' + dias + ' días sin enviarse.</b> ' +
+          (c.error
+            ? 'El servidor la rechazó: ábrela, corrige y vuelve a enviarla.'
+            : 'Busca un sitio con señal y toca "Intentar enviar ahora".') +
           '</p>'
         : '') +
       '<div class="cola-acciones">' +
@@ -2837,9 +2862,37 @@ function panelSolicitud(s) {
   return bloque;
 }
 
+/**
+ * Índice de las 9 secciones, pegado bajo la barra de progreso.
+ *
+ * La ficha es una tira larga: se sabía qué faltaba en la sección que se
+ * tenía abierta, pero para ver el resto había que recorrerla entera. Aquí
+ * están las nueve de un vistazo, y tocando una se salta a ella.
+ */
+function dibujarIndice() {
+  const caja = $('#indice-secciones');
+  if (!caja) return;
+  caja.innerHTML = FICHA_SCHEMA.secciones.map((sec) =>
+    '<button type="button" class="ind-sec" data-ir="' + esc(sec.id) + '" ' +
+      'title="' + esc(sec.numero + '. ' + sec.titulo) + '">' + esc(sec.numero) + '</button>'
+  ).join('');
+
+  caja.querySelectorAll('.ind-sec').forEach((b) => {
+    b.addEventListener('click', () => {
+      const bloque = $('#form-ficha .seccion[data-seccion="' + b.dataset.ir + '"]');
+      if (!bloque) return;
+      // Si está plegada se abre: saltar a una sección cerrada no sirve
+      // de nada, el geólogo tendría que tocar otra vez.
+      bloque.classList.remove('cerrada');
+      bloque.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+}
+
 function dibujarFormulario() {
   const form = $('#form-ficha');
   form.innerHTML = '';
+  dibujarIndice();
 
   const panel = panelSolicitud(APP.solicitudActual);
   if (panel) form.appendChild(panel);
@@ -3562,6 +3615,21 @@ function actualizarProgreso() {
       : n ? 'Faltan ' + n : 'Completa';
     chip.className = 'seccion-faltan ' + (sinDecidir ? 'espera'
       : omitida ? 'omitida' : n ? 'pendiente' : 'lista');
+  });
+
+  // El índice de arriba, con el mismo criterio que los rótulos de cada
+  // sección: así los dos dicen siempre lo mismo.
+  $$('#indice-secciones .ind-sec').forEach((b) => {
+    const sec = FICHA_SCHEMA.secciones.find((x) => x.id === b.dataset.ir);
+    if (!sec) return;
+    const omitida = seccionOmitida(sec);
+    const sinDecidir = sec.soloSi && !APP.datos[sec.soloSi.campo];
+    const n = porSeccion[sec.id] || 0;
+    b.className = 'ind-sec ' + (sinDecidir ? 'espera'
+      : omitida ? 'omitida' : n ? 'pendiente' : 'lista');
+    b.title = sec.numero + '. ' + sec.titulo + ' — ' +
+      (sinDecidir ? 'según la pregunta 1'
+       : omitida ? 'no aplica' : n ? 'faltan ' + n : 'completa');
   });
 
   const btn = $('#btn-enviar-ficha');
