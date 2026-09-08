@@ -1044,8 +1044,15 @@ async function iniciar() {
   // Sin esto, a quien ya tiene la sesión abierta le aparecería el desplegable
   // de municipios en vez de su municipio fijo, hasta volver a ingresar.
   // La regla vieja era: quien tiene solicitudes propias trabaja en Pereira.
+  //
+  // Ya NO se asume Pereira. La regla vieja —«quien tiene solicitudes
+  // trabaja en Pereira»— era cierta cuando la única entidad con lista era
+  // la DIGER. Desde que CARDER tiene la suya, esa misma regla le fijaba
+  // Pereira a quien cubre los 14 municipios del departamento. Se deja
+  // vacío hasta que la primera sincronización traiga el municipio real de
+  // la entidad: preguntar de más es mejor que fijar el municipio errado.
   if (APP.perfil && APP.perfil.municipio === undefined) {
-    APP.perfil.municipio = APP.perfil.verSolicitudes ? 'Pereira' : '';
+    APP.perfil.municipio = '';
     localStorage.setItem(CLAVE_PERFIL, JSON.stringify(APP.perfil));
   }
 
