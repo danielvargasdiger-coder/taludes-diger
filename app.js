@@ -10,6 +10,11 @@ const APP = {
   solicitudes: [],     // catálogo descargado del servidor
   historial: [],       // visitas ya realizadas
   cola: [],            // fichas pendientes de enviar
+  // Números de solicitud que tienen una ficha empezada guardada en este
+  // celular. Se llena al arrancar leyendo los borradores; sin esto, al
+  // reabrir la app una ficha a medio llenar volvía a decir "POR VISITAR"
+  // y el geólogo la hacía otra vez desde cero.
+  borradores: new Set(),
   datos: {},           // ficha que se está llenando ahora
   solicitudActual: null,
   vistaActual: 'pendientes',
@@ -938,6 +943,90 @@ function pedirCodigoDeNuevo() {
       : '');
 }
 
+/**
+ * Rescata las fichas empezadas que quedaron guardadas en el celular.
+ *
+ * POR QUÉ EXISTE
+ * Los borradores se guardaban pero NUNCA se volvían a listar. Eso dejaba
+ * dos agujeros por donde se perdía trabajo de campo:
+ *
+ *   1. Una solicitud a medio llenar volvía a aparecer como "POR VISITAR"
+ *      al reabrir la app, así que se hacía de nuevo desde cero.
+ *   2. Peor: un hallazgo en campo (botón "+") inventa su número al vuelo y
+ *      ese número no existe en ninguna lista. Si el geólogo salía de la
+ *      ficha antes de enviarla —se apagó el celular, entró una llamada—,
+ *      la ficha quedaba en el celular CON SUS FOTOS y sin una sola forma
+ *      de volver a ella. Una visita completa perdida.
+ *
+ * Ahora se leen todos los borradores al arrancar y después de cada
+ * sincronización: los que corresponden a una solicitud conocida la marcan
+ * "EN PROCESO", y los que no —los hallazgos— se rearman a partir de lo que
+ * el propio borrador tiene escrito, para que vuelvan a aparecer en la lista.
+ *
+ * Rescata también los que ya estaban huérfanos de antes en los celulares.
+ */
+async function recuperarBorradores() {
+  let guardados = [];
+  try {
+    guardados = (await DB.todos('borradores')) || [];
+  } catch (e) {
+    return;                      // sin borradores legibles no hay nada que rescatar
+  }
+
+  APP.borradores = new Set();
+  const enLista = new Set(APP.solicitudes.map((s) => String(s.idSolicitud)));
+  const rescatadas = [];
+
+  guardados.forEach((b) => {
+    const id = String((b && b.clave) || '').replace(/^sol-/, '').trim();
+    if (!id) return;
+    APP.borradores.add(id);
+    if (enLista.has(id)) return;
+
+    // No está en el catálogo: es un hallazgo en campo sin terminar. Se
+    // reconstruye con lo que alcanzó a escribir para que se reconozca.
+    const d = (b && b.datos) || {};
+    const c = d.coordenadas || {};
+    rescatadas.push({
+      idSolicitud: id,
+      noProgramada: true,
+      barrio: d.barrio_vereda || '',
+      comuna: '',
+      direccion: d.direccion_referencia || '',
+      edificacion: '',
+      latitud: c.y || '',
+      longitud: c.x || '',
+      recomendaciones: '',
+      prioridad: '',
+      entidad: '',
+      estado: '',
+      _rescatada: true,
+      _guardado: b && b.guardado
+    });
+  });
+
+  if (rescatadas.length) APP.solicitudes = APP.solicitudes.concat(rescatadas);
+}
+
+/**
+ * Le pide al navegador que NO borre lo guardado si el celular se queda sin
+ * espacio. Sin esto, Android puede desalojar la base local por su cuenta y
+ * llevarse los borradores y las fichas sin enviar, sin avisar a nadie.
+ *
+ * Se pide una sola vez y no se insiste: si el navegador dice que no, la app
+ * sigue funcionando igual. No se le muestra nada al geólogo porque no hay
+ * nada que él pueda hacer al respecto.
+ */
+async function pedirAlmacenamientoDuradero() {
+  try {
+    if (!navigator.storage || !navigator.storage.persist) return;
+    if (await navigator.storage.persisted()) return;
+    await navigator.storage.persist();
+  } catch (e) {
+    // Navegador que no lo admite: no es motivo para no arrancar.
+  }
+}
+
 // ---------------------------------------------------------------- INGRESO
 async function iniciar() {
   APP.perfil = JSON.parse(localStorage.getItem(CLAVE_PERFIL) || 'null');
@@ -951,9 +1040,12 @@ async function iniciar() {
     localStorage.setItem(CLAVE_PERFIL, JSON.stringify(APP.perfil));
   }
 
+  pedirAlmacenamientoDuradero();     // no se espera: no debe demorar el arranque
+
   APP.cola = (await DB.todos('cola')) || [];
   APP.solicitudes = (await DB.leerKV('solicitudes')) || [];
   APP.historial = (await DB.leerKV('historial')) || [];
+  await recuperarBorradores();
 
   if (APP.perfil) entrarApp();
   else $('#vista-ingreso').hidden = false;
@@ -969,7 +1061,15 @@ async function iniciar() {
   // Se pone un mínimo de un minuto entre refrescos para que cambiar de
   // pestaña varias veces seguidas no dispare una descarga cada vez.
   document.addEventListener('visibilitychange', async () => {
-    if (document.hidden || !navigator.onLine || !APP.perfil) return;
+    // Al mandar la app a segundo plano se guarda YA lo que esté escrito.
+    // Es el último momento seguro: Android puede descartar la pestaña sin
+    // avisar, y el autoguardado normal espera a que pasen 1,2 segundos sin
+    // teclear. Ese hueco costaba lo último que el geólogo había escrito.
+    if (document.hidden) {
+      if (APP.perfil && !$('#vista-ficha').hidden) guardarBorrador(true).catch(() => {});
+      return;
+    }
+    if (!navigator.onLine || !APP.perfil) return;
     const ultima = await DB.leerKV('ultimaSync');
     if (ultima && Date.now() - new Date(ultima).getTime() < 60000) return;
     sincronizar(true);
@@ -1630,7 +1730,11 @@ async function sincronizar(silencioso = false) {
 
     APP.solicitudes = r.solicitudes || [];
     APP.historial = r.historial || [];
+    // Se guarda el catálogo TAL COMO vino del servidor, antes de sumarle
+    // las fichas empezadas: lo local no tiene por qué acabar en la copia
+    // del catálogo, se vuelve a rescatar de los borradores cada vez.
     await DB.guardarKV('solicitudes', APP.solicitudes);
+    await recuperarBorradores();
     await DB.guardarKV('historial', APP.historial);
     await DB.guardarKV('ultimaSync', new Date().toISOString());
     pintarTodo();
@@ -1678,6 +1782,7 @@ async function enviarCola(silencioso) {
       await DB.borrar('cola', item.idLocal);
       APP.cola = APP.cola.filter((x) => x.idLocal !== item.idLocal);
       await DB.borrar('borradores', item.clave);
+      APP.borradores.delete(String(item.idSolicitud));
     } catch (e) {
       // Cada intento parte de cero: si antes fallo y ahora funciona, el
       // motivo viejo no se queda pegado en la tarjeta.
@@ -1691,6 +1796,7 @@ async function enviarCola(silencioso) {
         await DB.borrar('cola', item.idLocal);
         APP.cola = APP.cola.filter((x) => x.idLocal !== item.idLocal);
         await DB.borrar('borradores', item.clave);
+        APP.borradores.delete(String(item.idSolicitud));
         if (!silencioso) {
           toast('La solicitud ' + item.idSolicitud + ' ya estaba registrada. Se quitó de la cola.', 'ok');
         }
@@ -1872,7 +1978,11 @@ function estadoSolicitud(s) {
     return { clave: 'por-enviar', texto: 'POR ENVIAR' };
   }
   if (String(s.estado).toUpperCase() === 'ATENDIDA') return { clave: 'realizada', texto: 'REALIZADA' };
-  if (s._tieneBorrador) return { clave: 'en-proceso', texto: 'EN PROCESO' };
+  // La marca de la sesión actual, o la que se rescató de los borradores
+  // guardados en el celular al arrancar (ver recuperarBorradores).
+  if (s._tieneBorrador || APP.borradores.has(String(s.idSolicitud))) {
+    return { clave: 'en-proceso', texto: 'EN PROCESO' };
+  }
   return { clave: 'pendiente', texto: 'POR VISITAR' };
 }
 
@@ -2208,6 +2318,7 @@ async function eliminarDeLaCola(idLocal) {
 
   await DB.borrar('cola', idLocal);
   await DB.borrar('borradores', item.clave);
+  APP.borradores.delete(String(item.idSolicitud));
   APP.cola = APP.cola.filter((x) => x.idLocal !== idLocal);
   pintarTodo();
   toast('Ficha eliminada del celular', 'ok');
@@ -2298,6 +2409,7 @@ async function guardarBorrador(silencioso) {
   const clave = 'sol-' + APP.solicitudActual.idSolicitud;
   try {
     await DB.guardar('borradores', { clave, datos: APP.datos, guardado: new Date().toISOString() });
+    APP.borradores.add(String(APP.solicitudActual.idSolicitud));
   } catch (e) {
     avisoGuardado('<b>No se está pudiendo guardar en este celular.</b> ' +
       'Lo que escribas ahora se puede perder. Suele ser falta de espacio: ' +
@@ -2307,6 +2419,17 @@ async function guardarBorrador(silencioso) {
     return false;
   }
   APP.solicitudActual._tieneBorrador = true;
+
+  // Un hallazgo en campo inventa su número al vuelo y no está en el
+  // catálogo. Se mete en la lista apenas se guarda para que quede visible
+  // al cerrar la ficha, sin esperar a la próxima sincronización.
+  if (APP.solicitudActual.noProgramada) {
+    const id = String(APP.solicitudActual.idSolicitud);
+    if (!APP.solicitudes.some((s) => String(s.idSolicitud) === id)) {
+      APP.solicitudes.push(APP.solicitudActual);
+    }
+  }
+
   avisoGuardado('');            // volvió a funcionar: se quita el aviso
   if (!silencioso) toast('Borrador guardado en el celular', 'ok');
   return true;
