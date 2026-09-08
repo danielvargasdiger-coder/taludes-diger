@@ -11,7 +11,7 @@
  * service worker borra solo las cachés de SU prefijo.
  */
 const PREFIJO = 'taludes';        // en el gemelo de pruebas: 'pruebas'
-const VERSION = PREFIJO + '-v64';
+const VERSION = PREFIJO + '-v65';
 
 /**
  * Caché del mapa: Leaflet y los cuadritos del mapa ya vistos.

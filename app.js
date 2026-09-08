@@ -1938,7 +1938,13 @@ async function sincronizar(silencioso = false) {
     if (APP.perfil && r.verSolicitudes !== undefined) {
       APP.perfil.verSolicitudes = r.verSolicitudes !== false;
       APP.perfil.municipio = r.municipio || '';
+      // La entidad también, por el mismo motivo. Un celular que guardó un
+      // nombre equivocado al ingresar lo llevaba pegado para siempre, y
+      // ese era el que salía en la ficha. Ahora se corrige solo en la
+      // siguiente sincronización, sin que nadie tenga que volver a entrar.
+      if (r.entidad) APP.perfil.entidad = r.entidad;
       localStorage.setItem(CLAVE_PERFIL, JSON.stringify(APP.perfil));
+      $('#perfil-entidad').textContent = APP.perfil.entidad || '';
     }
 
     // Las fichas completas que ya se habían consultado se conservan.
