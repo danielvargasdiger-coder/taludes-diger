@@ -1415,3 +1415,56 @@ body.con-aviso { padding-top: var(--alto-aviso, 52px); }
 /* El aviso de "copiado" no roba el foco ni mueve la pantalla: solo cambia
    el texto del propio botón un momento. */
 #btn-copiar.copiado { background: var(--verde, #1b7a1f); color: #fff; border-color: transparent; }
+
+/* Créditos del desarrollo. Discretos: se leen si se buscan, no compiten. */
+.creditos {
+  margin: 18px 0 4px; text-align: center;
+  font-size: .74rem; color: var(--texto-suave);
+}
+.creditos b { font-weight: 700; color: var(--texto); }
+
+/* ---------------------------------------------------------------------
+   COMPARTIR EN PANTALLA ANCHA
+   En el celular el bloque va en una sola columna y centrado. En un PC esa
+   misma columna se estiraba a 1148 px: el QR de 176 px quedaba flotando en
+   una tarjeta vacía y los botones separadísimos.
+   Aquí el QR pasa a la izquierda y el texto y los botones a su derecha, con
+   la columna de texto limitada a un ancho de lectura.
+   --------------------------------------------------------------------- */
+@media (min-width: 720px) {
+  .bloque-compartir {
+    display: grid;
+    grid-template-columns: auto minmax(240px, 420px);
+    grid-template-areas:
+      "titulo titulo"
+      "qr     nota"
+      "qr     url"
+      "qr     botones"
+      "qr     instalar"
+      "qr     ayuda";
+    justify-content: start;
+    align-items: start;
+    column-gap: 24px; row-gap: 8px;
+    text-align: left;
+  }
+  .bloque-compartir > h3 { grid-area: titulo; }
+  /* El primer <p> es la nota de arriba; el ultimo es la ayuda de instalar. */
+  .bloque-compartir > .compartir-nota:first-of-type {
+    grid-area: nota; margin: 0; max-width: none;
+  }
+  .bloque-compartir > .qr-caja { grid-area: qr; align-self: start; }
+  .bloque-compartir > .qr-url { grid-area: url; margin: 0; word-break: normal; }
+  .bloque-compartir > .compartir-botones {
+    grid-area: botones; justify-content: flex-start; margin: 4px 0 0;
+  }
+  /* .btn-secundario y .btn-principal traen width:100%, pensado para el
+     celular. En esta fila hay que devolverles su ancho natural o cada uno
+     ocupa la columna entera y quedan uno debajo del otro. */
+  .bloque-compartir > .compartir-botones > * {
+    flex: 0 1 auto; width: auto; padding-left: 18px; padding-right: 18px;
+  }
+  .bloque-compartir > #btn-instalar {
+    grid-area: instalar; justify-self: start; width: auto; min-width: 240px;
+  }
+  .bloque-compartir > #instalar-ayuda { grid-area: ayuda; margin: 0; max-width: none; }
+}

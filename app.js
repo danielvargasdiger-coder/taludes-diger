@@ -1183,8 +1183,8 @@ $('#btn-perfil').addEventListener('click', () => { irA('cola'); pintarCompartir(
  */
 const URL_PARA_COMPARTIR = 'https://danielvargasdiger-coder.github.io/taludes-diger/';
 const MENSAJE_COMPARTIR =
-  'App de Evaluación de Taludes — DIGER Pereira.\n' +
-  'Ábrela en el celular y agrégala a la pantalla de inicio:\n' + URL_PARA_COMPARTIR;
+  'App de Evaluación de Taludes. Ábrela en el celular y agrégala a la ' +
+  'pantalla de inicio: ' + URL_PARA_COMPARTIR;
 
 /**
  * El navegador avisa cuando la app se puede instalar, y no siempre lo
