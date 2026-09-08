@@ -1054,6 +1054,11 @@ async function iniciar() {
   APP.cola = (await DB.todos('cola')) || [];
   APP.solicitudes = (await DB.leerKV('solicitudes')) || [];
   APP.historial = (await DB.leerKV('historial')) || [];
+  // Cómo dejó el filtro del mapa la última vez. Si viniera algo raro
+  // guardado, se cae a 'todas' en vez de dejar el mapa en blanco.
+  const vistaMapa = await DB.leerKV('verEnMapa');
+  APP.verEnMapa = ['todas', 'pendiente', 'realizada'].indexOf(vistaMapa) !== -1
+    ? vistaMapa : 'todas';
   await recuperarBorradores();
 
   if (APP.perfil) entrarApp();
@@ -1199,6 +1204,25 @@ $('#buscar-mapa').addEventListener('keydown', (ev) => {
   ev.target.blur();          // en el celular, esconde el teclado
 });
 
+/**
+ * Filtro del mapa: todas / por visitar / visitadas, de un solo toque.
+ *
+ * La elección se guarda en el celular. Un geólogo que trabaja mirando solo
+ * lo que le falta no tiene que volver a tocarlo cada vez que abre el mapa.
+ */
+$$('.filtro-mapa').forEach((b) => {
+  b.addEventListener('click', () => {
+    const quiere = b.dataset.ver;
+    if (quiere === APP.verEnMapa) return;        // ya está en esa vista
+    APP.verEnMapa = quiere;
+    APP.mapaRefiltrado = true;                   // para que se reencuadre
+    pintarMapa();
+    DB.guardarKV('verEnMapa', quiere).catch(() => {
+      // Que no se recuerde para la próxima no es motivo para fallar ahora.
+    });
+  });
+});
+
 /** Carga Leaflet la primera vez que se pide el mapa, no antes. */
 function cargarLeaflet() {
   if (window.L) return Promise.resolve(true);
@@ -1289,6 +1313,20 @@ async function abrirMapa() {
   setTimeout(() => { APP.mapa.invalidateSize(); pintarMapa(); }, 400);
 }
 
+/**
+ * Deja en la lista solo lo que pide el filtro del mapa.
+ *
+ * `ver` vale 'todas', 'pendiente' o 'realizada'. Cualquier otra cosa
+ * devuelve la lista entera: si algún día llegara un valor raro —guardado
+ * por una versión vieja, por ejemplo—, es preferible mostrar de más que
+ * dejarle el mapa en blanco a alguien que está parado en un talud.
+ */
+function segunEstadoDeVisita(lista, ver) {
+  if (ver !== 'pendiente' && ver !== 'realizada') return lista;
+  const quiereHecha = ver === 'realizada';
+  return lista.filter((s) => (s._estado.clave === 'realizada') === quiereHecha);
+}
+
 function pintarMapa() {
   if (!APP.mapa) return;
   APP.capaPuntos.clearLayers();
@@ -1316,11 +1354,33 @@ function pintarMapa() {
         ['idSolicitud', 'barrio', 'comuna', 'direccion', 'edificacion', 'responsable'])
     : todos;
 
+  /**
+   * Filtro de un toque: todas, solo las que faltan, o solo las hechas.
+   *
+   * Las cuentas de los botones se sacan ANTES de filtrar. Un botón tiene
+   * que decir cuántos puntos hay de lo suyo, no cuántos se están viendo:
+   * si dijera lo segundo, el botón apagado marcaría cero y parecería que
+   * no queda nada por visitar.
+   */
+  const esHecha = (s) => s._estado.clave === 'realizada';
+  const hayReal = conCoords.filter(esHecha).length;
+  const hayPend = conCoords.length - hayReal;
+  const ver = APP.verEnMapa || 'todas';
+
+  $('#cuenta-todas').textContent = conCoords.length;
+  $('#cuenta-pendiente').textContent = hayPend;
+  $('#cuenta-realizada').textContent = hayReal;
+  $$('.filtro-mapa').forEach((b) => {
+    b.setAttribute('aria-pressed', b.dataset.ver === ver ? 'true' : 'false');
+  });
+
+  const visibles = segunEstadoDeVisita(conCoords, ver);
+
   let nPend = 0, nReal = 0;
   const puntos = [];
   let unico = null;
 
-  conCoords.forEach((s) => {
+  visibles.forEach((s) => {
     const hecha = s._estado.clave === 'realizada';
     hecha ? nReal++ : nPend++;
     const color = hecha ? VERDE_VISITADA : AZUL_POR_VISITAR;
@@ -1353,13 +1413,16 @@ function pintarMapa() {
     APP.capaPuntos.addLayer(m);
   });
 
-  $('#mapa-resumen').textContent = nPend + ' por visitar · ' + nReal + ' visitadas';
+  $('#mapa-resumen').textContent =
+    ver === 'pendiente' ? 'Solo las ' + hayPend + ' por visitar'
+  : ver === 'realizada' ? 'Solo las ' + hayReal + ' visitadas'
+  : hayPend + ' por visitar · ' + hayReal + ' visitadas';
 
   const marcador = $('#mapa-resultados');
   marcador.textContent = busqueda
     ? (puntos.length ? puntos.length + (puntos.length === 1 ? ' punto' : ' puntos') : 'Nada coincide')
-    : '';
-  marcador.classList.toggle('vacio', !!busqueda && !puntos.length);
+    : (ver !== 'todas' && !puntos.length ? 'No hay ninguna en el mapa' : '');
+  marcador.classList.toggle('vacio', !puntos.length && (!!busqueda || ver !== 'todas'));
 
   // Al buscar, el mapa va a donde está el resultado. Sin búsqueda, se
   // encuadra una sola vez para no arrancarle el mapa de las manos al
@@ -1370,7 +1433,12 @@ function pintarMapa() {
   const paraEncuadrar = puntos.filter((p) => coordPlausible(p[0], p[1]));
   const encuadre = paraEncuadrar.length ? paraEncuadrar : puntos;
 
-  if (puntos.length && (busqueda || seLimpio || !APP.mapaCentrado)) {
+  // Al cambiar el filtro se reencuadra: si no, tocas "Visitadas" y el mapa
+  // se queda donde estaba, con los puntos que quedan fuera de pantalla.
+  const cambioFiltro = APP.mapaRefiltrado;
+  APP.mapaRefiltrado = false;
+
+  if (puntos.length && (busqueda || seLimpio || cambioFiltro || !APP.mapaCentrado)) {
     if (busqueda && puntos.length === 1) {
       APP.mapa.setView(puntos[0], 17);
       if (unico) unico.openPopup();

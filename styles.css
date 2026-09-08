@@ -1337,3 +1337,40 @@ body.con-aviso { padding-top: var(--alto-aviso, 52px); }
   font-size: .78rem; line-height: 1.4;
 }
 .aviso-cola.estancada { background: var(--alta); }
+
+/* ---------------------------------------------------------------------
+   FILTRO DEL MAPA
+   La leyenda hace de filtro: un toque y el mapa muestra solo lo pendiente
+   o solo lo hecho. Se puso aquí, al final, porque las reglas de
+   .mapa-leyenda de más arriba tienen la misma especificidad y ganarían.
+   --------------------------------------------------------------------- */
+.filtro-mapa {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 11px; border-radius: 999px;
+  border: 1px solid var(--borde); background: var(--blanco);
+  font-family: inherit; font-size: .72rem; font-weight: 700;
+  color: var(--texto-suave); cursor: pointer; white-space: nowrap;
+  /* Objetivo cómodo para un dedo con guante, en campo y de pie. */
+  min-height: 34px;
+}
+.filtro-mapa b { font-weight: 800; color: var(--texto); font-variant-numeric: tabular-nums; }
+.filtro-mapa[aria-pressed="true"] {
+  background: var(--azul); border-color: var(--azul); color: #fff;
+}
+.filtro-mapa[aria-pressed="true"] b { color: #fff; }
+.filtro-mapa[aria-pressed="true"] .punto { box-shadow: 0 0 0 1px rgba(255,255,255,.5); }
+.filtro-mapa:focus-visible { outline: 3px solid var(--azul); outline-offset: 2px; }
+
+.mapa-leyenda .leyenda-yo { margin-left: 2px; opacity: .8; }
+
+/* En pantallas angostas la fila se desliza en horizontal en vez de
+   partirse en dos y comerse el alto del mapa. */
+@media (max-width: 460px) {
+  .mapa-leyenda {
+    flex-wrap: nowrap; justify-content: flex-start;
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    gap: 6px; padding-left: 12px; padding-right: 12px;
+  }
+  .mapa-leyenda > * { flex: none; }
+  .filtro-mapa { font-size: .7rem; padding: 6px 9px; }
+}

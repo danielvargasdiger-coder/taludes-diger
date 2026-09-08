@@ -159,10 +159,18 @@
            placeholder="Buscar barrio, dirección o N.º…">
     <span id="mapa-resultados" class="mapa-resultados"></span>
   </div>
+  <!-- La leyenda es además el filtro: un toque y el mapa muestra solo eso. -->
   <div id="mapa-leyenda" class="mapa-leyenda">
-    <span><i class="punto pendiente"></i>Por visitar</span>
-    <span><i class="punto realizada"></i>Visitada</span>
-    <span><i class="punto yo"></i>Estás aquí</span>
+    <button type="button" class="filtro-mapa" data-ver="todas" aria-pressed="true">
+      Todas <b id="cuenta-todas">0</b>
+    </button>
+    <button type="button" class="filtro-mapa" data-ver="pendiente" aria-pressed="false">
+      <i class="punto pendiente"></i>Por visitar <b id="cuenta-pendiente">0</b>
+    </button>
+    <button type="button" class="filtro-mapa" data-ver="realizada" aria-pressed="false">
+      <i class="punto realizada"></i>Visitadas <b id="cuenta-realizada">0</b>
+    </button>
+    <span class="leyenda-yo"><i class="punto yo"></i>Estás aquí</span>
   </div>
   <div id="mapa"></div>
   <div id="mapa-sin-red" class="mapa-sin-red" hidden>
