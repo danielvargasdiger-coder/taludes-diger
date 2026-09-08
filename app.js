@@ -791,7 +791,10 @@ async function pintarMapaTablero(visitas) {
   if (APP.mapaT) { try { APP.mapaT.remove(); } catch (e) { /* ya no estaba */ } }
 
   APP.mapaT = L.map(caja, { zoomControl: true, scrollWheelZoom: false });
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  // Sin el {s} de siempre: Leaflet lo repartia entre a./b./c. y el
+    // service worker guardaba el MISMO cuadrito hasta tres veces. OSM
+    // ya recomienda el dominio sin prefijo.
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19, attribution: '&copy; OpenStreetMap'
   }).addTo(APP.mapaT);
 
@@ -1258,7 +1261,10 @@ async function abrirMapa() {
 
   if (!APP.mapa) {
     APP.mapa = L.map('mapa', { zoomControl: true });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    // Sin el {s} de siempre: Leaflet lo repartia entre a./b./c. y el
+    // service worker guardaba el MISMO cuadrito hasta tres veces. OSM
+    // ya recomienda el dominio sin prefijo.
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap'
     }).addTo(APP.mapa);
