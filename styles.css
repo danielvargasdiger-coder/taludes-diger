@@ -1244,3 +1244,11 @@ body.con-aviso { padding-top: var(--alto-aviso, 52px); }
   .logo-barra-carder { height: 29px; }
   .tarjeta { padding: 14px 16px; }
 }
+
+/* ---- Pestaña de borradores ---------------------------------------------
+   Las fichas a medio llenar van aparte de las solicitudes: mezcladas, unos
+   días de pruebas dejaban decenas de fichas a medias entre el trabajo real
+   y la lista se volvía inservible. */
+.filtro-borradores.activo { background: var(--media); border-color: var(--media); }
+.tarjeta-borrador { border-left: 4px solid var(--media); }
+.tarjeta-borrador .chip.en-proceso { background: var(--media); color: var(--blanco); }

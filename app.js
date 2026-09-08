@@ -15,6 +15,7 @@ const APP = {
   // reabrir la app una ficha a medio llenar volvía a decir "POR VISITAR"
   // y el geólogo la hacía otra vez desde cero.
   borradores: new Set(),
+  listaBorradores: [],  // fichas a medio llenar, con lo que se alcanzó a escribir
   datos: {},           // ficha que se está llenando ahora
   solicitudActual: null,
   vistaActual: 'pendientes',
@@ -974,38 +975,42 @@ async function recuperarBorradores() {
   }
 
   APP.borradores = new Set();
-  const enLista = new Set(APP.solicitudes.map((s) => String(s.idSolicitud)));
-  const rescatadas = [];
+  const enCola = new Set(APP.cola.map((c) => String(c.idSolicitud)));
+  const porId = {};
+  APP.solicitudes.forEach((s) => { porId[String(s.idSolicitud)] = s; });
 
-  guardados.forEach((b) => {
+  APP.listaBorradores = guardados.map((b) => {
     const id = String((b && b.clave) || '').replace(/^sol-/, '').trim();
-    if (!id) return;
+    if (!id) return null;
+    // Lo que ya está esperando envío no es un borrador pendiente: su copia
+    // se borra sola al enviarse. Mostrarlo aquí sería contarlo dos veces.
+    if (enCola.has(id)) return null;
     APP.borradores.add(id);
-    if (enLista.has(id)) return;
 
-    // No está en el catálogo: es un hallazgo en campo sin terminar. Se
-    // reconstruye con lo que alcanzó a escribir para que se reconozca.
     const d = (b && b.datos) || {};
     const c = d.coordenadas || {};
-    rescatadas.push({
-      idSolicitud: id,
-      noProgramada: true,
-      barrio: d.barrio_vereda || '',
-      comuna: '',
-      direccion: d.direccion_referencia || '',
-      edificacion: '',
-      latitud: c.y || '',
-      longitud: c.x || '',
-      recomendaciones: '',
-      prioridad: '',
-      entidad: '',
-      estado: '',
-      _rescatada: true,
-      _guardado: b && b.guardado
-    });
-  });
-
-  if (rescatadas.length) APP.solicitudes = APP.solicitudes.concat(rescatadas);
+    const delCatalogo = porId[id];
+    return {
+      id: id,
+      clave: b.clave,
+      guardado: b.guardado,
+      datos: d,
+      esHallazgo: !delCatalogo,
+      barrio: d.barrio_vereda || (delCatalogo && delCatalogo.barrio) || '',
+      direccion: d.direccion_referencia || (delCatalogo && delCatalogo.direccion) || '',
+      fotos: (d.fotos || []).length,
+      // La solicitud con la que se vuelve a abrir: la del catálogo si
+      // existe, o una rearmada con lo que el propio borrador tiene escrito.
+      solicitud: delCatalogo || {
+        idSolicitud: id, noProgramada: true,
+        barrio: d.barrio_vereda || '', comuna: '',
+        direccion: d.direccion_referencia || '', edificacion: '',
+        latitud: c.y || '', longitud: c.x || '',
+        recomendaciones: '', prioridad: '', entidad: '', estado: ''
+      }
+    };
+  }).filter(Boolean)
+    .sort((a, b) => String(b.guardado || '').localeCompare(String(a.guardado || '')));
 }
 
 /**
@@ -1992,7 +1997,11 @@ function estadoSolicitud(s) {
   if (String(s.estado).toUpperCase() === 'ATENDIDA') return { clave: 'realizada', texto: 'REALIZADA' };
   // La marca de la sesión actual, o la que se rescató de los borradores
   // guardados en el celular al arrancar (ver recuperarBorradores).
-  if (s._tieneBorrador || APP.borradores.has(String(s.idSolicitud))) {
+  // Una sola fuente de verdad: el conjunto que se arma leyendo los
+  // borradores guardados. Antes había además una marca pegada al objeto de
+  // la solicitud, y al descartar el borrador esa marca se quedaba puesta:
+  // la solicitud seguía diciendo EN PROCESO sin tener nada guardado.
+  if (APP.borradores.has(String(s.idSolicitud))) {
     return { clave: 'en-proceso', texto: 'EN PROCESO' };
   }
   return { clave: 'pendiente', texto: 'POR VISITAR' };
@@ -2072,7 +2081,16 @@ function pintarPendientes() {
   // común a todas las entidades- y el botón + para registrar lo que encuentre.
   const sinLista = !!(APP.perfil && APP.perfil.verSolicitudes === false);
   $('#filtros .filtro[data-filtro="pendientes"]').hidden = sinLista;
-  if (sinLista && APP.filtro !== 'realizadas') APP.filtro = 'realizadas';
+  if (sinLista && APP.filtro === 'pendientes') APP.filtro = 'realizadas';
+
+  // La pestaña de borradores solo existe si hay algo a medio llenar.
+  const nBorr = (APP.listaBorradores || []).length;
+  const pestanaBorr = $('#filtros .filtro[data-filtro="borradores"]');
+  if (pestanaBorr) {
+    pestanaBorr.hidden = nBorr === 0;
+    $('#dato-borradores').textContent = nBorr;
+  }
+  if (!nBorr && APP.filtro === 'borradores') APP.filtro = sinLista ? 'realizadas' : 'pendientes';
 
   $('#dato-pendientes').textContent = nPend;
   $('#dato-realizadas').textContent = nReal;
@@ -2080,6 +2098,10 @@ function pintarPendientes() {
     b.classList.toggle('activo', b.dataset.filtro === APP.filtro);
   });
   pintarChipsActivos();
+
+  // Los borradores tienen su propia lista: no pasan por los filtros ni por
+  // el buscador de solicitudes, que no aplican a una ficha a medio llenar.
+  if (APP.filtro === 'borradores') { pintarBorradores(); return; }
 
   const f = APP.filtros;
   const base = APP.filtro === 'realizadas' ? visitadas : conEstado;
@@ -2324,6 +2346,104 @@ function pintarCola() {
  * El borrador se escribe ANTES de sacarla de la cola: si algo se corta en
  * el medio, la ficha queda en los dos lados, nunca en ninguno.
  */
+/**
+ * Pestaña de borradores: las fichas empezadas y sin enviar.
+ *
+ * Van aparte de "Por visitar" a propósito. Cuando se mezclaban, unos días
+ * de pruebas dejaban decenas de fichas a medias entre las solicitudes de
+ * verdad y no había forma de trabajar con esa lista.
+ */
+function pintarBorradores() {
+  const cont = $('#lista-pendientes');
+  const lista = APP.listaBorradores || [];
+
+  if (!lista.length) {
+    $('#resumen-pendientes').textContent = '';
+    cont.innerHTML = '<div class="vacio"><span class="vacio-icono">&#10003;</span>' +
+      'No tienes fichas a medio llenar.</div>';
+    return;
+  }
+
+  $('#resumen-pendientes').textContent =
+    lista.length + ' ficha(s) a medio llenar en este celular';
+
+  cont.innerHTML =
+    lista.map((b) => {
+      const cuando = b.guardado ? fechaBonita(b.guardado) : 'sin fecha';
+      return '<div class="tarjeta tarjeta-borrador">' +
+        '<div class="tarjeta-cabeza"><div>' +
+          '<div class="tarjeta-id">' +
+            (b.esHallazgo ? 'HALLAZGO EN CAMPO' : 'SOLICITUD ' + esc(b.id)) + '</div>' +
+          '<div class="tarjeta-titulo">' + esc(b.direccion || '(sin dirección)') + '</div>' +
+          '<div class="tarjeta-sub">' + esc(b.barrio || '(sin barrio)') + '</div>' +
+        '</div><span class="chip en-proceso">EN PROCESO</span></div>' +
+        '<div class="tarjeta-pie">' +
+          '<span>Guardada ' + esc(cuando) + '</span>' +
+          (b.fotos ? '<span>· ' + b.fotos + ' foto(s)</span>' : '<span>· sin fotos</span>') +
+        '</div>' +
+        '<div class="cola-acciones">' +
+          '<button type="button" class="btn-corregir-cola" data-borrador="' + esc(b.clave) + '">' +
+            '&#9998; Continuar</button>' +
+          '<button type="button" class="btn-eliminar-cola" data-borrador="' + esc(b.clave) + '">' +
+            'Descartar</button>' +
+        '</div>' +
+      '</div>';
+    }).join('') +
+    (lista.length > 3
+      ? '<button id="btn-limpiar-borradores" class="btn-secundario" style="margin-top:12px">' +
+        'Descartar los ' + lista.length + ' borradores</button>'
+      : '');
+
+  cont.querySelectorAll('[data-borrador].btn-corregir-cola').forEach((b) => {
+    b.addEventListener('click', () => continuarBorrador(b.dataset.borrador));
+  });
+  cont.querySelectorAll('[data-borrador].btn-eliminar-cola').forEach((b) => {
+    b.addEventListener('click', () => descartarBorrador(b.dataset.borrador));
+  });
+  const limpiar = $('#btn-limpiar-borradores');
+  if (limpiar) limpiar.addEventListener('click', descartarTodosLosBorradores);
+}
+
+/** Vuelve a abrir una ficha a medio llenar. */
+async function continuarBorrador(clave) {
+  const b = (APP.listaBorradores || []).find((x) => x.clave === clave);
+  if (!b) return;
+  await abrirFicha(b.solicitud);
+}
+
+/** Descarta una ficha a medio llenar. Se pregunta: es trabajo de campo. */
+async function descartarBorrador(clave) {
+  const b = (APP.listaBorradores || []).find((x) => x.clave === clave);
+  if (!b) return;
+  if (!confirm('Se va a descartar la ficha de ' +
+      (b.esHallazgo ? 'este hallazgo' : 'la solicitud ' + b.id) +
+      (b.fotos ? ', con sus ' + b.fotos + ' foto(s)' : '') +
+      '.\n\nNo se puede deshacer. ¿Continuar?')) return;
+  await DB.borrar('borradores', clave).catch(() => {});
+  APP.borradores.delete(String(b.id));
+  await recuperarBorradores();
+  pintarTodo();
+  toast('Borrador descartado', 'ok');
+}
+
+/** Limpieza de una sola vez, para cuando se acumularon de las pruebas. */
+async function descartarTodosLosBorradores() {
+  const lista = (APP.listaBorradores || []).slice();
+  const conFotos = lista.filter((b) => b.fotos).length;
+  if (!confirm('Se van a descartar los ' + lista.length + ' borradores' +
+      (conFotos ? ' (' + conFotos + ' con fotos)' : '') +
+      '.\n\nNo se puede deshacer. ¿Continuar?')) return;
+  if (!confirm('Confirma otra vez: se pierde lo escrito en las ' +
+      lista.length + ' fichas.')) return;
+  for (const b of lista) {
+    await DB.borrar('borradores', b.clave).catch(() => {});
+    APP.borradores.delete(String(b.id));
+  }
+  await recuperarBorradores();
+  pintarTodo();
+  toast('Borradores descartados', 'ok');
+}
+
 async function corregirDeLaCola(idLocal) {
   const item = APP.cola.find((x) => x.idLocal === idLocal);
   if (!item) return;
@@ -2452,15 +2572,80 @@ function datosIniciales(s) {
   };
 }
 
+/**
+ * Salir de la ficha preguntando qué hacer con lo escrito.
+ *
+ * POR QUÉ SE PREGUNTA
+ * La ficha se autoguarda mientras se llena —eso protege de que el celular
+ * se apague— pero antes ese borrador se quedaba para siempre. Después de
+ * unos días de pruebas había noventa y pico de borradores viejos que nadie
+ * iba a terminar, y encontrar los que sí importaban se volvía imposible.
+ *
+ * El autoguardado se mantiene, que es la red de seguridad. Lo que decide
+ * el geólogo al salir es si esa ficha SE QUEDA o se descarta.
+ */
 $('#btn-cerrar-ficha').addEventListener('click', async () => {
-  const guardo = await guardarBorrador(true);
-  if (!guardo && !confirm(
-      'No se pudo guardar el borrador en este celular.\n\n' +
-      'Si sales ahora puedes perder lo que llevas escrito.\n\n' +
-      '¿Salir de todas formas?')) return;
-  $('#vista-ficha').hidden = true;
-  pintarTodo();
+  const algoEscrito = hayAlgoEscrito();
+
+  // Ficha en blanco: no hay nada que preguntar ni nada que guardar.
+  if (!algoEscrito) {
+    if (APP.solicitudActual) {
+      const clave = 'sol-' + APP.solicitudActual.idSolicitud;
+      await DB.borrar('borradores', clave).catch(() => {});
+      APP.borradores.delete(String(APP.solicitudActual.idSolicitud));
+    }
+    return cerrarFicha();
+  }
+
+  const quedarse = confirm(
+    '¿GUARDAR ESTA FICHA COMO BORRADOR?\n\n' +
+    'Aceptar  →  se guarda en la pestaña "Borradores" y puedes seguir después.\n' +
+    'Cancelar →  se sale SIN guardar y se pierde lo escrito.\n');
+
+  if (quedarse) {
+    const guardo = await guardarBorrador(true);
+    if (!guardo && !confirm(
+        'No se pudo guardar el borrador en este celular.\n\n' +
+        'Si sales ahora pierdes lo que llevas escrito.\n\n' +
+        '¿Salir de todas formas?')) return;
+    if (guardo) toast('Guardada en Borradores', 'ok');
+  } else {
+    // Se confirma otra vez: es trabajo de campo lo que se descarta.
+    if (!confirm('Se va a perder lo escrito en esta ficha' +
+        ((APP.datos.fotos || []).length
+          ? ', incluidas las ' + APP.datos.fotos.length + ' foto(s) tomadas' : '') +
+        '.\n\nEsto no se puede deshacer. ¿Salir sin guardar?')) return;
+    const clave = 'sol-' + APP.solicitudActual.idSolicitud;
+    await DB.borrar('borradores', clave).catch(() => {});
+    APP.borradores.delete(String(APP.solicitudActual.idSolicitud));
+    toast('Se salió sin guardar', '');
+  }
+
+  cerrarFicha();
 });
+
+/** Cierra la vista de la ficha y refresca las listas. */
+async function cerrarFicha() {
+  $('#vista-ficha').hidden = true;
+  APP.solicitudActual = null;
+  await recuperarBorradores();
+  pintarTodo();
+}
+
+/**
+ * ¿El geólogo alcanzó a escribir algo, más allá de lo que la ficha trae
+ * puesto de entrada (fecha, municipio, coordenada de la solicitud)?
+ */
+function hayAlgoEscrito() {
+  if (!APP.solicitudActual) return false;
+  const inicial = datosIniciales(APP.solicitudActual);
+  return Object.keys(APP.datos).some((k) => {
+    const v = APP.datos[k];
+    if (v == null || v === '') return false;
+    if (Array.isArray(v) && !v.length) return false;
+    return JSON.stringify(v) !== JSON.stringify(inicial[k]);
+  });
+}
 
 $('#btn-guardar-borrador').addEventListener('click', () => guardarBorrador());
 
@@ -2498,18 +2683,6 @@ async function guardarBorrador(silencioso) {
     toast('No se pudo guardar el borrador', 'error');
     return false;
   }
-  APP.solicitudActual._tieneBorrador = true;
-
-  // Un hallazgo en campo inventa su número al vuelo y no está en el
-  // catálogo. Se mete en la lista apenas se guarda para que quede visible
-  // al cerrar la ficha, sin esperar a la próxima sincronización.
-  if (APP.solicitudActual.noProgramada) {
-    const id = String(APP.solicitudActual.idSolicitud);
-    if (!APP.solicitudes.some((s) => String(s.idSolicitud) === id)) {
-      APP.solicitudes.push(APP.solicitudActual);
-    }
-  }
-
   avisoGuardado('');            // volvió a funcionar: se quita el aviso
   if (!silencioso) toast('Borrador guardado en el celular', 'ok');
   return true;

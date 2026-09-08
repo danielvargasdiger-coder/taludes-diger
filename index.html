@@ -84,6 +84,11 @@
     <button class="filtro" data-filtro="realizadas">
       Visitadas <b id="dato-realizadas">0</b>
     </button>
+    <!-- Solo aparece si hay fichas a medio llenar: no ocupa sitio cuando
+         no hay nada que atender. -->
+    <button class="filtro filtro-borradores" data-filtro="borradores" hidden>
+      Borradores <b id="dato-borradores">0</b>
+    </button>
     <button id="btn-filtros" class="filtro filtro-mas" title="Filtrar">
       <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path fill="currentColor" d="M3 5h18l-7 8v6l-4 2v-8L3 5z"/></svg><span id="filtros-activos" class="filtros-activos"></span>
     </button>
