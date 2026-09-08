@@ -2543,6 +2543,16 @@ async function abrirFicha(solicitud) {
 
   APP.datos = borrador ? borrador.datos : datosIniciales(solicitud);
 
+  // Foto de cómo quedó la ficha al abrirla, para poder saber después si el
+  // geólogo escribió algo o solo entró a mirar.
+  //
+  // Tiene que ser una copia tomada AQUÍ, no volver a armar los datos
+  // iniciales al salir: entre esos dos momentos la hora de la visita ya
+  // cambió, y comparar contra ella daba "sí escribió" siempre. Por eso una
+  // ficha que solo se abría a mirar terminaba preguntando si guardarla, y
+  // quedaba de borrador aunque nadie hubiera tocado nada.
+  APP.datosAlAbrir = JSON.stringify(APP.datos);
+
   $('#ficha-titulo').textContent = solicitud.noProgramada
     ? 'Hallazgo en campo'
     : 'Solicitud ' + solicitud.idSolicitud;
@@ -2638,13 +2648,8 @@ async function cerrarFicha() {
  */
 function hayAlgoEscrito() {
   if (!APP.solicitudActual) return false;
-  const inicial = datosIniciales(APP.solicitudActual);
-  return Object.keys(APP.datos).some((k) => {
-    const v = APP.datos[k];
-    if (v == null || v === '') return false;
-    if (Array.isArray(v) && !v.length) return false;
-    return JSON.stringify(v) !== JSON.stringify(inicial[k]);
-  });
+  if (!APP.datosAlAbrir) return true;      // sin referencia, se guarda por si acaso
+  return JSON.stringify(APP.datos) !== APP.datosAlAbrir;
 }
 
 $('#btn-guardar-borrador').addEventListener('click', () => guardarBorrador());
