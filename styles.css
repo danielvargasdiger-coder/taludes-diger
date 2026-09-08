@@ -1252,3 +1252,19 @@ body.con-aviso { padding-top: var(--alto-aviso, 52px); }
 .filtro-borradores.activo { background: var(--media); border-color: var(--media); }
 .tarjeta-borrador { border-left: 4px solid var(--media); }
 .tarjeta-borrador .chip.en-proceso { background: var(--media); color: var(--blanco); }
+
+/* ---- Orden de la lista -------------------------------------------------- */
+.orden-lista { display: flex; align-items: center; gap: 7px; padding: 0 14px 8px; }
+.orden-txt { font-size: .76rem; color: var(--texto-suave); }
+.orden-op {
+  border: 1px solid var(--borde); background: var(--blanco); color: var(--texto-suave);
+  border-radius: 20px; padding: 5px 12px; font-size: .78rem; font-weight: 600; cursor: pointer;
+}
+.orden-op.activa { background: var(--azul); border-color: var(--azul); color: var(--blanco); }
+
+/* Punto del mapa que en realidad es el centroide del barrio: si el geólogo
+   se guía por él, llega a donde no hay nada. */
+.aviso-punto-compartido {
+  display: block; margin-top: 4px; color: var(--media);
+  font-size: .74rem; font-weight: 600; line-height: 1.35;
+}

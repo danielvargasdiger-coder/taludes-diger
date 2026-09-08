@@ -24,6 +24,7 @@ const APP = {
   // Se llena en la línea de abajo para no repetir la forma en cuatro sitios.
   filtros: null,
   miUbicacion: null,
+  orden: 'prioridad',   // 'prioridad' o 'cercania' (para armar la ruta)
   sincronizando: false
 };
 
@@ -1872,11 +1873,11 @@ function pendientes() {
   return APP.solicitudes
     .filter((s) => s.estado !== 'ATENDIDA' && !hechos.has(String(s.idSolicitud)))
     .sort((a, b) => {
-      const pa = ORDEN_PRIORIDAD[(a.prioridad || '').toUpperCase()] ?? 4;
-      const pb = ORDEN_PRIORIDAD[(b.prioridad || '').toUpperCase()] ?? 4;
-      if (pa !== pb) return pa - pb;
-      return String(a.idSolicitud).localeCompare(String(b.idSolicitud), 'es', { numeric: true });
-    });
+    const pa = ORDEN_PRIORIDAD[(a.prioridad || '').toUpperCase()] ?? 4;
+    const pb = ORDEN_PRIORIDAD[(b.prioridad || '').toUpperCase()] ?? 4;
+    if (pa !== pb) return pa - pb;
+    return String(a.idSolicitud).localeCompare(String(b.idSolicitud), 'es', { numeric: true });
+  });
 }
 
 function pintarTodo() {
@@ -1983,6 +1984,38 @@ function filtrar(lista, texto, campos) {
 
 $('#buscar-pendientes').addEventListener('input', pintarPendientes);
 
+/**
+ * Cambia el orden de la lista: por urgencia o por lo que queda más cerca.
+ *
+ * "Cerca de mí" necesita la ubicación. Si el GPS no la da, se avisa y se
+ * vuelve a prioridad: es preferible eso a dejar la lista en un orden que
+ * el geólogo cree que es por distancia y no lo es.
+ */
+$$('#orden-lista .orden-op').forEach((b) => {
+  b.addEventListener('click', async () => {
+    const quiere = b.dataset.orden;
+    if (quiere === APP.orden) return;
+
+    if (quiere === 'cercania' && !APP.miUbicacion) {
+      if (!navigator.geolocation) { toast('Este celular no tiene GPS disponible.', 'error'); return; }
+      b.textContent = 'Ubicando…';
+      try {
+        const pos = await new Promise((ok, no) => navigator.geolocation.getCurrentPosition(
+          ok, no, { enableHighAccuracy: true, timeout: 20000 }));
+        APP.miUbicacion = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+      } catch (e) {
+        toast('No se pudo obtener tu ubicación. Se deja el orden por prioridad.', 'error');
+        b.textContent = 'Cerca de mí';
+        return;
+      }
+      b.textContent = 'Cerca de mí';
+    }
+
+    APP.orden = quiere;
+    pintarPendientes();
+  });
+});
+
 
 /**
  * Estado de una solicitud desde el punto de vista del geólogo.
@@ -1995,8 +2028,6 @@ function estadoSolicitud(s) {
     return { clave: 'por-enviar', texto: 'POR ENVIAR' };
   }
   if (String(s.estado).toUpperCase() === 'ATENDIDA') return { clave: 'realizada', texto: 'REALIZADA' };
-  // La marca de la sesión actual, o la que se rescató de los borradores
-  // guardados en el celular al arrancar (ver recuperarBorradores).
   // Una sola fuente de verdad: el conjunto que se arma leyendo los
   // borradores guardados. Antes había además una marca pegada al objeto de
   // la solicitud, y al descartar el borrador esa marca se quedaba puesta:
@@ -2007,11 +2038,40 @@ function estadoSolicitud(s) {
   return { clave: 'pendiente', texto: 'POR VISITAR' };
 }
 
+/**
+ * Coordenadas que se repiten en muchas solicitudes: no son el sitio, son
+ * el centroide del barrio.
+ *
+ * En la base del EDR hay puntos que aparecen decenas de veces —uno sale 95
+ * veces— porque cuando no se tomó el GPS se puso el punto del barrio. En
+ * el mapa caen todas amontonadas, y un geólogo que se guíe por ahí llega a
+ * un sitio donde no hay nada. Se detectan solos: si un punto se repite en
+ * más de tres solicitudes, no puede ser la ubicación exacta de ninguna.
+ */
+function coordenadasRepetidas() {
+  const cuenta = {};
+  APP.solicitudes.forEach((s) => {
+    if (s.latitud === '' || s.longitud === '') return;
+    const k = Number(s.latitud).toFixed(5) + ',' + Number(s.longitud).toFixed(5);
+    cuenta[k] = (cuenta[k] || 0) + 1;
+  });
+  const repetidas = {};
+  Object.keys(cuenta).forEach((k) => { if (cuenta[k] > 3) repetidas[k] = cuenta[k]; });
+  return repetidas;
+}
+
 /** Solicitudes con su estado resuelto, lo que falta primero. */
 function solicitudesConEstado() {
+  const comodines = coordenadasRepetidas();
   return APP.solicitudes
     .map((s) => {
       const con = Object.assign({}, s, { _estado: estadoSolicitud(s) });
+
+      // Se avisa en la tarjeta: la dirección manda sobre el GPS aquí.
+      if (s.latitud !== '' && s.longitud !== '') {
+        const k = Number(s.latitud).toFixed(5) + ',' + Number(s.longitud).toFixed(5);
+        if (comodines[k]) con._puntoCompartido = comodines[k];
+      }
       // Contexto, NO advertencia de repetido: en zona urbana dos casas
       // vecinas están a 10 m y son taludes distintos. La duplicidad real
       // la define el número de solicitud, no la distancia. Esto solo
@@ -2035,9 +2095,19 @@ function solicitudesConEstado() {
       const rb = b._estado.clave === 'realizada' ? 1 : 0;
       if (ra !== rb) return ra - rb;   // lo que falta, primero
 
+      // Orden por cercanía: es el que sirve para armar la ruta del día.
+      // La distancia ya se calcula arriba para mostrarla en la tarjeta.
+      // Las que no tienen coordenada van al final: no se pueden meter en
+      // una ruta, pero tampoco se esconden.
+      if (ra === 0 && APP.orden === 'cercania' && APP.miUbicacion) {
+        const da = typeof a._distancia === 'number' ? a._distancia : Infinity;
+        const db = typeof b._distancia === 'number' ? b._distancia : Infinity;
+        if (da !== db) return da - db;
+      }
+
       // Entre visitadas manda la fecha: lo más reciente arriba, que es
       // lo que se quiere consultar. La prioridad ahí ya no ordena nada.
-      if (ra === 1) {
+      else if (ra === 1) {
         const fa = (a._estado.visita && a._estado.visita.fechaVisita) || '';
         const fb = (b._estado.visita && b._estado.visita.fechaVisita) || '';
         if (fa !== fb) return fb.localeCompare(fa);
@@ -2098,6 +2168,15 @@ function pintarPendientes() {
     b.classList.toggle('activo', b.dataset.filtro === APP.filtro);
   });
   pintarChipsActivos();
+
+  // El orden solo se ofrece donde sirve: en lo que falta por visitar.
+  // En "Visitadas" manda la fecha y en "Borradores" el último guardado.
+  const cajaOrden = $('#orden-lista');
+  if (cajaOrden) {
+    cajaOrden.hidden = APP.filtro !== 'pendientes';
+    $$('#orden-lista .orden-op').forEach((b) =>
+      b.classList.toggle('activa', b.dataset.orden === APP.orden));
+  }
 
   // Los borradores tienen su propia lista: no pasan por los filtros ni por
   // el buscador de solicitudes, que no aplican a una ficha a medio llenar.
@@ -2206,6 +2285,13 @@ function pintarPendientes() {
         '<div class="tarjeta-pie">' +
           (s.responsable ? '<span>Asignada a <b>' + esc(s.responsable) + '</b></span>' : '') +
           (!s.latitud ? '<span class="aviso-sin-gps">Sin coordenadas — capturar GPS</span>' : '') +
+          // El punto del mapa no es el sitio: guiarse por él lleva a un
+          // lugar donde no hay nada. Mejor decirlo en la tarjeta.
+          (s._puntoCompartido
+            ? '<span class="aviso-punto-compartido">Ubicación aproximada — ' +
+              'este punto lo comparten ' + s._puntoCompartido + ' solicitudes. ' +
+              'Guíate por la dirección.</span>'
+            : '') +
         '</div>';
 
     return '<div class="tarjeta ' + claseP(p) + ' est-' + e.clave + '" data-id="' + esc(s.idSolicitud) + '">' +

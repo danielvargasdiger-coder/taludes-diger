@@ -98,6 +98,14 @@
     <input type="search" id="buscar-pendientes" placeholder="Buscar barrio, dirección o N.º…">
   </div>
 
+  <!-- Cómo se ordena la lista. Para armar la ruta del día, "lo más cerca
+       de mí" es el orden natural; por prioridad es el orden de urgencia. -->
+  <div id="orden-lista" class="orden-lista">
+    <span class="orden-txt">Ordenar por</span>
+    <button type="button" class="orden-op activa" data-orden="prioridad">Prioridad</button>
+    <button type="button" class="orden-op" data-orden="cercania">Cerca de mí</button>
+  </div>
+
   <div id="chips-activos" class="chips-activos"></div>
   <div id="resumen-pendientes" class="resumen"></div>
   <div id="lista-pendientes" class="lista"></div>
