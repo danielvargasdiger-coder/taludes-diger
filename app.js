@@ -1728,8 +1728,20 @@ async function sincronizar(silencioso = false) {
       localStorage.setItem(CLAVE_PERFIL, JSON.stringify(APP.perfil));
     }
 
+    // Las fichas completas que ya se habían consultado se conservan.
+    //
+    // Cada sincronización reemplazaba el historial entero y se llevaba por
+    // delante las fichas descargadas, así que había que volver a pedirlas
+    // —con señal— para verlas. En campo eso significaba no poder consultar
+    // lo que ya se había abierto. Ahora se vuelven a pegar al historial
+    // nuevo y quedan guardadas: lo consultado una vez sirve sin señal.
+    const fichasGuardadas = {};
+    APP.historial.forEach((h) => { if (h.ficha) fichasGuardadas[h.idVisita] = h.ficha; });
+
     APP.solicitudes = r.solicitudes || [];
-    APP.historial = r.historial || [];
+    APP.historial = (r.historial || []).map((h) =>
+      fichasGuardadas[h.idVisita] ? Object.assign(h, { ficha: fichasGuardadas[h.idVisita] }) : h);
+
     // Se guarda el catálogo TAL COMO vino del servidor, antes de sumarle
     // las fichas empezadas: lo local no tiene por qué acabar en la copia
     // del catálogo, se vuelve a rescatar de los borradores cada vez.
@@ -2268,8 +2280,12 @@ function pintarCola() {
         ? '<p class="cola-motivo"><b>No la aceptó el servidor:</b> ' + esc(c.error) +
           '</p>'
         : '') +
-      '<button type="button" class="btn-eliminar-cola" data-id="' + esc(c.idLocal) + '">' +
-        'Eliminar del celular</button>' +
+      '<div class="cola-acciones">' +
+        '<button type="button" class="btn-corregir-cola" data-id="' + esc(c.idLocal) + '">' +
+          '&#9998; Abrir y corregir</button>' +
+        '<button type="button" class="btn-eliminar-cola" data-id="' + esc(c.idLocal) + '">' +
+          'Eliminar del celular</button>' +
+      '</div>' +
     '</div>';
   }).join('') +
   '<button id="btn-forzar-envio" class="btn-principal" style="margin-top:12px">Intentar enviar ahora</button>';
@@ -2277,6 +2293,9 @@ function pintarCola() {
   const btn = $('#btn-forzar-envio');
   if (btn) btn.addEventListener('click', () => sincronizar());
 
+  cont.querySelectorAll('.btn-corregir-cola').forEach((b) => {
+    b.addEventListener('click', () => corregirDeLaCola(b.dataset.id));
+  });
   cont.querySelectorAll('.btn-eliminar-cola').forEach((b) => {
     b.addEventListener('click', () => eliminarDeLaCola(b.dataset.id));
   });
@@ -2286,6 +2305,67 @@ function pintarCola() {
  * Borra una ficha de la cola del celular. Es una acción sin vuelta atrás,
  * así que se avisa distinto según lo que se vaya a perder.
  */
+/**
+ * Saca una ficha de la cola y la devuelve a borrador para poder corregirla.
+ *
+ * POR QUÉ EXISTE
+ * Cuando el servidor rechazaba una ficha, las únicas salidas eran
+ * "Intentar enviar" —que volvía a fallar por el mismo motivo— y "Eliminar
+ * del celular". O sea: la salida natural del geólogo cansado era borrar
+ * una visita ya hecha, con sus fotos. Ahora puede abrirla, arreglar lo que
+ * el servidor no aceptó y volver a enviarla.
+ *
+ * Se pasa por el camino normal de siempre (borrador → "Finalizar y
+ * enviar") en vez de inventar un envío aparte: es el que está probado.
+ * Al reenviarla se crea una entrada de cola nueva sin idServidor, y si el
+ * intento anterior ya había dejado una fila a medias en la hoja, el
+ * servidor la reutiliza en vez de duplicarla (ver accionCrearVisita).
+ *
+ * El borrador se escribe ANTES de sacarla de la cola: si algo se corta en
+ * el medio, la ficha queda en los dos lados, nunca en ninguno.
+ */
+async function corregirDeLaCola(idLocal) {
+  const item = APP.cola.find((x) => x.idLocal === idLocal);
+  if (!item) return;
+
+  if (!confirm('Vas a abrir la ficha de la solicitud ' + item.idSolicitud +
+      ' para corregirla.\n\nSale de la lista de envío y queda como ficha en ' +
+      'proceso. No se pierde nada: cuando la termines, la envías otra vez.\n\n¿Continuar?')) return;
+
+  const clave = item.clave || ('sol-' + item.idSolicitud);
+  try {
+    await DB.guardar('borradores', { clave: clave, datos: item.datos,
+                                     guardado: new Date().toISOString() });
+  } catch (e) {
+    toast('No se pudo preparar la ficha para corregirla', 'error');
+    return;
+  }
+  APP.borradores.add(String(item.idSolicitud));
+
+  await DB.borrar('cola', idLocal);
+  APP.cola = APP.cola.filter((x) => x.idLocal !== idLocal);
+
+  // La solicitud original, o una rearmada si era un hallazgo en campo.
+  const id = String(item.idSolicitud);
+  let solicitud = APP.solicitudes.find((s) => String(s.idSolicitud) === id);
+  if (!solicitud) {
+    const c = (item.datos && item.datos.coordenadas) || {};
+    solicitud = {
+      idSolicitud: id, noProgramada: true,
+      barrio: (item.datos && item.datos.barrio_vereda) || '',
+      comuna: '', direccion: (item.datos && item.datos.direccion_referencia) || '',
+      edificacion: '', latitud: c.y || '', longitud: c.x || '',
+      recomendaciones: '', prioridad: '', entidad: '', estado: ''
+    };
+    APP.solicitudes.push(solicitud);
+  }
+
+  pintarTodo();
+  irA('pendientes');
+  await abrirFicha(solicitud);
+  toast('Corrige lo que haga falta y vuelve a enviarla', 'ok');
+}
+
 async function eliminarDeLaCola(idLocal) {
   const item = APP.cola.find((x) => x.idLocal === idLocal);
   if (!item) return;
@@ -3317,8 +3397,16 @@ async function abrirDetalle(idVisita) {
   let ficha = h.ficha;
   if (!ficha) {
     if (!navigator.onLine) {
+      // Se dice qué SÍ se puede ver y cómo dejarla lista para la próxima
+      // salida: sin eso el geólogo se queda sin saber qué hacer.
       $('#detalle-cuerpo').innerHTML =
-        '<div class="vacio">Necesitas internet para ver el detalle completo de esta visita.</div>';
+        '<div class="vacio">' +
+          '<b>Esta ficha no se ha descargado a este celular.</b>' +
+          '<p>Ábrela una vez con internet y queda guardada: después se puede ' +
+          'consultar en campo sin señal.</p>' +
+          '<p>Mientras tanto, de esta visita ya tienes aquí el barrio, la ' +
+          'dirección, la fecha, el evaluador y la prioridad.</p>' +
+        '</div>';
       return;
     }
     try {

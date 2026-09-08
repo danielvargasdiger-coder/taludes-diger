@@ -810,12 +810,21 @@ select { appearance: none; -webkit-appearance: none;
 body.con-aviso #topbar { top: var(--alto-aviso, 52px); }
 body.con-aviso { padding-top: var(--alto-aviso, 52px); }
 
+/* Las dos salidas de una ficha atascada. Corregir va primero y con más
+   peso: borrar una visita ya hecha debe ser la última opción, no la
+   primera que se ve. */
+.cola-acciones { display: flex; gap: 8px; margin-top: 11px; }
+.cola-acciones button { flex: 1; padding: 10px; border-radius: 8px;
+  font-size: .82rem; font-weight: 700; cursor: pointer; }
+
+.btn-corregir-cola {
+  border: 1px solid var(--azul); background: var(--azul); color: var(--blanco);
+}
+.btn-corregir-cola:active { background: var(--azul-oscuro); }
+
 /* Eliminar una ficha de la cola: acción destructiva, se ve como tal. */
 .btn-eliminar-cola {
-  display: block; width: 100%; margin-top: 11px; padding: 10px;
-  border: 1px solid var(--error); border-radius: 8px;
-  background: var(--blanco); color: var(--error);
-  font-size: .82rem; font-weight: 700; cursor: pointer;
+  border: 1px solid var(--error); background: var(--blanco); color: var(--error);
 }
 .btn-eliminar-cola:active { background: #fdecea; }
 
