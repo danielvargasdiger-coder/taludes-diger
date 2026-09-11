@@ -46,6 +46,50 @@ const $$ = (sel) => Array.from(document.querySelectorAll(sel));
  */
 const SUFIJO = (typeof CONFIG !== 'undefined' && CONFIG.ESPACIO) ? '-' + CONFIG.ESPACIO : '';
 const NOMBRE_BD = 'taludes-diger' + SUFIJO;
+// ---------------------------------------------------------------- ICONOS
+/**
+ * Iconos dibujados, no caracteres. Los simbolos de texto (flecha, menu,
+ * telefono, candado...) cambian de forma y de color segun el celular: en
+ * unos salian como emoji rosado, en otros como un cuadrito, y la flecha de
+ * volver se veia delgada y corrida. Todos van con el mismo trazo y toman el
+ * color del texto que los rodea (ver .ico en styles.css). Los de index.html
+ * usan exactamente los mismos trazos.
+ */
+const ICONOS = {
+  atras: '<path d="M15 18l-6-6 6-6"/>',
+  menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+  mas: '<path d="M12 5v14M5 12h14"/>',
+  abajo: '<path d="M6 9l6 6 6-6"/>',
+  derecha: '<path d="M9 6l6 6-6 6"/>',
+  check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5v.01"/>',
+  alerta: '<path d="M10.3 4.2L2.6 17.5A2 2 0 0 0 4.3 20.5h15.4a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0z"/><path d="M12 9.5v4M12 17v.01"/>',
+  telefono: '<path d="M5 4h3.5l1.8 4.4-2.2 1.4a11 11 0 0 0 6.1 6.1l1.4-2.2L20 15.5V19a1 1 0 0 1-1 1A16 16 0 0 1 4 5a1 1 0 0 1 1-1z"/>',
+  ubicacion: '<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="7.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22"/>',
+  lapiz: '<path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17v3z"/><path d="M14.5 7.5l2 2"/>',
+  candado: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+  camara: '<path d="M4 8h3l1.8-2.5h6.4L17 8h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/>',
+  galeria: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-10 9"/>',
+  documento: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
+  sincronizar: '<path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v4h-4"/>',
+  mapa: '<path d="M12 21s-6.5-5.8-6.5-11a6.5 6.5 0 0 1 13 0c0 5.2-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/>',
+  tablero: '<path d="M6 20v-8M12 20V5M18 20v-5"/>',
+  filtro: '<path d="M4 5h16l-6.2 7.4V18l-3.6 2v-7.6L4 5z"/>'
+};
+
+function icono(nombre) {
+  const trazo = ICONOS[nombre];
+  if (!trazo) return '';
+  return '<svg class="ico ico-' + nombre + '" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+    trazo + '</svg>';
+}
+
+/** "Ana Maria Restrepo" -> "AM". Para el circulo de "Mis datos". */
+function iniciales(nombre) {
+  return String(nombre || '').trim().split(/\s+/).filter(Boolean).slice(0, 2)
+    .map((p) => p.charAt(0).toUpperCase()).join('') || '?';
+}
+
 const CLAVE_PERFIL = 'perfil' + SUFIJO;
 const CLAVE_COPIA_FOTO = 'copiaFoto' + SUFIJO;
 const CLAVE_FILTROS = 'filtros' + SUFIJO;
@@ -1172,6 +1216,11 @@ $('#btn-salir').addEventListener('click', async () => {
  * filtros siguen a pantalla completa.
  */
 function irA(vista) {
+  // Al salir de una seccion se deja arriba: la proxima vez abre desde el
+  // principio y no donde quedo (el tablero se abria al final de las
+  // graficas). Se hace ANTES de ocultarla: una vista oculta no se desplaza.
+  const saliendo = APP.vistaActual && APP.vistaActual !== vista ? $('#vista-' + APP.vistaActual) : null;
+  if (saliendo && saliendo.classList.contains('seccion-app')) saliendo.scrollTop = 0;
   APP.vistaActual = vista;
   $('#vista-pendientes').hidden = vista !== 'pendientes';
   $('#vista-cola').hidden = vista !== 'cola';
@@ -1837,9 +1886,9 @@ function centrarEnMi() {
         radius: 9, color: '#fff', weight: 3, fillColor: '#1565c0', fillOpacity: 1
       }).addTo(APP.mapa).bindPopup('Estás aquí');
       APP.mapa.setView(p, 16);
-      btn.textContent = 'Mi ubicación';
+      btn.innerHTML = icono('ubicacion') + ' Mi ubicación';
     },
-    () => { toast('No se pudo obtener tu ubicación.', 'error'); btn.textContent = 'Mi ubicación'; },
+    () => { toast('No se pudo obtener tu ubicación.', 'error'); btn.innerHTML = icono('ubicacion') + ' Mi ubicación'; },
     { enableHighAccuracy: true, timeout: 20000 }
   );
 }
@@ -1958,7 +2007,7 @@ function dibujarPanelFiltros() {
       '<button type="button" class="grupo-cabeza" data-abrir="' + esc(campo.clave) + '">' +
         '<span>' + esc(campo.titulo) + '</span>' +
         (marcados ? '<span class="grupo-marcados">' + marcados + '</span>' : '') +
-        '<span class="grupo-flecha">' + (abierto ? '&#9662;' : '&#9656;') + '</span>' +
+        '<span class="grupo-flecha">' + icono(abierto ? 'abajo' : 'derecha') + '</span>' +
       '</button>' +
       (abierto
         ? '<div class="opciones-filtro">' + opciones.map((o) =>
@@ -1987,7 +2036,7 @@ function dibujarPanelFiltros() {
 
     '<div class="grupo-filtro abierto"><h3>Dónde estoy</h3>' +
       '<button type="button" id="btn-cerca-mi" class="op-filtro grande' +
-        (f.cercanas ? ' activa' : '') + '">&#9678; Solo las cercanas a mí</button>' +
+        (f.cercanas ? ' activa' : '') + '">' + icono('ubicacion') + ' Solo las cercanas a mí</button>' +
       '<p class="ayuda-filtro">Usa el GPS para mostrar lo que tienes a menos de ' +
         (CONFIG.METROS_CERCA_DE_MI / 1000) + ' km.</p>' +
     '</div>' +
@@ -2359,7 +2408,9 @@ function pintarTodo() {
 
   $('#perfil-entidad').textContent = APP.perfil ? APP.perfil.entidad : '';
   $('#perfil-datos').innerHTML = APP.perfil
-    ? esc(APP.perfil.nombre) + '<br>TP ' + esc(APP.perfil.tp) + ' · ' + esc(APP.perfil.entidad)
+    ? '<span class="avatar" aria-hidden="true">' + esc(iniciales(APP.perfil.nombre)) + '</span>' +
+      '<span class="perfil-texto"><b>' + esc(APP.perfil.nombre) + '</b>' +
+      '<span>TP ' + esc(APP.perfil.tp) + ' · ' + esc(APP.perfil.entidad) + '</span></span>'
     : '';
 }
 
@@ -2671,13 +2722,13 @@ function pintarPendientes() {
 
   if (!lista.length) {
     cont.innerHTML = APP.solicitudes.length
-      ? '<div class="vacio"><span class="vacio-icono">&#10003;</span>' +
+      ? '<div class="vacio"><span class="vacio-icono">' + icono('check') + '</span>' +
         ($('#buscar-pendientes').value
           ? 'Ninguna solicitud coincide con la búsqueda.'
           : APP.filtro === 'realizadas' ? 'Todavía no hay solicitudes visitadas.'
           : 'No queda ninguna solicitud por visitar.') + '</div>'
       : sinLista
-        ? '<div class="vacio"><span class="vacio-icono">&#43;</span>' +
+        ? '<div class="vacio"><span class="vacio-icono">' + icono('mas') + '</span>' +
           '<b>' + esc(APP.perfil.entidad) + '</b><br>' +
           ($('#buscar-pendientes').value
             ? 'Ninguna visita coincide con la búsqueda.'
@@ -2685,7 +2736,7 @@ function pintarPendientes() {
           'Toca el botón <b>+</b> para registrar una visita de talud.<br><br>' +
           '<small>Aquí verás las visitas hechas por todas las entidades, ' +
           'para no repetir trabajo.</small></div>'
-        : '<div class="vacio"><span class="vacio-icono">&#8681;</span>' +
+        : '<div class="vacio"><span class="vacio-icono">' + icono('sincronizar') + '</span>' +
           'Toca el botón de sincronizar (arriba a la derecha) para descargar las solicitudes.</div>';
     return;
   }
@@ -2707,7 +2758,7 @@ function pintarPendientes() {
     const pie = hecha
       ? '<div class="tarjeta-visita">' +
           '<div class="visita-linea">' +
-            '<span class="visto">&#10003;</span>' +
+            '<span class="visto">' + icono('check') + '</span>' +
             '<span>' + (e.visita
               ? esc(fechaBonita(e.visita.fechaVisita))
               : 'Registrada como atendida') + '</span>' +
@@ -2733,7 +2784,7 @@ function pintarPendientes() {
               (s.contacto ? '<span class="contacto-nombre">' + esc(s.contacto) + '</span>' : '') +
               (s.telefono
                 ? '<a href="tel:' + esc(s.telefono) + '" class="tel btn-llamar" ' +
-                  'onclick="event.stopPropagation()">&#128222; ' + esc(s.telefono) + '</a>'
+                  'onclick="event.stopPropagation()">' + icono('telefono') + ' ' + esc(s.telefono) + '</a>'
                 : '') +
             '</div>'
           : '') +
@@ -2764,7 +2815,7 @@ function pintarPendientes() {
         ? '<div class="tarjeta-edif">' + esc(s.edificacion) + '</div>' : '') +
       (s._vecinas
         ? '<div class="aviso-vecinas">' +
-            '<b>&#9432; ' + s._vecinas.length +
+            '<b>' + icono('info') + ' ' + s._vecinas.length +
               (s._vecinas.length === 1 ? ' visita hecha cerca' : ' visitas hechas cerca') +
               ' (' + s._vecinas.slice(0, 3).map((v) => v.distancia + ' m').join(', ') + ')</b>' +
             '<span>Son <b>otras solicitudes</b>. Revísalas solo para confirmar que ' +
@@ -2825,10 +2876,10 @@ function pintarCola() {
   const cont = $('#lista-cola');
   $('#resumen-cola').textContent = APP.cola.length
     ? APP.cola.length + ' ficha(s) guardadas en este celular, esperando internet'
-    : 'No hay fichas pendientes de enviar';
+    : '';   // sin fichas sobra el renglon: la tarjeta de abajo ya lo dice
 
   if (!APP.cola.length) {
-    cont.innerHTML = '<div class="vacio"><span class="vacio-icono">&#10003;</span>Todo enviado. No queda nada en el celular.</div>';
+    cont.innerHTML = '<div class="vacio"><span class="vacio-icono ok">' + icono('check') + '</span><b>Todo enviado</b>No queda nada pendiente en este celular.</div>';
     return;
   }
 
@@ -2856,7 +2907,7 @@ function pintarCola() {
       // Una ficha lleva días sin salir y la tarjeta se veía igual el
       // primer día que el quinto. Así no se queda olvidada en el celular.
       (dias >= 2
-        ? '<p class="cola-estancada"><b>&#9888; Lleva ' + dias + ' días sin enviarse.</b> ' +
+        ? '<p class="cola-estancada"><b>' + icono('alerta') + ' Lleva ' + dias + ' días sin enviarse.</b> ' +
           (c.error
             ? 'El servidor la rechazó: ábrela, corrige y vuelve a enviarla.'
             : 'Busca un sitio con señal y toca "Intentar enviar ahora".') +
@@ -2864,7 +2915,7 @@ function pintarCola() {
         : '') +
       '<div class="cola-acciones">' +
         '<button type="button" class="btn-corregir-cola" data-id="' + esc(c.idLocal) + '">' +
-          '&#9998; Abrir y corregir</button>' +
+          icono('lapiz') + ' Abrir y corregir</button>' +
         '<button type="button" class="btn-eliminar-cola" data-id="' + esc(c.idLocal) + '">' +
           'Eliminar del celular</button>' +
       '</div>' +
@@ -2919,7 +2970,7 @@ function pintarBorradores() {
 
   if (!lista.length) {
     $('#resumen-pendientes').textContent = '';
-    cont.innerHTML = '<div class="vacio"><span class="vacio-icono">&#10003;</span>' +
+    cont.innerHTML = '<div class="vacio"><span class="vacio-icono">' + icono('check') + '</span>' +
       'No tienes fichas a medio llenar.</div>';
     return;
   }
@@ -2943,7 +2994,7 @@ function pintarBorradores() {
         '</div>' +
         '<div class="cola-acciones">' +
           '<button type="button" class="btn-corregir-cola" data-borrador="' + esc(b.clave) + '">' +
-            '&#9998; Continuar</button>' +
+            icono('lapiz') + ' Continuar</button>' +
           '<button type="button" class="btn-eliminar-cola" data-borrador="' + esc(b.clave) + '">' +
             'Descartar</button>' +
         '</div>' +
@@ -3281,9 +3332,9 @@ function panelSolicitud(s) {
   bloque.className = 'seccion panel-solicitud';
   bloque.innerHTML =
     '<div class="seccion-cabeza">' +
-      '<span class="seccion-num">i</span>' +
+      '<span class="seccion-num">' + icono('info') + '</span>' +
       '<span class="seccion-titulo">DATOS DE LA SOLICITUD</span>' +
-      '<span class="seccion-flecha">&#9660;</span>' +
+      '<span class="seccion-flecha">' + icono('abajo') + '</span>' +
     '</div>' +
     '<div class="seccion-cuerpo"><table class="tabla-solicitud">' +
       filas.map(([etiqueta, valor, tipo]) => {
@@ -3355,7 +3406,7 @@ function dibujarFormulario() {
         '<span class="seccion-num">' + sec.numero + '</span>' +
         '<span class="seccion-titulo">' + esc(sec.titulo) + '</span>' +
         '<span class="seccion-faltan"></span>' +
-        '<span class="seccion-flecha">&#9660;</span>' +
+        '<span class="seccion-flecha">' + icono('abajo') + '</span>' +
       '</div>' +
       '<div class="seccion-cuerpo">' +
         (sec.noAplica ? '<label class="no-aplica">' +
@@ -3422,7 +3473,7 @@ function dibujarCampo(campo) {
       if (campo.soloLectura) {
         div.innerHTML = etiqueta +
           '<div class="valor-fijo">' + esc(valor || '—') +
-            '<span class="candado" title="No se puede modificar">&#128274;</span>' +
+            '<span class="candado" title="No se puede modificar">' + icono('candado') + '</span>' +
           '</div>';
         break;
       }
@@ -3460,7 +3511,7 @@ function dibujarCampo(campo) {
         div.innerHTML = etiqueta +
           '<div class="valor-fijo">' + esc(fijo) +
             '<span class="candado" title="' + esc(APP.perfil.entidad) +
-              ' solo trabaja en ' + esc(fijo) + '">&#128274;</span>' +
+              ' solo trabaja en ' + esc(fijo) + '">' + icono('candado') + '</span>' +
           '</div>';
         break;
       }
@@ -3545,7 +3596,7 @@ function dibujarCampo(campo) {
       const c = valor || {};
       div.innerHTML = etiqueta +
         '<div class="gps-caja">' +
-          '<button type="button" class="btn-secundario btn-gps">&#9678; Capturar mi ubicación</button>' +
+          '<button type="button" class="btn-secundario btn-gps">' + icono('ubicacion') + ' Capturar mi ubicación</button>' +
           '<div class="gps-coords">' +
             '<label>Latitud (Y)<input type="text" inputmode="decimal" class="gps-y" value="' + esc(c.y || '') + '" placeholder="4.8123456"></label>' +
             '<label>Longitud (X)<input type="text" inputmode="decimal" class="gps-x" value="' + esc(c.x || '') + '" placeholder="-75.7012345"></label>' +
@@ -3580,7 +3631,7 @@ function dibujarCampo(campo) {
         if (!v.y || !v.x || coordPlausible(v.y, v.x)) { cajaRara.hidden = true; return; }
         cajaRara.hidden = false;
         cajaRara.innerHTML =
-          '<b>&#9888; Esta coordenada no parece estar en Risaralda.</b>' +
+          '<b>' + icono('alerta') + ' Esta coordenada no parece estar en Risaralda.</b>' +
           '<p>Suele ser un punto decimal en el lugar equivocado. Debería verse ' +
           'parecido a <b>4.8123456</b> en latitud y <b>-75.7012345</b> en longitud ' +
           '(la longitud va en negativo). Revísala antes de enviar.</p>';
@@ -3600,7 +3651,7 @@ function dibujarCampo(campo) {
 
         cajaCercanas.innerHTML =
           '<div class="aviso-cercanas">' +
-            '<b>&#9432; ' + cerca.length + ' visita(s) a menos de ' +
+            '<b>' + icono('info') + ' ' + cerca.length + ' visita(s) a menos de ' +
               CONFIG.METROS_ALERTA_CERCANIA + ' m de este punto</b>' +
             '<p>Están prácticamente encima. Aun así <b>pueden ser otro talud</b>: ' +
               'ábrelas y compara. Si el tuyo es distinto, sigue con tu ficha normalmente — ' +
@@ -3640,7 +3691,7 @@ function dibujarCampo(campo) {
       });
 
       const btnGps = div.querySelector('.btn-gps');
-      const ETIQUETA_GPS = '\u25CE Capturar mi ubicación';
+      const ETIQUETA_GPS = icono('ubicacion') + ' Capturar mi ubicación';
 
       /** Escribe una lectura en las casillas y en el borrador. */
       const ponerUbicacion = (p, sola) => {
@@ -3666,9 +3717,9 @@ function dibujarCampo(campo) {
             ? '\u2713 Usar esta (\u00b1' + mejor.precision + ' m)'
             : '\u25CB Buscando… (' + seg + ' s)';
         },
-        listo: (p) => { btnGps.textContent = ETIQUETA_GPS; ponerUbicacion(p, sola); },
+        listo: (p) => { btnGps.innerHTML = ETIQUETA_GPS; ponerUbicacion(p, sola); },
         error: (err) => {
-          btnGps.textContent = ETIQUETA_GPS;
+          btnGps.innerHTML = ETIQUETA_GPS;
           estado.className = 'gps-estado malo';
           estado.textContent = err.code === 1
             ? 'Permiso de ubicación denegado. Actívalo en los ajustes del navegador.'
@@ -3727,10 +3778,10 @@ function dibujarCampo(campo) {
       div.innerHTML = etiqueta +
         '<div class="fotos-caja">' +
           '<div class="fotos-acciones">' +
-            '<label class="fotos-btn">&#128247; Tomar foto' +
+            '<label class="fotos-btn">' + icono('camara') + ' Tomar foto' +
               '<input type="file" accept="image/*" capture="environment" hidden>' +
             '</label>' +
-            '<label class="fotos-btn alterno">&#128194; Elegir de la galería' +
+            '<label class="fotos-btn alterno">' + icono('galeria') + ' Elegir de la galería' +
               '<input type="file" accept="image/*" multiple hidden>' +
             '</label>' +
           '</div>' +
@@ -4209,7 +4260,7 @@ async function abrirDetalle(idVisita) {
     // navegador imprime o guarda en PDF, no hace falta generarlo aparte.
     html += '<div class="detalle-seccion"><div class="detalle-acciones">' +
       '<a class="btn-pdf" href="' + esc(h.fichaUrl) + '" target="_blank" rel="noopener">' +
-        '&#128196; Abrir la ficha completa</a>' +
+        icono('documento') + ' Abrir la ficha completa</a>' +
       '<p class="nota-ficha">Se abre en el navegador con los datos de hoy. ' +
         'Desde ahi puedes imprimirla, guardarla en PDF o copiar el enlace ' +
         'para mandarlo.</p>' +

@@ -26,12 +26,12 @@
       </div>
     </div>
     <div class="topbar-acciones">
-      <button id="btn-sync" class="icon-btn" title="Sincronizar">
-        <svg id="sync-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 5V2L7.5 6.5 12 11V8a5 5 0 1 1-4.9 6h-2.05A7 7 0 1 0 12 5z"/></svg>
+      <button id="btn-sync" class="icon-btn" title="Sincronizar" aria-label="Sincronizar">
+        <svg id="sync-icon" class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v4h-4"/></svg>
       </button>
-      <button id="btn-mapa" class="icon-btn" title="Ver en el mapa"><svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><path fill="currentColor" d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></button>
-      <button id="btn-tablero" class="icon-btn" title="Tablero de control"><svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><path fill="currentColor" d="M4 20V10h3.5v10H4zm6.25 0V4h3.5v16h-3.5zM16.5 20v-6H20v6h-3.5z"/></svg></button>
-      <button id="btn-perfil" class="icon-btn" title="Mi perfil">&#9776;</button>
+      <button id="btn-mapa" class="icon-btn" title="Ver en el mapa" aria-label="Ver en el mapa"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 21s-6.5-5.8-6.5-11a6.5 6.5 0 0 1 13 0c0 5.2-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg></button>
+      <button id="btn-tablero" class="icon-btn" title="Tablero de control" aria-label="Tablero de control"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 20v-8M12 20V5M18 20v-5"/></svg></button>
+      <button id="btn-perfil" class="icon-btn" title="Mi perfil y envíos" aria-label="Mi perfil y envíos"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
     </div>
   </div>
   <div id="estado-conexion" class="estado-linea"></div>
@@ -91,7 +91,7 @@
       Borradores <b id="dato-borradores">0</b>
     </button>
     <button id="btn-filtros" class="filtro filtro-mas" title="Filtrar">
-      <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path fill="currentColor" d="M3 5h18l-7 8v6l-4 2v-8L3 5z"/></svg><span id="filtros-activos" class="filtros-activos"></span>
+      <svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 5h16l-6.2 7.4V18l-3.6 2v-7.6L4 5z"/></svg><span id="filtros-activos" class="filtros-activos"></span>
     </button>
   </div>
 
@@ -110,13 +110,13 @@
   <div id="chips-activos" class="chips-activos"></div>
   <div id="resumen-pendientes" class="resumen"></div>
   <div id="lista-pendientes" class="lista"></div>
-  <button id="btn-nueva-no-programada" class="btn-flotante" title="Registrar hallazgo en campo">+</button>
+  <button id="btn-nueva-no-programada" class="btn-flotante" title="Registrar hallazgo en campo" aria-label="Registrar hallazgo en campo"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg></button>
 </section>
 
 <!-- ============================ POR ENVIAR ============================ -->
 <section id="vista-cola" class="vista seccion-app" hidden>
   <div class="cabecera-seccion">
-    <button id="btn-cerrar-cola" class="btn-volver" title="Volver a la lista" aria-label="Volver a la lista">&larr;</button>
+    <button id="btn-cerrar-cola" class="btn-volver" title="Volver a la lista" aria-label="Volver a la lista"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 18l-6-6 6-6"/></svg></button>
     <div class="cabecera-seccion-titulo">
       <strong>Mi perfil y envíos</strong>
       <span id="perfil-entidad"></span>
@@ -176,7 +176,7 @@
 <!-- ============================ TABLERO ============================ -->
 <section id="vista-tablero" class="vista seccion-app" hidden>
   <div class="cabecera-seccion">
-    <button id="btn-cerrar-tablero" class="btn-volver" title="Volver a la lista" aria-label="Volver a la lista">&larr;</button>
+    <button id="btn-cerrar-tablero" class="btn-volver" title="Volver a la lista" aria-label="Volver a la lista"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 18l-6-6 6-6"/></svg></button>
     <div class="cabecera-seccion-titulo">
       <strong>Tablero de control</strong>
       <span id="tablero-corte"></span>
@@ -188,12 +188,12 @@
 <!-- ============================ MAPA ============================ -->
 <section id="vista-mapa" class="vista seccion-app" hidden>
   <div class="cabecera-seccion">
-    <button id="btn-cerrar-mapa" class="btn-volver" title="Volver a la lista" aria-label="Volver a la lista">&larr;</button>
+    <button id="btn-cerrar-mapa" class="btn-volver" title="Volver a la lista" aria-label="Volver a la lista"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 18l-6-6 6-6"/></svg></button>
     <div class="cabecera-seccion-titulo">
       <strong>Mapa de solicitudes</strong>
       <span id="mapa-resumen"></span>
     </div>
-    <button id="btn-mi-ubicacion" class="btn-mini">Mi ubicación</button>
+    <button id="btn-mi-ubicacion" class="btn-mini"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="7.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22"/></svg> Mi ubicación</button>
   </div>
   <div class="mapa-buscador">
     <input type="search" id="buscar-mapa" autocomplete="off"
@@ -224,7 +224,7 @@
 <!-- ==================== FILTROS PERSONALIZADOS ==================== -->
 <section id="vista-filtros" class="vista pantalla-completa" hidden>
   <div class="ficha-topbar">
-    <button id="btn-cerrar-filtros" class="icon-btn">&larr;</button>
+    <button id="btn-cerrar-filtros" class="icon-btn" title="Volver a la lista" aria-label="Volver a la lista"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 18l-6-6 6-6"/></svg></button>
     <div class="ficha-topbar-titulo">
       <strong>Filtrar solicitudes</strong>
       <span id="filtros-resultado"></span>
@@ -240,7 +240,7 @@
 <!-- ============================ FICHA ============================ -->
 <section id="vista-ficha" class="vista pantalla-completa" hidden>
   <div class="ficha-topbar">
-    <button id="btn-cerrar-ficha" class="icon-btn">&larr;</button>
+    <button id="btn-cerrar-ficha" class="icon-btn" title="Salir de la ficha" aria-label="Salir de la ficha"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 18l-6-6 6-6"/></svg></button>
     <div class="ficha-topbar-titulo">
       <strong id="ficha-titulo">Ficha de evaluación</strong>
       <span id="ficha-subtitulo"></span>
@@ -262,7 +262,7 @@
 <!-- ============================ DETALLE (SOLO LECTURA) ============================ -->
 <section id="vista-detalle" class="vista pantalla-completa" hidden>
   <div class="ficha-topbar">
-    <button id="btn-cerrar-detalle" class="icon-btn">&larr;</button>
+    <button id="btn-cerrar-detalle" class="icon-btn" title="Volver" aria-label="Volver"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 18l-6-6 6-6"/></svg></button>
     <div class="ficha-topbar-titulo">
       <strong id="detalle-titulo">Visita realizada</strong>
       <span id="detalle-subtitulo"></span>

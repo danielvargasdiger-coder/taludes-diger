@@ -1572,3 +1572,161 @@ body.con-aviso { padding-top: var(--alto-aviso, 52px); }
     padding-right: max(16px, calc((100% - var(--ancho-app)) / 2 + 16px));
   }
 }
+
+/* ---------------------------------------------------------------------
+   ACABADOS (sw v71)
+   Iconos dibujados en vez de caracteres, y detalles para que todas las
+   pantallas se sientan de la misma app. Nada de esto cambia qué hace
+   cada botón: solo cómo se ve.
+   --------------------------------------------------------------------- */
+
+/* Iconos: mismo trazo en toda la app y el color del texto que los rodea.
+   Los caracteres (←, ☰, 📞, 🔒…) cambiaban según el celular: emoji rosado
+   en unos, cuadrito en otros, flecha delgada y corrida en casi todos. */
+.ico {
+  width: 1.15em; height: 1.15em; flex: none; display: inline-block;
+  fill: none; stroke: currentColor; stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round;
+  vertical-align: -.2em;
+}
+.icon-btn .ico { width: 21px; height: 21px; vertical-align: 0; }
+
+/* Volver: el mismo botón redondo en todas las pantallas. */
+.btn-volver, .ficha-topbar > .icon-btn:first-child {
+  width: 40px; height: 40px; padding: 0; transition: background .15s;
+}
+.btn-volver { border: 0; background: var(--azul-claro); }
+.btn-volver .ico, .ficha-topbar > .icon-btn:first-child .ico {
+  width: 22px; height: 22px; stroke-width: 2.5; vertical-align: 0;
+}
+
+/* En PC se nota qué se puede tocar al pasar el ratón. */
+@media (hover: hover) {
+  .icon-btn:hover { background: rgba(255,255,255,.26); }
+  .topbar-acciones .icon-btn[aria-current="page"]:hover { background: #fff; }
+  .btn-volver:hover { background: #d2e5ee; }
+  .tarjeta:hover { box-shadow: 0 2px 4px rgba(16,32,44,.08), 0 8px 22px rgba(16,32,44,.1); }
+  .btn-secundario:hover, .op-filtro:hover, .filtro:not(.activo):hover, .orden-op:not(.activa):hover {
+    border-color: #9fb6c4;
+  }
+}
+
+/* Con teclado el foco se ve; con el dedo no aparece. */
+button:focus-visible, a:focus-visible, label.fotos-btn:focus-within {
+  outline: 3px solid #5fa3c4; outline-offset: 2px;
+}
+
+/* El botón + ya no tapa el teléfono de la última tarjeta. */
+#vista-pendientes { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+.btn-flotante { display: grid; place-items: center; }
+.btn-flotante .ico { width: 28px; height: 28px; stroke-width: 2.6; vertical-align: 0; }
+
+/* Llamar: icono dibujado y sin subrayado, se ve como botón. */
+.btn-llamar { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+.btn-llamar .ico { width: 15px; height: 15px; vertical-align: 0; }
+
+.visto .ico { width: 11px; height: 11px; stroke-width: 3.4; vertical-align: 0; }
+.aviso-vecinas > b, .aviso-cercanas > b { display: flex; align-items: center; gap: 6px; }
+
+/* Estados vacíos: icono en un círculo en vez de un símbolo gris suelto,
+   y borde continuo (el punteado se veía a medio terminar). */
+.vacio { border: 1px solid var(--borde); }
+.vacio-icono {
+  display: grid; place-items: center;
+  width: 56px; height: 56px; margin: 0 auto 12px; border-radius: 50%;
+  background: var(--azul-claro); color: var(--azul);
+  font-size: 1rem; opacity: 1;
+}
+.vacio-icono .ico { width: 28px; height: 28px; vertical-align: 0; }
+.vacio-icono.ok { background: #e3f4e4; color: var(--baja); }
+.vacio-icono.ok .ico { stroke-width: 2.6; }
+.vacio-icono.ok + b { display: block; margin-bottom: 3px; font-size: 1rem; color: var(--texto); }
+
+/* Flechas de las secciones de la ficha y de los grupos de filtros. */
+.seccion-flecha, .grupo-flecha { display: inline-flex; }
+.seccion-flecha .ico { width: 18px; height: 18px; stroke-width: 2.4; vertical-align: 0; }
+.grupo-flecha .ico { width: 16px; height: 16px; vertical-align: 0; }
+.panel-solicitud .seccion-num { font-style: normal; font-family: inherit; }
+.panel-solicitud .seccion-num .ico { width: 16px; height: 16px; stroke-width: 2.4; vertical-align: 0; }
+.candado { display: inline-flex; }
+.candado .ico { width: 16px; height: 16px; vertical-align: 0; }
+
+/* Icono y texto alineados en los botones que llevan los dos. */
+.fotos-btn { gap: 8px; }
+.fotos-btn .ico { width: 20px; height: 20px; vertical-align: 0; }
+.btn-gps, #btn-cerca-mi, #btn-mi-ubicacion {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+}
+.btn-mini .ico, .op-filtro .ico, .btn-gps .ico { width: 17px; height: 17px; vertical-align: 0; }
+
+/* Abrir la ficha: en azul. En rojo se leía como alerta o como prioridad
+   alta, y es solo un enlace para verla completa. */
+.btn-pdf {
+  display: flex; align-items: center; justify-content: center; gap: 9px;
+  background: var(--azul);
+}
+.btn-pdf:active { background: var(--azul-oscuro); }
+.btn-pdf .ico { width: 20px; height: 20px; vertical-align: 0; }
+
+/* Detalle de la visita en el celular: la pregunta arriba y la respuesta
+   abajo. En dos columnas, un concepto técnico largo quedaba en una tira
+   angosta con dos o tres palabras por renglón. */
+.detalle-tabla td { font-weight: 500; color: var(--texto); }
+@media (max-width: 559px) {
+  .detalle-tabla th, .detalle-tabla td { display: block; width: auto; }
+  .detalle-tabla th {
+    padding: 10px 13px 0; border-bottom: 0;
+    font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em;
+  }
+  .detalle-tabla td { padding: 3px 13px 10px; line-height: 1.45; }
+}
+
+/* Menú: bloques con el mismo título y el mismo borde que los del tablero. */
+.bloque-perfil { border: 1px solid var(--borde); }
+.bloque-perfil h3 {
+  margin: 0 0 12px; font-size: .82rem; font-weight: 800; color: var(--azul);
+  letter-spacing: .03em; text-transform: uppercase;
+}
+.bloque-compartir > h3 { text-align: left; }
+
+/* Mis datos: iniciales en un círculo, el nombre y debajo TP y entidad. */
+#perfil-datos { display: flex; align-items: center; gap: 12px; }
+.avatar {
+  flex: none; display: grid; place-items: center;
+  width: 44px; height: 44px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--azul) 0%, var(--azul-oscuro) 100%);
+  color: #fff; font-weight: 800; font-size: .95rem; letter-spacing: .02em;
+}
+.perfil-texto { display: flex; flex-direction: column; min-width: 0; }
+.perfil-texto b { font-size: .95rem; color: var(--texto); overflow-wrap: anywhere; }
+.perfil-texto span { font-size: .8rem; color: var(--texto-suave); overflow-wrap: anywhere; }
+
+/* Tablero en celular: la quinta cifra ocupa la fila entera en vez de
+   dejar un hueco a su lado. Solo mientras van de a dos por fila. */
+@media (max-width: 459px) {
+  .t-cifras > .t-tarjeta:last-child:nth-child(odd) { grid-column: 1 / -1; }
+}
+
+/* Barra de arriba y botón de filtros: los mismos trazos que el resto. Las
+   barras del tablero van un poco más gruesas para que pesen lo mismo que
+   los otros iconos, que tienen más línea. */
+#btn-tablero .ico { stroke-width: 2.7; }
+#btn-sync .ico { stroke-width: 2.3; }
+#btn-filtros .ico { width: 18px; height: 18px; vertical-align: 0; }
+
+/* Títulos de sección largos en celular. El rótulo de la derecha ("Según la
+   pregunta 1") le dejaba al título unos 140 px: RECOMENDACIONES se metía
+   debajo del rótulo o se partía por la mitad. En pantalla angosta el
+   rótulo pasa debajo del título y el título usa todo el ancho. */
+.seccion-titulo { overflow-wrap: break-word; }
+@media (max-width: 559px) {
+  .seccion-cabeza {
+    display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: "num titulo flecha" "num faltan flecha";
+    column-gap: 10px; row-gap: 0; align-items: center;
+  }
+  .seccion-cabeza > .seccion-num { grid-area: num; }
+  .seccion-cabeza > .seccion-titulo { grid-area: titulo; }
+  .seccion-cabeza > .seccion-faltan { grid-area: faltan; justify-self: start; margin-top: 4px; }
+  .seccion-cabeza > .seccion-flecha { grid-area: flecha; }
+}
