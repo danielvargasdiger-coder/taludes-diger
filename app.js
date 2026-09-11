@@ -1061,6 +1061,9 @@ async function iniciar() {
   APP.cola = (await DB.todos('cola')) || [];
   APP.solicitudes = (await DB.leerKV('solicitudes')) || [];
   APP.historial = (await DB.leerKV('historial')) || [];
+  // Cuándo sincronizó este celular por última vez. Se lee al abrir para que
+  // la línea de estado lo diga de una, aunque no haya señal.
+  APP.ultimaSync = (await DB.leerKV('ultimaSync')) || '';
   // Cómo dejó el filtro del mapa la última vez. Si viniera algo raro
   // guardado, se cae a 'todas' en vez de dejar el mapa en blanco.
   const vistaMapa = await DB.leerKV('verEnMapa');
@@ -2068,17 +2071,40 @@ function actualizarConteoFiltros() {
   $('#lista-pendientes').innerHTML = antes;
 }
 
+/**
+ * Qué dice la línea bajo la barra superior.
+ *
+ * Siempre dice cuándo sincronizó ESTE celular por última vez. Antes la línea
+ * se escondía cuando todo estaba bien, y en campo no había cómo saber si lo
+ * que se veía era de hace diez minutos o de ayer.
+ *
+ * Va aparte de pintarConexion, sin tocar la pantalla, para poder probarla.
+ * Fecha y hora absolutas, con el mismo formato del tablero: no se
+ * desactualizan en pantalla y no hace falta un reloj que las refresque.
+ */
+function estadoDeConexion(enLinea, fichasEnCola, ultimaSync) {
+  const cuando = ultimaSync
+    ? 'Última sincronización: ' + fechaBonita(ultimaSync)
+    : 'Este celular aún no se ha sincronizado';
+  const enMinuscula = cuando.charAt(0).toLowerCase() + cuando.slice(1);
+  if (!enLinea) {
+    return { clase: 'estado-linea sin-conexion',
+             texto: 'Sin conexión · las fichas se guardan en el celular · ' + enMinuscula };
+  }
+  if (fichasEnCola) {
+    return { clase: 'estado-linea',
+             texto: fichasEnCola + (fichasEnCola === 1 ? ' ficha esperando envío' : ' fichas esperando envío') +
+                    ' · ' + enMinuscula };
+  }
+  return { clase: 'estado-linea', texto: cuando };
+}
+
 function pintarConexion() {
   const el = $('#estado-conexion');
-  if (!navigator.onLine) {
-    el.className = 'estado-linea sin-conexion';
-    el.textContent = 'Sin conexión · las fichas se guardan en el celular';
-  } else if (APP.cola.length) {
-    el.className = 'estado-linea';
-    el.textContent = APP.cola.length + ' ficha(s) esperando envío';
-  } else {
-    el.className = 'estado-linea oculto';
-  }
+  if (!el) return;
+  const e = estadoDeConexion(navigator.onLine, APP.cola.length, APP.ultimaSync);
+  el.className = e.clase;
+  el.textContent = e.texto;
 }
 
 // ---------------------------------------------------------------- SINCRONIZACIÓN
@@ -2148,7 +2174,8 @@ async function sincronizar(silencioso = false) {
     await DB.guardarKV('solicitudes', APP.solicitudes);
     await recuperarBorradores();
     await DB.guardarKV('historial', APP.historial);
-    await DB.guardarKV('ultimaSync', new Date().toISOString());
+    APP.ultimaSync = new Date().toISOString();
+    await DB.guardarKV('ultimaSync', APP.ultimaSync);
     pintarTodo();
     if (!silencioso) toast('Actualizado: ' + pendientes().length + ' pendientes', 'ok');
   } catch (e) {
