@@ -1494,3 +1494,81 @@ body.con-aviso { padding-top: var(--alto-aviso, 52px); }
 @media (min-width: 720px) {
   .descargas-botones { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* ---------------------------------------------------------------------
+   UNA SOLA BARRA PARA TODA LA APP (sw v70)
+   Mapa, tablero y menú se abrían como ventanas por encima de todo, con
+   otra barra azul plana: sin logos, sin franja de colores y sin la hora
+   de sincronización. Parecía otra aplicación.
+
+   Ahora se abren DEBAJO de la barra institucional, que no se mueve, y
+   cada sección lleva una cabecera clara con su título y la flecha para
+   volver. El icono de la sección abierta queda marcado en blanco.
+
+   La barra cambia de alto sola (aviso de fichas sin enviar, línea de
+   sincronización en dos renglones, aviso de versión nueva), así que su
+   alto no se escribe aquí: app.js lo mide y lo deja en --alto-cabecera.
+
+   La ficha, el detalle y los filtros SIGUEN a pantalla completa: son
+   tareas, y con los iconos a mano se podría saltar al mapa a mitad de
+   una ficha. Llevan el mismo degradado y la misma franja.
+   --------------------------------------------------------------------- */
+.vista.seccion-app {
+  position: fixed; left: 0; right: 0; bottom: 0;
+  top: var(--alto-cabecera, 96px);
+  z-index: 30;   /* debajo de la barra (40): su sombra cae sobre la sección */
+  background: var(--fondo);
+  overflow-y: auto; overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 0 calc(24px + env(safe-area-inset-bottom));
+}
+
+.cabecera-seccion {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 13px;
+  background: #fff; color: var(--texto);
+  border-bottom: 1px solid var(--borde);
+}
+/* En el mapa la cabecera es una fila más de la columna, no flota. */
+#vista-mapa .cabecera-seccion { position: static; flex: none; }
+.cabecera-seccion-titulo { flex: 1; min-width: 0; }
+.cabecera-seccion-titulo strong {
+  display: block; font-size: .98rem; line-height: 1.25; color: var(--azul-oscuro);
+}
+.cabecera-seccion-titulo span {
+  display: block; font-size: .74rem; color: var(--texto-suave);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.btn-volver {
+  flex: none; width: 38px; height: 38px; border-radius: 50%;
+  display: grid; place-items: center;
+  border: 1px solid var(--borde); background: var(--azul-claro); color: var(--azul);
+  font-size: 1.2rem; font-weight: 800; font-family: inherit; cursor: pointer;
+}
+.btn-volver:active { background: #d2e5ee; }
+/* .btn-mini es blanco translúcido, pensado para la barra azul: sobre la
+   cabecera clara no se vería. */
+.cabecera-seccion .btn-mini { background: var(--azul); color: #fff; }
+.cabecera-seccion .btn-mini:active { background: var(--azul-oscuro); }
+
+/* El icono de la sección abierta. */
+.topbar-acciones .icon-btn[aria-current="page"] { background: #fff; color: var(--azul); }
+
+/* Ficha, detalle y filtros: mismo degradado y misma franja que la barra.
+   La franja va POR DENTRO (absoluta, abajo) para no cambiar el alto: la
+   barra de progreso de la ficha está pegada justo debajo. */
+.ficha-topbar { background: linear-gradient(135deg, var(--azul) 0%, var(--azul-oscuro) 100%); }
+.ficha-topbar::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 3px;
+  background: linear-gradient(90deg,
+    var(--inst-rojo) 0 33.3%, var(--inst-amarillo) 33.3% 66.6%, var(--inst-verde) 66.6%);
+}
+
+@media (min-width: 600px) {
+  .vista.seccion-app { max-width: none; margin: 0; padding: 0 0 30px; }
+  .cabecera-seccion {
+    padding-left: max(16px, calc((100% - var(--ancho-app)) / 2 + 16px));
+    padding-right: max(16px, calc((100% - var(--ancho-app)) / 2 + 16px));
+  }
+}

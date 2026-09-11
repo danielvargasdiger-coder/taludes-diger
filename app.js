@@ -923,7 +923,9 @@ function pedirCodigoDeNuevo() {
   APP.perfil = null;
   localStorage.removeItem(CLAVE_PERFIL);
 
-  ['ficha', 'detalle', 'pendientes', 'historial', 'cola'].forEach((v) => {
+  // TODAS las vistas. Faltaban mapa, tablero y filtros: si el código dejaba
+  // de servir con una de ellas abierta, quedaba pintada encima del ingreso.
+  ['ficha', 'detalle', 'pendientes', 'cola', 'mapa', 'tablero', 'filtros'].forEach((v) => {
     const el = $('#vista-' + v);
     if (el) el.hidden = true;
   });
@@ -1165,7 +1167,9 @@ $('#btn-salir').addEventListener('click', async () => {
 // ---------------------------------------------------------------- NAVEGACIÓN
 /**
  * Ya no hay pestañas: la app es una sola lista con filtros.
- * El panel de perfil y envíos se abre y se cierra por encima.
+ * Mapa, tablero y perfil se abren DEBAJO de la barra de arriba, que se
+ * queda igual en todas (logos, franja y hora de sincronización). Los
+ * filtros siguen a pantalla completa.
  */
 function irA(vista) {
   APP.vistaActual = vista;
@@ -1175,7 +1179,31 @@ function irA(vista) {
   $('#vista-mapa').hidden = vista !== 'mapa';
   $('#vista-tablero').hidden = vista !== 'tablero';
   $('#btn-nueva-no-programada').style.display = vista === 'pendientes' ? '' : 'none';
+
+  // Con la barra siempre a la vista, el icono marcado dice en qué sección
+  // se está. En la lista no se marca ninguno: es el inicio.
+  [['mapa', '#btn-mapa'], ['tablero', '#btn-tablero'], ['cola', '#btn-perfil']].forEach(([v, sel]) => {
+    if (vista === v) $(sel).setAttribute('aria-current', 'page');
+    else $(sel).removeAttribute('aria-current');
+  });
+  medirCabecera();
 }
+
+/**
+ * Las secciones empiezan donde termina la barra de arriba. Ese alto cambia
+ * solo: aparece el aviso de fichas sin enviar, la línea de sincronización
+ * pasa a dos renglones sin señal, sale la franja de versión nueva. Por eso
+ * se mide en vez de escribirlo en el CSS: con un número fijo, la sección
+ * quedaría tapada o con un hueco.
+ */
+function medirCabecera() {
+  const barra = $('#topbar');
+  if (!barra || barra.hidden) return;
+  const abajo = Math.ceil(barra.getBoundingClientRect().bottom);
+  if (abajo > 0) document.documentElement.style.setProperty('--alto-cabecera', abajo + 'px');
+}
+if ('ResizeObserver' in window) new ResizeObserver(() => medirCabecera()).observe($('#topbar'));
+window.addEventListener('resize', medirCabecera);
 
 $('#btn-tablero').addEventListener('click', () => { irA('tablero'); pintarTablero(); });
 $('#btn-cerrar-tablero').addEventListener('click', () => irA('pendientes'));
@@ -4281,6 +4309,9 @@ function avisarVersionNueva(worker) {
   // el celular pinte: si la app estaba en segundo plano igual queda bien.
   document.documentElement.style.setProperty(
     '--alto-aviso', Math.ceil(barra.getBoundingClientRect().height) + 'px');
+  // La barra de arriba baja sin cambiar de tamaño, así que el observador
+  // no se entera: las secciones abiertas se reacomodan a mano.
+  medirCabecera();
 
   btn.onclick = async () => {
     btn.disabled = true;
