@@ -1176,7 +1176,181 @@ function irA(vista) {
 
 $('#btn-tablero').addEventListener('click', () => { irA('tablero'); pintarTablero(); });
 $('#btn-cerrar-tablero').addEventListener('click', () => irA('pendientes'));
-$('#btn-perfil').addEventListener('click', () => { irA('cola'); pintarCompartir(); });
+$('#btn-perfil').addEventListener('click', () => { irA('cola'); pintarCompartir(); pintarDescargas(); });
+
+// ---------------------------------------------------- DESCARGAR EN EXCEL
+/**
+ * Dos descargas desde "Mi perfil y envíos".
+ *
+ * SOLICITUDES POR VISITAR — solo las de la entidad con la que se ingresó.
+ * No hay que filtrar nada aquí: el servidor ya le manda a cada entidad
+ * únicamente las suyas (accionCatalogo), así que el celular nunca tiene
+ * las de otra. Se arman con lo que ya está en el teléfono: funciona sin
+ * señal, y salen exactamente las mismas que se ven en "Por visitar".
+ *
+ * VISITAS REALIZADAS — todas, porque las tres entidades las ven. Los
+ * campos completos (tipo de movimiento, dimensiones, valoración...) solo
+ * están en la hoja, así que se piden al servidor y esa sí necesita señal.
+ */
+const COLUMNAS_SOLICITUDES = [
+  ['ID solicitud', (s) => String(s.idSolicitud || '')],
+  ['Estado', (s) => (s._estado && s._estado.texto) || ''],
+  ['Prioridad', (s) => s.prioridad || ''],
+  ['Responsable', (s) => s.responsable || ''],
+  ['Barrio / vereda', (s) => s.barrio || ''],
+  ['Comuna', (s) => s.comuna || ''],
+  ['Dirección', (s) => s.direccion || ''],
+  ['Edificación', (s) => s.edificacion || ''],
+  ['Persona de contacto', (s) => s.contacto || ''],
+  // Como TEXTO: si fuera número, Excel mostraría 3,18E+09.
+  ['Teléfono', (s) => String(s.telefono || '')],
+  ['Recomendaciones', (s) => s.recomendaciones || ''],
+  ['Latitud', (s) => aNumeroExcel(s.latitud)],
+  ['Longitud', (s) => aNumeroExcel(s.longitud)],
+  ['Nota de la coordenada', (s) => s.coordNota || ''],
+  ['Entidad', (s) => s.entidad || '']
+];
+
+/** Número de verdad para Excel; vacío si no hay dato. Acepta coma o punto. */
+function aNumeroExcel(v) {
+  if (v === '' || v === null || v === undefined) return '';
+  const n = Number(String(v).replace(',', '.'));
+  return isFinite(n) ? n : '';
+}
+
+/** Lo mismo que muestra "Por visitar": todo lo que no está realizado. */
+function solicitudesPorVisitar() {
+  return solicitudesConEstado().filter((s) => s._estado.clave !== 'realizada');
+}
+
+function tablaDeSolicitudes(lista) {
+  return {
+    columnas: COLUMNAS_SOLICITUDES.map((c) => c[0]),
+    filas: lista.map((s) => COLUMNAS_SOLICITUDES.map((c) => c[1](s)))
+  };
+}
+
+/** «Solicitudes por visitar» + entidad + fecha, sin tildes ni espacios. */
+function nombreDeArchivo(partes) {
+  const hoy = new Date();
+  const fecha = hoy.getFullYear() + '-' + String(hoy.getMonth() + 1).padStart(2, '0') +
+    '-' + String(hoy.getDate()).padStart(2, '0');
+  const limpio = partes
+    .map((p) => String(p || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, ''))
+    .filter(Boolean)
+    .join('_')
+    .slice(0, 80);
+  return limpio + '_' + fecha + '.xlsx';
+}
+
+/** Hoja corta que dice qué es el archivo, para cuando se reenvía. */
+function hojaAcercaDe(que, cuantas) {
+  return {
+    nombre: 'Información',
+    columnas: ['Dato', 'Valor'],
+    filas: [
+      ['Contenido', que],
+      ['Filas', cuantas],
+      ['Entidad que descargó', (APP.perfil && APP.perfil.entidad) || ''],
+      ['Descargado por', (APP.perfil && APP.perfil.nombre) || ''],
+      ['Fecha', new Date().toLocaleString('es-CO')]
+    ]
+  };
+}
+
+async function entregarExcel(hojas, nombre) {
+  const bytes = Excel.crear(hojas);
+  // En iPhone, una descarga desde la app instalada se abre como vista
+  // previa y a veces no deja guardarla. Allí se usa el menú de compartir
+  // del teléfono, que sí ofrece "Guardar en Archivos".
+  if (esIPhoneOIPad() && navigator.canShare) {
+    const archivo = new File([bytes], nombre, {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
+    if (navigator.canShare({ files: [archivo] })) {
+      try {
+        await navigator.share({ files: [archivo], title: nombre });
+        return;
+      } catch (e) {
+        if (e && e.name === 'AbortError') return;   // cerró el menú
+      }
+    }
+  }
+  Excel.guardar(bytes, nombre);
+}
+
+function pintarDescargas() {
+  const botonSol = $('#btn-excel-solicitudes');
+  if (!botonSol) return;
+  // Una entidad sin lista propia no tiene solicitudes que descargar.
+  const conLista = !(APP.perfil && APP.perfil.verSolicitudes === false);
+  botonSol.hidden = !conLista;
+  if (conLista) {
+    const n = solicitudesPorVisitar().length;
+    $('#excel-sol-detalle').textContent = n + (n === 1 ? ' solicitud' : ' solicitudes') +
+      ' de ' + ((APP.perfil && APP.perfil.entidad) || 'tu entidad');
+  }
+  const nv = (APP.historial || []).length;
+  $('#excel-vis-detalle').textContent = nv + (nv === 1 ? ' visita' : ' visitas') +
+    ' de todas las entidades · necesita señal';
+}
+
+// Con guarda: si alguien sube este app.js sin el index.html nuevo, los
+// botones no existen y un addEventListener sobre null tumbaría la app
+// entera en el arranque.
+const botonExcelSolicitudes = $('#btn-excel-solicitudes');
+if (botonExcelSolicitudes) {
+  botonExcelSolicitudes.addEventListener('click', async () => {
+    const lista = solicitudesPorVisitar();
+    if (!lista.length) {
+      toast('No hay solicitudes por visitar para descargar.');
+      return;
+    }
+    try {
+      cargando(true, 'Armando el Excel…');
+      const t = tablaDeSolicitudes(lista);
+      const entidad = (APP.perfil && APP.perfil.entidad) || '';
+      await entregarExcel([
+        { nombre: 'Solicitudes por visitar', columnas: t.columnas, filas: t.filas },
+        hojaAcercaDe('Solicitudes por visitar de ' + entidad, t.filas.length)
+      ], nombreDeArchivo(['Solicitudes por visitar', entidad]));
+      toast('Excel listo: ' + lista.length + (lista.length === 1 ? ' solicitud' : ' solicitudes'), 'ok');
+    } catch (e) {
+      toast('No se pudo armar el Excel: ' + e.message, 'error');
+    } finally {
+      cargando(false);
+    }
+  });
+}
+
+const botonExcelVisitas = $('#btn-excel-visitas');
+if (botonExcelVisitas) {
+  botonExcelVisitas.addEventListener('click', async () => {
+    if (!navigator.onLine) {
+      toast('Para descargar las visitas se necesita señal: los datos completos están en el servidor.', 'error');
+      return;
+    }
+    try {
+      cargando(true, 'Trayendo las visitas…');
+      const r = await api('exportar_visitas', {}, 120000);
+      if (!r.filas || !r.filas.length) {
+        toast('No hay visitas para descargar.');
+        return;
+      }
+      cargando(true, 'Armando el Excel…');
+      await entregarExcel([
+        { nombre: 'Visitas realizadas', columnas: r.columnas, filas: r.filas },
+        hojaAcercaDe('Visitas realizadas de todas las entidades', r.filas.length)
+      ], nombreDeArchivo(['Visitas realizadas']));
+      toast('Excel listo: ' + r.filas.length + (r.filas.length === 1 ? ' visita' : ' visitas'), 'ok');
+    } catch (e) {
+      toast('No se pudieron descargar las visitas: ' + e.message, 'error');
+    } finally {
+      cargando(false);
+    }
+  });
+}
 
 // ------------------------------------------------------ COMPARTIR LA APP
 /**
@@ -1310,7 +1484,7 @@ async function copiarTexto(texto) {
   }
 }
 $('#btn-cerrar-cola').addEventListener('click', () => irA('pendientes'));
-$('#aviso-cola').addEventListener('click', () => irA('cola'));
+$('#aviso-cola').addEventListener('click', () => { irA('cola'); pintarDescargas(); });
 
 $$('#filtros .filtro[data-filtro]').forEach((b) => {
   b.addEventListener('click', () => {
@@ -3931,6 +4105,7 @@ $('#btn-enviar-ficha').addEventListener('click', async () => {
   } else {
     toast('Guardada en el celular. Se enviará al recuperar internet.', 'ok');
     irA('cola');
+    pintarDescargas();   // los conteos de las descargas
   }
 });
 

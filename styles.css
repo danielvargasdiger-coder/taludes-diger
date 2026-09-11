@@ -1468,3 +1468,29 @@ body.con-aviso { padding-top: var(--alto-aviso, 52px); }
   }
   .bloque-compartir > #instalar-ayuda { grid-area: ayuda; margin: 0; max-width: none; }
 }
+
+/* ---------------------------------------------------------------------
+   DESCARGAR EN EXCEL
+   En el celular los dos botones van uno debajo del otro; en PC, lado a
+   lado.
+   --------------------------------------------------------------------- */
+.descargas-botones {
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px;
+  /* Sin la nota de antes, el titulo quedaba a 5 px de los botones y la
+     tarjeta deja 14 px arriba y abajo: se veia apretado. Con esto queda parejo. */
+  margin-top: 8px;
+}
+.btn-descarga {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
+  text-align: left; min-height: 58px; padding: 10px 14px; margin: 0;
+}
+/* display:flex le ganaría al hidden del navegador: se repite a mano. */
+.btn-descarga[hidden] { display: none; }
+.btn-descarga .descarga-titulo { font-size: .92rem; font-weight: 700; color: var(--texto); }
+.btn-descarga .descarga-detalle {
+  font-size: .76rem; font-weight: 500; color: var(--texto-suave);
+  overflow-wrap: anywhere;   /* "Secretaría de Infraestructura de Pereira" no desborda */
+}
+@media (min-width: 720px) {
+  .descargas-botones { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

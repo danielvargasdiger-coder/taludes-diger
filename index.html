@@ -125,6 +125,23 @@
   <div class="panel-cuerpo">
     <div id="resumen-cola" class="resumen"></div>
     <div id="lista-cola" class="lista"></div>
+    <!-- Descargas en Excel. Las solicitudes son solo las de la entidad con
+         que se ingresó (el servidor ya le manda solo esas); las visitas son
+         todas, porque las tres entidades las ven. -->
+    <div class="bloque-perfil bloque-descargas">
+      <h3>Descargar Excel</h3>
+      <div class="descargas-botones">
+        <button type="button" id="btn-excel-solicitudes" class="btn-secundario btn-descarga">
+          <span class="descarga-titulo">Solicitudes por visitar</span>
+          <span class="descarga-detalle" id="excel-sol-detalle">Solo las de tu entidad</span>
+        </button>
+        <button type="button" id="btn-excel-visitas" class="btn-secundario btn-descarga">
+          <span class="descarga-titulo">Visitas realizadas</span>
+          <span class="descarga-detalle" id="excel-vis-detalle">De todas las entidades · necesita señal</span>
+        </button>
+      </div>
+    </div>
+
     <!-- El QR va escrito aquí dentro, no como archivo aparte: así se ve
          sin señal sin tener que guardarlo en la caché. Apunta SIEMPRE a
          producción, aunque se abra desde el gemelo de pruebas. -->
@@ -265,6 +282,7 @@
 
 <script src="config.js"></script>
 <script src="ficha-schema.js"></script>
+<script src="excel.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
