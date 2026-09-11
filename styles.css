@@ -1730,3 +1730,63 @@ button:focus-visible, a:focus-visible, label.fotos-btn:focus-within {
   .seccion-cabeza > .seccion-faltan { grid-area: faltan; justify-self: start; margin-top: 4px; }
   .seccion-cabeza > .seccion-flecha { grid-area: flecha; }
 }
+
+/* ---------------------------------------------------------------------
+   IPHONE (sw v72)
+   Safari de iPhone hace cosas que Chrome de Android no hace. Lo que es solo
+   de iPhone va dentro de @supports (-webkit-touch-callout: none), que solo
+   cumple Safari de iOS: en Android no cambia ni un pixel.
+   --------------------------------------------------------------------- */
+
+/* Al girar el celular Safari agranda la letra por su cuenta. */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+
+/* dvh no existe antes de iOS 15.4: sin respaldo el ingreso no se centraba. */
+#vista-ingreso { min-height: 100vh; min-height: 100dvh; }
+
+@supports (-webkit-touch-callout: none) {
+  /* Safari hace zoom al tocar un campo con letra de menos de 16 px, y la
+     pantalla se queda agrandada y corrida de lado. Los filtros del tablero,
+     las coordenadas, la valoración y los responsables tenían 14 px. */
+  input, select, textarea { font-size: 16px !important; }
+
+  /* Buscadores: sin esto Safari los dibuja redondos, a su manera. */
+  input[type=search] { -webkit-appearance: none; appearance: none; }
+  input[type=search]::-webkit-search-decoration { -webkit-appearance: none; }
+
+  /* Fecha y hora: Safari la centra y, vacía, la encoge a una rayita. */
+  input[type=datetime-local] {
+    -webkit-appearance: none; appearance: none;
+    display: block; min-height: 48px; text-align: left;
+  }
+  input[type=datetime-local]::-webkit-date-and-time-value { text-align: left; }
+}
+
+/* Archivo listo para guardar (iPhone). Safari solo abre el menú de
+   compartir con un toque reciente; si el archivo tardó en armarse, ese
+   toque ya venció y se pide uno nuevo aquí. */
+#archivo-listo {
+  position: fixed; left: 12px; right: 12px; z-index: 250;
+  bottom: calc(env(safe-area-inset-bottom) + 16px);
+  max-width: 520px; margin: 0 auto;
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 10px 10px 16px; border-radius: 14px;
+  background: var(--texto); color: #fff;
+  box-shadow: 0 8px 26px rgba(0, 0, 0, .3);
+  font-size: .88rem; font-weight: 600;
+}
+#archivo-listo-txt { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+#btn-archivo-guardar {
+  flex: none; border: 0; border-radius: 9px; padding: 10px 16px;
+  background: #fff; color: var(--azul);
+  font-size: .9rem; font-weight: 800; font-family: inherit; cursor: pointer;
+}
+#btn-archivo-cerrar {
+  flex: none; width: 36px; height: 36px; border: 0; border-radius: 50%;
+  background: rgba(255, 255, 255, .14); color: #fff;
+  font-size: 1.2rem; line-height: 1; cursor: pointer; font-family: inherit;
+}
+
+/* Descargar PDF, debajo de "Abrir la ficha completa". */
+.btn-descargar-pdf { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.btn-descargar-pdf .ico { width: 19px; height: 19px; vertical-align: 0; }

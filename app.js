@@ -74,7 +74,8 @@ const ICONOS = {
   sincronizar: '<path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v4h-4"/>',
   mapa: '<path d="M12 21s-6.5-5.8-6.5-11a6.5 6.5 0 0 1 13 0c0 5.2-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/>',
   tablero: '<path d="M6 20v-8M12 20V5M18 20v-5"/>',
-  filtro: '<path d="M4 5h16l-6.2 7.4V18l-3.6 2v-7.6L4 5z"/>'
+  filtro: '<path d="M4 5h16l-6.2 7.4V18l-3.6 2v-7.6L4 5z"/>',
+  descargar: '<path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/>'
 };
 
 function icono(nombre) {
@@ -1339,25 +1340,78 @@ function hojaAcercaDe(que, cuantas) {
   };
 }
 
+const TIPO_EXCEL = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
 async function entregarExcel(hojas, nombre) {
-  const bytes = Excel.crear(hojas);
-  // En iPhone, una descarga desde la app instalada se abre como vista
-  // previa y a veces no deja guardarla. Allí se usa el menú de compartir
-  // del teléfono, que sí ofrece "Guardar en Archivos".
+  await entregarArchivo(Excel.crear(hojas), nombre, TIPO_EXCEL);
+}
+
+/**
+ * Entrega un archivo armado en el celular: el Excel o el PDF de una visita.
+ *
+ * En iPhone, una descarga desde la app instalada se abre como vista previa y
+ * a veces no deja guardarla. Allí se usa el menú de compartir del teléfono,
+ * que sí ofrece "Guardar en Archivos". En Android y en el computador,
+ * descarga normal.
+ *
+ * Trampa de iPhone: el menú de compartir solo abre como respuesta a un toque
+ * RECIENTE. Si el archivo tardó (el PDF y el Excel de visitas vienen del
+ * servidor), ese toque ya venció y Safari lo bloquea sin avisar. Entonces se
+ * muestra la barra "Listo · Guardar" y el toque en Guardar sí lo abre.
+ */
+async function entregarArchivo(bytes, nombre, tipo) {
   if (esIPhoneOIPad() && navigator.canShare) {
-    const archivo = new File([bytes], nombre, {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    });
+    const archivo = new File([bytes], nombre, { type: tipo });
     if (navigator.canShare({ files: [archivo] })) {
+      // navigator.userActivation dice si el toque sigue vigente (Safari 16.4
+      // en adelante). Si no existe, se asume vencido: pedir un toque de más
+      // es mejor que un menú que no abre.
+      const toqueVigente = !!(navigator.userActivation && navigator.userActivation.isActive);
+      if (!toqueVigente) { ofrecerGuardar(archivo); return; }
       try {
         await navigator.share({ files: [archivo], title: nombre });
-        return;
       } catch (e) {
-        if (e && e.name === 'AbortError') return;   // cerró el menú
+        if (!e || e.name !== 'AbortError') ofrecerGuardar(archivo);   // Safari no lo dejó abrir
       }
+      return;
     }
   }
-  Excel.guardar(bytes, nombre);
+  descargarArchivo(bytes, nombre, tipo);
+}
+
+/**
+ * Descarga normal. El enlace temporal se libera medio minuto después y no
+ * enseguida: en algunos celulares liberarlo al instante cancela la descarga.
+ */
+function descargarArchivo(bytes, nombre, tipo) {
+  const blob = bytes instanceof Blob ? bytes : new Blob([bytes], { type: tipo });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nombre;
+  a.rel = 'noopener';
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
+
+/** Barra de iPhone con el archivo listo: el toque en "Guardar" abre el menú. */
+function ofrecerGuardar(archivo) {
+  const barra = $('#archivo-listo');
+  if (!barra) { descargarArchivo(archivo, archivo.name, archivo.type); return; }
+  $('#archivo-listo-txt').textContent = archivo.name + ' está listo';
+  barra.hidden = false;
+  $('#btn-archivo-guardar').onclick = async () => {
+    barra.hidden = true;
+    try {
+      await navigator.share({ files: [archivo], title: archivo.name });
+    } catch (e) {
+      if (!e || e.name !== 'AbortError') descargarArchivo(archivo, archivo.name, archivo.type);
+    }
+  };
+  $('#btn-archivo-cerrar').onclick = () => { barra.hidden = true; };
 }
 
 function pintarDescargas() {
@@ -4218,6 +4272,44 @@ $('#btn-enviar-ficha').addEventListener('click', async () => {
 // ---------------------------------------------------------------- DETALLE
 $('#btn-cerrar-detalle').addEventListener('click', () => { $('#vista-detalle').hidden = true; });
 
+/** Texto base64 -> bytes. El PDF llega así dentro de la respuesta del servidor. */
+function base64ABytes(b64) {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+/**
+ * PDF de una visita, armado en el servidor (PdfDescarga.gs).
+ *
+ * Existe por el iPhone: el botón "Imprimir o guardar en PDF" de la ficha en
+ * línea llama a window.print() dentro del marco de Google, y Safari de
+ * iPhone no imprime desde ahí. En Android funcionaba y no se había notado.
+ */
+async function descargarPdfVisita(h, boton) {
+  if (!navigator.onLine) {
+    toast('Para descargar el PDF se necesita internet.', 'error');
+    return;
+  }
+  if (boton) boton.disabled = true;
+  cargando(true, 'Armando el PDF… puede tardar unos segundos');
+  try {
+    // Con fotos incrustadas el servidor tarda más que en una consulta normal.
+    const r = await api('pdf_visita', { idVisita: h.idVisita }, 120000);
+    const nombre = r.nombre || ('Ficha ' + (h.idSolicitud || h.idVisita) + '.pdf');
+    cargando(false);
+    await entregarArchivo(base64ABytes(r.pdf), nombre, 'application/pdf');
+  } catch (e) {
+    toast(/Acción desconocida/.test(e.message)
+      ? 'El servidor aún no tiene la descarga de PDF: falta publicar la versión nueva del script.'
+      : 'No se pudo armar el PDF: ' + e.message, 'error');
+  } finally {
+    cargando(false);
+    if (boton) boton.disabled = false;
+  }
+}
+
 async function abrirDetalle(idVisita) {
   const h = APP.historial.find((x) => String(x.idVisita) === String(idVisita));
   if (!h) return;
@@ -4261,9 +4353,12 @@ async function abrirDetalle(idVisita) {
     html += '<div class="detalle-seccion"><div class="detalle-acciones">' +
       '<a class="btn-pdf" href="' + esc(h.fichaUrl) + '" target="_blank" rel="noopener">' +
         icono('documento') + ' Abrir la ficha completa</a>' +
-      '<p class="nota-ficha">Se abre en el navegador con los datos de hoy. ' +
-        'Desde ahi puedes imprimirla, guardarla en PDF o copiar el enlace ' +
-        'para mandarlo.</p>' +
+      // El PDF se arma en el servidor: el de "Imprimir" no funciona en iPhone.
+      '<button type="button" class="btn-secundario btn-descargar-pdf">' +
+        icono('descargar') + ' Descargar PDF</button>' +
+      '<p class="nota-ficha">«Abrir» la muestra en el navegador con los datos de hoy, ' +
+        'para leerla o copiar el enlace. «Descargar PDF» guarda el archivo en el celular' +
+        (esIPhoneOIPad() ? ' (en iPhone: Guardar en Archivos).' : '.') + '</p>' +
       '</div></div>';
   }
 
@@ -4289,6 +4384,8 @@ async function abrirDetalle(idVisita) {
   });
 
   $('#detalle-cuerpo').innerHTML = html || '<div class="vacio">Sin datos.</div>';
+  const btnPdf = $('#detalle-cuerpo').querySelector('.btn-descargar-pdf');
+  if (btnPdf) btnPdf.addEventListener('click', () => descargarPdfVisita(h, btnPdf));
 }
 
 function formatearValor(campo, v) {

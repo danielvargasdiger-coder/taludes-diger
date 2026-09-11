@@ -9,6 +9,9 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<!-- Sin esto Safari de iPhone convierte en enlace azul cualquier número que
+     parezca teléfono o fecha: TP, coordenadas, códigos de solicitud. -->
+<meta name="format-detection" content="telephone=no, date=no, email=no, address=no">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -275,6 +278,14 @@
 <div id="aviso-version" hidden>
   <span>Versión nueva disponible</span>
   <button type="button" id="btn-actualizar">Actualizar</button>
+</div>
+
+<!-- Archivo listo para guardar (iPhone). Safari solo abre el menú de
+     compartir con un toque reciente; si el archivo tardó, se toca aquí. -->
+<div id="archivo-listo" role="status" hidden>
+  <span id="archivo-listo-txt"></span>
+  <button type="button" id="btn-archivo-guardar">Guardar</button>
+  <button type="button" id="btn-archivo-cerrar" aria-label="Cerrar">&times;</button>
 </div>
 
 <div id="toast"></div>
