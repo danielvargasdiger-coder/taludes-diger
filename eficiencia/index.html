@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Eficiencia de visitas — Taludes DIGER</title>
+<meta name="description" content="Tablero informativo: solicitudes de geotecnia del EDR, visitas realizadas y movimientos en masa encontrados.">
+<link rel="icon" href="../icon-192.png">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="eficiencia.css">
+</head>
+<body>
+
+<!-- La misma barra de la app: azul, logos en pastilla blanca y la franja institucional. -->
+<header id="topbar">
+  <div class="topbar-main">
+    <div class="topbar-title">
+      <strong>Eficiencia de las visitas de taludes</strong>
+      <div class="logos-barra">
+        <img class="logo-barra" src="../logo-app.png" width="460" height="118" alt="Alcaldía de Pereira - DIGER">
+        <img class="logo-barra logo-barra-carder" src="../logo-carder-compacto.png" width="158" height="224" alt="CARDER">
+      </div>
+    </div>
+    <div class="estado" id="estado" role="status">Cargando datos…</div>
+  </div>
+</header>
+
+<main class="contenido">
+
+  <p class="intro">Solicitudes de geotecnia del EDR (sismo del 10 de agosto), visitas realizadas por DIGER, CARDER y la Secretaría de Infraestructura, y cuántas encontraron un movimiento en masa.</p>
+
+  <section class="tarjetas" aria-label="Resumen">
+    <article class="tarjeta">
+      <span class="t-rotulo">Solicitudes iniciales</span>
+      <b class="t-cifra" id="k-sol">—</b>
+      <span class="t-nota">Filtro de geotecnia del EDR</span>
+    </article>
+    <article class="tarjeta">
+      <span class="t-rotulo">Solicitudes visitadas</span>
+      <b class="t-cifra" id="k-vis">—</b>
+      <span class="t-pct" id="k-vis-p"></span>
+      <span class="t-nota">de las solicitudes iniciales</span>
+    </article>
+    <article class="tarjeta destacada">
+      <span class="t-rotulo">Movimiento en masa efectivo</span>
+      <b class="t-cifra" id="k-mm">—</b>
+      <span class="t-pct" id="k-mm-p"></span>
+      <span class="t-nota">de las solicitudes visitadas</span>
+    </article>
+    <article class="tarjeta">
+      <span class="t-rotulo">Pendientes por visitar</span>
+      <b class="t-cifra" id="k-pen">—</b>
+      <span class="t-pct" id="k-pen-p"></span>
+      <span class="t-nota">de las solicitudes iniciales</span>
+    </article>
+  </section>
+
+  <section class="bloque">
+    <div class="pasos" role="tablist" aria-label="Qué mostrar en el mapa">
+      <button class="paso" id="paso-1" role="tab" aria-selected="true"><i>1</i>Solicitudes iniciales</button>
+      <button class="paso" id="paso-2" role="tab" aria-selected="false"><i>2</i>Solicitudes visitadas</button>
+      <button class="paso" id="paso-3" role="tab" aria-selected="false"><i>3</i>Movimiento en masa</button>
+    </div>
+    <div class="leyenda" id="leyenda"></div>
+    <div id="mapa" aria-label="Mapa de Pereira"></div>
+    <p class="nota" id="nota-mapa"></p>
+  </section>
+
+  <section class="graficas">
+    <article class="bloque">
+      <h2>Eficiencia de las visitas</h2>
+      <div class="dona-caja">
+        <svg id="dona" viewBox="0 0 120 120" role="img" aria-label="Porcentaje de visitas con movimiento en masa"></svg>
+        <ul class="dona-ley" id="dona-ley"></ul>
+      </div>
+    </article>
+    <article class="bloque">
+      <h2>Avance sobre las solicitudes iniciales</h2>
+      <div class="barras" id="g-avance"></div>
+    </article>
+    <article class="bloque ancho">
+      <h2>Por entidad</h2>
+      <div class="barras" id="g-entidad"></div>
+      <div class="mini-ley"><span><i class="c-mm"></i>Movimiento en masa</span><span><i class="c-no"></i>Sin movimiento en masa</span></div>
+    </article>
+  </section>
+
+  <p class="pie">Vista informativa. Los puntos están ubicados a nivel de cuadra y no muestran datos personales. Una visita es <b>efectiva</b> cuando en campo se encontró un movimiento en masa. Todas las visitas realizadas cuentan como solicitudes atendidas. Los datos salen de la app de taludes y se actualizan solos cada 10 minutos.</p>
+  <p class="creditos">Aplicación creada por <b>Daniel Vargas</b>, geólogo · DIGER Pereira</p>
+</main>
+
+<script src="../config.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="eficiencia.js"></script>
+</body>
+</html>

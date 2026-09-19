@@ -1,0 +1,143 @@
+/* =========================================================================
+   Tablero de eficiencia — mismos colores y barra que la app de taludes
+   (ver ../styles.css). Vista informativa para el PMU: se ve bien en la
+   pantalla grande y en el celular.
+   ========================================================================= */
+
+:root {
+  --azul: #0b4f6c;
+  --azul-oscuro: #063a50;
+  --azul-claro: #e7f1f6;
+  --texto: #16202a;
+  --texto-suave: #4a5b6a;
+  --borde: #cdd8e0;
+  --fondo: #f4f7f9;
+  --blanco: #ffffff;
+  --inst-rojo: #d93933;
+  --inst-verde: #3f8c54;
+  --inst-amarillo: #f4bc42;
+
+  /* Datos */
+  --c-lista: #7a8b97;     /* solicitud inicial */
+  --c-vis: #0b4f6c;       /* visita realizada (azul de la app) */
+  --c-mm: #d84315;        /* movimiento en masa (el de prioridad alta de la app) */
+  --c-no: #9dbfd1;        /* visita sin movimiento en masa */
+  --riel: #e6edf1;
+
+  --radio: 10px;
+  --sombra: 0 1px 3px rgba(16, 32, 44, .12);
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--fondo); color: var(--texto);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 16px; line-height: 1.45;
+}
+
+/* ------------------------------------------------------------ barra (igual a la app) */
+#topbar {
+  position: sticky; top: 0; z-index: 1000;
+  background: linear-gradient(135deg, var(--azul) 0%, var(--azul-oscuro) 100%);
+  color: #fff;
+  padding: env(safe-area-inset-top, 0px) 0 0;
+  box-shadow: 0 2px 12px rgba(6, 58, 80, .28);
+  border-bottom: 3px solid transparent;
+  border-image: linear-gradient(90deg,
+    var(--inst-rojo) 0 33.3%, var(--inst-amarillo) 33.3% 66.6%, var(--inst-verde) 66.6%) 1;
+}
+.topbar-main {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 16px; max-width: 1180px; margin: 0 auto;
+}
+.topbar-title { min-width: 0; }
+.topbar-title strong { display: block; font-size: 1.06rem; letter-spacing: -.01em; }
+.logos-barra { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.logo-barra {
+  display: block; height: 27px; width: auto;
+  background: #fff; border-radius: 5px; padding: 3px 6px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .25);
+}
+.logo-barra-carder { height: 30px; padding: 2px 5px; }
+.estado { font-size: .78rem; opacity: .9; text-align: right; flex: none; max-width: 45%; }
+.estado.error { background: #fff; color: #c62828; border-radius: 6px; padding: 4px 8px; opacity: 1; font-weight: 700; }
+
+/* ------------------------------------------------------------ contenido */
+.contenido { max-width: 1180px; margin: 0 auto; padding-inline: 16px; padding-block: 16px 34px; display: grid; gap: 16px; }
+.intro { margin: 0; color: var(--texto-suave); font-size: .92rem; max-width: 80ch; }
+
+.tarjetas { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+@media (max-width: 860px) { .tarjetas { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 420px) { .tarjetas { grid-template-columns: 1fr; } }
+.tarjeta {
+  background: var(--blanco); border: 1px solid var(--borde); border-radius: var(--radio);
+  box-shadow: var(--sombra); padding: 14px 16px; display: grid; gap: 2px; align-content: start;
+}
+.t-rotulo { font-size: .74rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--azul); }
+.t-cifra { font-size: 2.2rem; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.t-pct { font-size: 1.05rem; font-weight: 800; color: var(--azul); font-variant-numeric: tabular-nums; }
+.t-nota { font-size: .8rem; color: var(--texto-suave); }
+.tarjeta.destacada { background: linear-gradient(135deg, var(--azul) 0%, var(--azul-oscuro) 100%); border-color: var(--azul-oscuro); color: #fff; }
+.tarjeta.destacada .t-rotulo, .tarjeta.destacada .t-nota { color: #d6e7ef; }
+.tarjeta.destacada .t-pct { color: #fff; font-size: 1.5rem; }
+
+.bloque { background: var(--blanco); border: 1px solid var(--borde); border-radius: var(--radio); box-shadow: var(--sombra); padding: 14px 16px; }
+.bloque h2 { margin: 0 0 12px; font-size: .8rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--azul); }
+
+/* ------------------------------------------------------------ mapa */
+.pasos { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.paso {
+  display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+  border: 1px solid var(--borde); background: var(--blanco); color: var(--texto);
+  border-radius: 999px; padding: 7px 14px 7px 7px; font: 700 .86rem system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+.paso i { font-style: normal; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--azul-claro); color: var(--azul); font-size: .8rem; }
+.paso[aria-selected="true"] { background: var(--azul); border-color: var(--azul); color: #fff; }
+.paso[aria-selected="true"] i { background: #fff; color: var(--azul); }
+.paso:focus-visible { outline: 3px solid var(--inst-amarillo); outline-offset: 2px; }
+.leyenda { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: .84rem; color: var(--texto-suave); margin-bottom: 10px; min-height: 22px; }
+.leyenda b { color: var(--texto); font-variant-numeric: tabular-nums; }
+.leyenda i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--borde); }
+#mapa { position: relative; z-index: 0; height: min(68vh, 600px); min-height: 360px; border-radius: 8px; border: 1px solid var(--borde); background: var(--riel); }
+#mapa .leaflet-tile-pane { filter: grayscale(.75) brightness(1.04) contrast(.92); }
+.leaflet-tooltip { font: .8rem/1.35 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; border-radius: 6px; }
+.nota { margin: 8px 0 0; font-size: .8rem; color: var(--texto-suave); }
+
+/* ------------------------------------------------------------ gráficas */
+.graficas { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.graficas .ancho { grid-column: 1 / -1; }
+@media (max-width: 860px) { .graficas { grid-template-columns: 1fr; } }
+
+.dona-caja { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+#dona { width: 170px; height: 170px; flex: none; max-width: 100%; }
+.dona-ley { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; font-size: .9rem; }
+.dona-ley li { display: grid; grid-template-columns: 14px 1fr; gap: 0 10px; align-items: baseline; }
+.dona-ley i { width: 12px; height: 12px; border-radius: 3px; display: block; transform: translateY(1px); }
+.dona-ley b { font-variant-numeric: tabular-nums; }
+.dona-ley small { grid-column: 2; color: var(--texto-suave); font-size: .8rem; }
+
+.barras { display: grid; gap: 12px; }
+.fila { display: grid; grid-template-columns: minmax(118px, 34%) 1fr auto; gap: 10px; align-items: center; }
+.fila .et { font-size: .86rem; color: var(--texto-suave); }
+.fila .et b { color: var(--texto); }
+.fila .pct { font-weight: 800; color: var(--azul); font-size: .92rem; font-variant-numeric: tabular-nums; min-width: 4.4em; text-align: right; }
+.riel { height: 24px; background: var(--riel); border-radius: 5px; display: flex; gap: 2px; overflow: hidden; }
+.seg { height: 100%; min-width: 3px; color: #fff; font: 700 .76rem system-ui, sans-serif; display: flex; align-items: center; justify-content: center; white-space: nowrap; overflow: hidden; font-variant-numeric: tabular-nums; }
+.seg.claro { color: var(--azul-oscuro); }
+.fila-nota { grid-column: 2 / -1; font-size: .76rem; color: var(--texto-suave); margin-top: -8px; }
+.mini-ley { display: flex; flex-wrap: wrap; gap: 14px; font-size: .8rem; color: var(--texto-suave); margin-top: 12px; }
+.mini-ley i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.c-mm { background: var(--c-mm); } .c-no { background: var(--c-no); } .c-vis { background: var(--c-vis); } .c-lista { background: var(--c-lista); }
+
+.pie { margin: 0; font-size: .8rem; color: var(--texto-suave); max-width: 110ch; }
+.creditos { margin: 0; font-size: .76rem; color: var(--texto-suave); text-align: center; }
+
+@media (max-width: 420px) {
+  .topbar-title strong { font-size: .95rem; }
+  .estado { font-size: .72rem; }
+  .fila { grid-template-columns: 1fr auto; }
+  .fila .riel { grid-column: 1 / -1; grid-row: 2; }
+  .fila-nota { grid-column: 1 / -1; margin-top: -6px; }
+}
