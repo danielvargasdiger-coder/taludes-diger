@@ -1232,7 +1232,7 @@ function irA(vista) {
 
   // Con la barra siempre a la vista, el icono marcado dice en qué sección
   // se está. En la lista no se marca ninguno: es el inicio.
-  [['mapa', '#btn-mapa'], ['tablero', '#btn-tablero'], ['cola', '#btn-perfil']].forEach(([v, sel]) => {
+  [['pendientes', '#btn-visitas'], ['mapa', '#btn-mapa'], ['tablero', '#btn-tablero'], ['cola', '#btn-perfil']].forEach(([v, sel]) => {
     if (vista === v) $(sel).setAttribute('aria-current', 'page');
     else $(sel).removeAttribute('aria-current');
   });
@@ -1255,6 +1255,7 @@ function medirCabecera() {
 if ('ResizeObserver' in window) new ResizeObserver(() => medirCabecera()).observe($('#topbar'));
 window.addEventListener('resize', medirCabecera);
 
+$('#btn-visitas').addEventListener('click', () => irA('pendientes'));
 $('#btn-tablero').addEventListener('click', () => { irA('tablero'); pintarTablero(); });
 $('#btn-cerrar-tablero').addEventListener('click', () => irA('pendientes'));
 $('#btn-perfil').addEventListener('click', () => { irA('cola'); pintarCompartir(); pintarDescargas(); });

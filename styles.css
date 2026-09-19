@@ -1790,3 +1790,144 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 /* Descargar PDF, debajo de "Abrir la ficha completa". */
 .btn-descargar-pdf { display: flex; align-items: center; justify-content: center; gap: 8px; }
 .btn-descargar-pdf .ico { width: 19px; height: 19px; vertical-align: 0; }
+
+/* =========================================================================
+   ASPECTO MIYAMOTO (sw v74)
+   La DIGER pidió que taludes se vea como la app Miyamoto. SOLO lo visual:
+   las funciones, los campos y los flujos de taludes no cambian.
+   Va AL FINAL a propósito: gana sobre las reglas anteriores.
+   ========================================================================= */
+
+/* ---- Barra superior: emblema en círculo blanco, título y subtítulo ---- */
+.topbar-main { gap: 10px; }
+.topbar-title { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1 1 auto; }
+.topbar-logo {
+  flex: none; display: inline-grid; place-items: center; width: 42px; height: 42px; border-radius: 50%;
+  background: #fff; box-shadow: 0 0 0 2px rgba(255,255,255,.35), 0 2px 6px rgba(0,0,0,.25);
+}
+.topbar-logo img { height: 30px; width: auto; display: block; }
+.topbar-logo-carder img { height: 32px; }
+.topbar-textos { min-width: 0; }
+.topbar-textos strong { display: block; font-size: 1.08rem; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.topbar-textos strong .t-largo { display: inline; opacity: 1; font-size: inherit; }
+.topbar-textos > span { display: block; font-size: .78rem; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: 0; }
+
+/* ---- Visitas / Mapa / Tablero con nombre ---- */
+.topbar-vistas { display: flex; gap: 4px; flex: none; }
+.btn-vista {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 12px; border: 0; border-radius: 22px;
+  background: transparent; color: #fff; font: inherit; font-weight: 600; font-size: .92rem; cursor: pointer;
+}
+.btn-vista .ico { width: 22px; height: 22px; }
+.btn-vista:hover { background: rgba(255,255,255,.14); }
+.btn-vista[aria-current="page"] { background: #fff; color: var(--azul); }
+.btn-vista:focus-visible { outline: 3px solid var(--inst-amarillo); outline-offset: 2px; }
+
+/* Con la barra de secciones, la flecha de volver del mapa y del tablero
+   sobra: "Visitas" hace lo mismo. El perfil sí la conserva. */
+#btn-cerrar-mapa, #btn-cerrar-tablero { display: none; }
+
+/* ---- Pestañas de la lista (Por visitar / Visitadas / Borradores) ---- */
+.filtro { min-height: 44px; font-size: .92rem; font-weight: 600; padding: 0 10px; gap: 6px; }
+.filtro b { font-size: .78rem; font-weight: 700; background: rgba(0,0,0,.08); color: inherit; padding: 1px 7px; }
+.filtro.activo { box-shadow: none; }
+.filtro.activo b { background: rgba(255,255,255,.22); }
+
+/* ---- Tarjetas: borde fino, sombra suave y la prioridad en una pastilla ---- */
+.lista .tarjeta {
+  border: 1px solid var(--borde); border-radius: var(--radio);
+  box-shadow: var(--sombra); padding: 12px 14px;
+}
+.lista .tarjeta.est-realizada { background: #f7fbf8; }
+.lista .tarjeta.est-por-enviar { border-left: 4px solid #6a1b9a; }
+.lista .tarjeta.est-en-proceso, .lista .tarjeta.tarjeta-borrador { border-left: 4px solid var(--media); }
+.lista .tarjeta.tarjeta-estancada { border-left: 4px solid var(--alta); }
+.tarjeta-alto { justify-content: space-between; margin-bottom: 4px; }
+.tarjeta-id { order: 2; text-align: right; font-size: .78rem; font-weight: 600; text-transform: none; letter-spacing: 0; }
+.tarjeta-alto .chip {
+  order: 1; box-shadow: none; font-size: .74rem; font-weight: 700; letter-spacing: 0; padding: 2px 9px;
+}
+.tarjeta-alto .chip.alta, .tarjeta-alto .chip.ALTA { background: #fde2e2; color: #a1000b; }
+.tarjeta-alto .chip.media, .tarjeta-alto .chip.MEDIA { background: #fff1d6; color: #8a4b00; }
+.tarjeta-alto .chip.baja, .tarjeta-alto .chip.BAJA { background: #e3f2e5; color: #1b5e20; }
+.tarjeta-alto .chip.critica, .tarjeta-alto .chip.CRITICA, .tarjeta-alto .chip.CRÍTICA { background: var(--critica); color: #fff; }
+.tarjeta-titulo { font-size: 1.04rem; }
+
+/* ---- Botón flotante con nombre ("+ Hallazgo") ---- */
+.btn-flotante {
+  width: auto; height: 56px; padding: 0 22px 0 18px; border-radius: 28px;
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--azul); font-size: 1rem; font-weight: 700; font-family: inherit;
+  box-shadow: 0 4px 14px rgba(6,58,80,.35);
+}
+.btn-flotante .ico { width: 24px; height: 24px; }
+
+/* ---- Tablero: cifras con filo azul, como Miyamoto ---- */
+.t-tarjeta { border-left: 5px solid var(--azul); padding: 10px 12px; }
+.t-tarjeta b { font-size: 1.7rem; }
+
+/* ---- Ingreso: fondo claro, tarjeta blanca y pasos numerados ---- */
+#vista-ingreso {
+  place-items: start center; padding: 24px 16px 40px;
+  background: linear-gradient(180deg, var(--azul-claro), var(--fondo) 320px);
+}
+.ingreso-caja { max-width: 460px; border-radius: 14px; padding: 22px 20px; box-shadow: 0 4px 22px rgba(6,58,80,.12); }
+.logos-ingreso { margin: 0 auto 14px; }
+.ingreso-caja h1 { font-size: 1.28rem; color: var(--texto); margin-bottom: .3em; }
+.ingreso-sub { text-align: center; color: var(--texto-suave); margin: 0 0 6px; font-size: .92rem; }
+.paso-ingreso { display: flex; align-items: center; gap: 8px; font-size: 1rem; margin: 18px 0 8px; color: var(--azul); }
+.paso-ingreso span {
+  display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+  background: var(--azul); color: #fff; font-size: .85rem; flex: none;
+}
+#btn-ingresar { margin-top: 4px; }
+
+/* ---- Crédito (ingreso y perfil) ---- */
+.credito {
+  margin: 22px auto 4px; padding-top: 14px; text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 1px; max-width: 260px;
+  border-top: 3px solid transparent;
+  border-image: linear-gradient(90deg, var(--inst-rojo) 0 33.3%, var(--inst-amarillo) 33.3% 66.6%, var(--inst-verde) 66.6%) 1;
+}
+.credito span { font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--texto-suave); }
+.credito b { font-size: 1.12rem; font-weight: 800; color: var(--azul); letter-spacing: .01em; }
+.credito em { font-style: normal; font-size: .85rem; font-weight: 600; color: var(--inst-verde); }
+
+/* ---- PC: las secciones van arriba, junto al título ---- */
+@media (min-width: 761px) {
+  .topbar-vistas { margin-left: auto; }
+}
+
+/* ---- Celular: la barra de secciones baja al pie de la pantalla ---- */
+@media (max-width: 760px) {
+  .topbar-vistas {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 45; justify-content: space-around; gap: 0;
+    background: #fff; border-top: 1px solid var(--borde); box-shadow: 0 -2px 10px rgba(16,32,44,.08);
+    padding: 4px max(8px, env(safe-area-inset-right)) calc(4px + env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+  }
+  .btn-vista {
+    flex: 1; flex-direction: column; gap: 2px; min-height: 54px; padding: 4px 0; border-radius: 12px;
+    color: var(--texto-suave); font-size: .76rem;
+  }
+  .btn-vista:hover { background: var(--azul-claro); }
+  .btn-vista[aria-current="page"] { background: var(--azul-claro); color: var(--azul); }
+
+  /* Lo que queda abajo sube por encima de la barra (≈62 px). */
+  .vista.seccion-app { bottom: calc(62px + env(safe-area-inset-bottom)); }
+  #vista-pendientes { padding-bottom: calc(160px + env(safe-area-inset-bottom)); }
+  .btn-flotante { bottom: calc(76px + env(safe-area-inset-bottom)); }
+  #toast { bottom: calc(84px + env(safe-area-inset-bottom)); }
+  #archivo-listo { bottom: calc(76px + env(safe-area-inset-bottom)); }
+}
+@media (max-width: 480px) {
+  .topbar-textos span { display: none; }
+  .topbar-textos strong .t-largo { display: none; }
+  .topbar-textos strong { font-size: .98rem; }
+  .topbar-logo { width: 38px; height: 38px; }
+  .topbar-logo img { height: 27px; }
+  .topbar-logo-carder img { height: 29px; }
+}
+@media (max-width: 360px) {
+  .topbar-logo-carder { display: none; }
+  .filtro b { display: none; }
+}
