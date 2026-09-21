@@ -1927,7 +1927,47 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   .topbar-logo img { height: 27px; }
   .topbar-logo-carder img { height: 29px; }
 }
-@media (max-width: 360px) {
-  .topbar-logo-carder { display: none; }
-  .filtro b { display: none; }
+
+/* =========================================================================
+   CORRECCIONES v75 (revisión de toda la app, 20/09/2026)
+   Varias eran de la v74: sus reglas pisaban las de antes sin querer.
+   ========================================================================= */
+
+/* Al tocar "Finalizar y enviar" con campos faltantes, la lista de faltantes vive en el
+   pie fijo: sin tope se comia hasta la mitad de la pantalla y tapaba el primer campo. */
+.ficha-pie #msg-validacion { max-height: 26vh; overflow-y: auto; }
+
+/* El aviso "Versión nueva" (fijo arriba) tapaba la flecha de volver y "Guardar" de la ficha. */
+body.con-aviso .vista.pantalla-completa { top: var(--alto-aviso, 52px); }
+
+/* Barra de progreso e índice de secciones: en iPhone con muesca quedaban bajo la cabecera. */
+#barra-progreso { top: calc(56px + env(safe-area-inset-top, 0px)); }
+.indice-secciones { top: calc(60px + env(safe-area-inset-top, 0px)); }
+.seccion { scroll-margin-top: calc(120px + env(safe-area-inset-top, 0px)); }
+
+/* Los emblemas de la barra no son parte del subtítulo: no deben salir semitransparentes. */
+.topbar-title .topbar-logo { opacity: 1; }
+
+/* Aviso temporal: era un óvalo de medio ancho que partía el texto en 3 o 4 líneas. */
+#toast { width: max-content; max-width: calc(100vw - 32px); border-radius: 16px; }
+
+/* Tarjetas de "Borradores" y "Mi perfil y envíos": usan .tarjeta-cabeza, que no tenía estilo,
+   y la v74 mandaba el código a la derecha. */
+.tarjeta-cabeza { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
+.tarjeta-cabeza > div { min-width: 0; }
+.tarjeta-cabeza .tarjeta-id { max-width: none; text-align: left; white-space: normal; order: 0; }
+.tarjeta-sub { font-size: .84rem; color: var(--texto-suave); }
+
+/* iPhone instalada: el ingreso arrancaba bajo la barra de estado. */
+#vista-ingreso { padding-top: calc(24px + env(safe-area-inset-top, 0px)); }
+
+/* Llamar es la acción que más se usa antes de salir: que se pueda tocar con el pulgar. */
+.btn-llamar { min-height: 44px; }
+
+@media (max-width: 480px) {
+  /* Las pestañas se cortaban por ambos lados (la regla de la v74 pisaba la de 430 px). */
+  .filtro { font-size: .8rem; padding: 0 6px; gap: 4px; }
+  /* Tres casillas de coordenadas no dejaban ver los decimales de la longitud. */
+  .gps-coords { grid-template-columns: 1fr 1fr; }
+  .gps-coords label:last-child { grid-column: 1 / -1; }
 }

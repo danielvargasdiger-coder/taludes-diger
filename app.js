@@ -120,7 +120,11 @@ const DB = {
       const tx = db.transaction(almacen, modo);
       const req = fn(tx.objectStore(almacen));
       tx.oncomplete = () => ok(req && req.result);
-      tx.onerror = () => fallo(tx.error);
+      // Sin onabort, una escritura cancelada (cuota llena al confirmar) dejaba la promesa
+      // colgada para siempre: 'Finalizar y enviar' esperaba sin fin y una sincronizacion
+      // podia quedar marcada como 'en curso' hasta cerrar la app.
+      tx.onabort = () => fallo(tx.error || new Error('El celular canceló el guardado (¿sin espacio?).'));
+      tx.onerror = () => fallo(tx.error || new Error('Error al guardar en el celular.'));
     });
   },
 
@@ -208,6 +212,16 @@ function normalizarNumero(txt) {
     .replace(/[^0-9.\-]/g, '')   // fuera letras y espacios
     .replace(/(?!^)-/g, '')      // el menos solo al principio
     .replace(/\.(?=.*\.)/g, ''); // un solo punto decimal
+}
+
+/**
+ * Colombia esta siempre al OESTE de Greenwich: la longitud es negativa. El teclado
+ * decimal del iPhone no tiene la tecla del menos, asi que si el GPS falla no habia
+ * forma de escribir -75.70. Un 66-80 sin signo se completa como -66..-80.
+ */
+function longitudOeste(txt) {
+  const n = parseFloat(txt);
+  return (/^\d/.test(txt) && n >= 66 && n <= 80) ? '-' + txt : txt;
 }
 
 function normalizar(txt) {
@@ -839,7 +853,7 @@ async function pintarMapaTablero(visitas) {
   // Sin el {s} de siempre: Leaflet lo repartia entre a./b./c. y el
     // service worker guardaba el MISMO cuadrito hasta tres veces. OSM
     // ya recomienda el dominio sin prefijo.
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { crossOrigin: true,
     maxZoom: 19, attribution: '&copy; OpenStreetMap'
   }).addTo(APP.mapaT);
 
@@ -1206,6 +1220,12 @@ $('#btn-salir').addEventListener('click', async () => {
     if (!confirm('Tienes ' + APP.cola.length + ' ficha(s) sin enviar. Si sales se quedan guardadas en este celular, pero solo tú podrás enviarlas. ¿Continuar?')) return;
   }
   localStorage.removeItem(CLAVE_PERFIL);
+  // Sin fichas pendientes no queda nada de esta entidad en el celular: nombres, telefonos y
+  // fichas descargadas se quedaban a la vista de quien entrara despues (o sin señal, para siempre).
+  if (!APP.cola.length) {
+    await DB.guardarKV('solicitudes', []).catch(() => {});
+    await DB.guardarKV('historial', []).catch(() => {});
+  }
   location.reload();
 });
 
@@ -1737,7 +1757,7 @@ async function abrirMapa() {
     // Sin el {s} de siempre: Leaflet lo repartia entre a./b./c. y el
     // service worker guardaba el MISMO cuadrito hasta tres veces. OSM
     // ya recomienda el dominio sin prefijo.
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { crossOrigin: true,
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap'
     }).addTo(APP.mapa);
@@ -2325,11 +2345,26 @@ async function sincronizar(silencioso = false) {
  * Así una conexión que se cae a mitad de camino no obliga a repetir todo:
  * al reintentar continúa donde quedó.
  */
+/**
+ * La ficha SIN los campos de fotos: es lo que viaja en crear_visita. Las fotos suben una
+ * a una con subir_foto, y el servidor descarta las que vengan aqui (sinFotosBase64).
+ * Mandarlas dos veces doblaba los datos moviles y, con señal mala, hacia que crear_visita
+ * se agotara a los 45 s: la ficha no salia nunca de la cola.
+ */
+function fichaSinFotos(datos) {
+  const ficha = Object.assign({}, datos);
+  FICHA_SCHEMA.secciones.forEach((s) => s.campos.forEach((c) => { if (c.tipo === 'fotos') delete ficha[c.id]; }));
+  return ficha;
+}
+
 async function enviarCola(silencioso) {
   for (const item of APP.cola.slice()) {
+    // Repetida: otra persona ya registro esa solicitud. Se queda a la vista, sin reintentar.
+    if (item.duplicada) continue;
     try {
       if (!item.idServidor) {
-        const r = await api('crear_visita', { ficha: item.datos, idSolicitud: item.idSolicitud, perfil: APP.perfil });
+        const r = await api('crear_visita', { ficha: fichaSinFotos(item.datos), idSolicitud: item.idSolicitud,
+          perfil: APP.perfil, noProgramada: !!item.noProgramada });
         item.idServidor = r.idVisita;
         item.fotosSubidas = 0;
         await DB.guardar('cola', item);
@@ -2363,14 +2398,13 @@ async function enviarCola(silencioso) {
       // El servidor dice que esa solicitud ya quedó registrada: la ficha no
       // está pendiente, está repetida. Se saca de la cola en vez de dejarla
       // reintentando para siempre.
+      // Ya NO se borra: la ficha completa (con sus fotos) es trabajo de campo. Si otra persona
+      // cerro la solicitud primero, se deja a la vista para que alguien decida cual sobra.
       if (/ya tiene una visita registrada/i.test(e.message)) {
-        await DB.borrar('cola', item.idLocal);
-        APP.cola = APP.cola.filter((x) => x.idLocal !== item.idLocal);
-        await DB.borrar('borradores', item.clave);
-        APP.borradores.delete(String(item.idSolicitud));
-        if (!silencioso) {
-          toast('La solicitud ' + item.idSolicitud + ' ya estaba registrada. Se quitó de la cola.', 'ok');
-        }
+        item.duplicada = true;
+        item.error = 'Otra persona ya registró esta solicitud. Revisa la visita hecha y, si la tuya sobra, elimínala.';
+        await DB.guardar('cola', item);
+        if (!silencioso) toast('La solicitud ' + item.idSolicitud + ' ya estaba registrada. Tu ficha se quedó en la cola para que la revises.', 'error');
         continue;
       }
 
@@ -2759,11 +2793,14 @@ function pintarPendientes() {
     if ((f.barrio || []).length && f.barrio.indexOf(s.barrio || '(sin barrio)') === -1) return false;
     if (f.entidad.length && f.entidad.indexOf(s.entidad || '(sin entidad)') === -1) return false;
     if (f.sinCoords && s.latitud !== '') return false;
-    if (f.cercanas && !s._cerca) return false;
+    // Sin ubicacion no hay 'cerca': se ignora, en vez de esconder TODAS las solicitudes.
+    if (f.cercanas && APP.miUbicacion && !s._cerca) return false;
     return true;
   });
   const lista = filtrar(porFiltro, $('#buscar-pendientes').value,
     ['idSolicitud', 'barrio', 'comuna', 'direccion', 'edificacion', 'responsable']);
+  // Cuantas habria sin ningun filtro: si la lista sale vacia por ellos, se dice.
+  const ocultas = base.filter((s) => !(APP.filtro === 'pendientes' && s._estado.clave === 'realizada')).length;
 
   const cont = $('#lista-pendientes');
   $('#resumen-pendientes').textContent = lista.length
@@ -2780,6 +2817,7 @@ function pintarPendientes() {
       ? '<div class="vacio"><span class="vacio-icono">' + icono('check') + '</span>' +
         ($('#buscar-pendientes').value
           ? 'Ninguna solicitud coincide con la búsqueda.'
+          : ocultas ? 'Los filtros ocultan ' + ocultas + (ocultas === 1 ? ' resultado' : ' resultados') + '. Quítalos con el botón de filtros para verlos.'
           : APP.filtro === 'realizadas' ? 'Todavía no hay solicitudes visitadas.'
           : 'No queda ninguna solicitud por visitar.') + '</div>'
       : sinLista
@@ -2912,6 +2950,11 @@ function pintarPendientes() {
         if (s._estado.visita) abrirDetalle(s._estado.visita.idVisita);
         else toast('Esta solicitud ya está registrada como atendida.');
         return;
+      }
+      // Ya esta en la cola de envio: abrirla como ficha nueva la encolaba dos veces.
+      if (s._estado.clave === 'por-enviar') {
+        const enCola = APP.cola.find((x) => String(x.idSolicitud) === String(s.idSolicitud));
+        if (enCola) { corregirDeLaCola(enCola.idLocal); return; }
       }
       abrirFicha(APP.solicitudes.find((x) => String(x.idSolicitud) === el.dataset.id));
     });
@@ -3206,6 +3249,8 @@ async function abrirFicha(solicitud) {
 
   const clave = 'sol-' + solicitud.idSolicitud;
   const borrador = await DB.leer('borradores', clave);
+  // Si ya existia, salir sin cambios NO debe borrarlo (con sus fotos): ver btn-cerrar-ficha.
+  APP.habiaBorrador = !!borrador;
 
   APP.datos = borrador ? borrador.datos : datosIniciales(solicitud);
 
@@ -3261,14 +3306,20 @@ function datosIniciales(s) {
  * el geólogo al salir es si esa ficha SE QUEDA o se descarta.
  */
 $('#btn-cerrar-ficha').addEventListener('click', async () => {
+  // Un autoguardado pendiente no debe resucitar un borrador que se descarta.
+  clearTimeout(setValor._temp);
   const algoEscrito = hayAlgoEscrito();
 
-  // Ficha en blanco: no hay nada que preguntar ni nada que guardar.
+  // Ficha en blanco: no hay nada que preguntar ni nada que guardar. Solo se borra el
+  // borrador si lo creo esta apertura; uno que ya existia (Continuar, o Abrir y corregir
+  // una ficha de la cola) se conserva: abrirlo a mirar no lo cambia y borrarlo perdia la ficha.
   if (!algoEscrito) {
-    if (APP.solicitudActual) {
-      const clave = 'sol-' + APP.solicitudActual.idSolicitud;
-      await DB.borrar('borradores', clave).catch(() => {});
-      APP.borradores.delete(String(APP.solicitudActual.idSolicitud));
+    if (!APP.habiaBorrador) {
+      if (APP.solicitudActual) {
+        const clave = 'sol-' + APP.solicitudActual.idSolicitud;
+        await DB.borrar('borradores', clave).catch(() => {});
+        APP.borradores.delete(String(APP.solicitudActual.idSolicitud));
+      }
     }
     return cerrarFicha();
   }
@@ -3737,7 +3788,8 @@ function dibujarCampo(campo) {
       });
       div.querySelectorAll('.gps-coords input').forEach((i) => {
         i.addEventListener('input', () => {
-          const limpio = normalizarNumero(i.value);
+          let limpio = normalizarNumero(i.value);
+          if (i.classList.contains('gps-x')) limpio = longitudOeste(limpio);
           if (limpio !== i.value) i.value = limpio;
           sincronizaCampos();
           revisarCercanas();
@@ -4253,6 +4305,10 @@ $('#btn-enviar-ficha').addEventListener('click', async () => {
     toast('No se pudo guardar la ficha', 'error');
     return;
   }
+  // Una sola ficha por solicitud: la nueva reemplaza a la anterior (ya reabierta o corregida).
+  const previos = APP.cola.filter((x) => x.idSolicitud === item.idSolicitud);
+  for (const p of previos) await DB.borrar('cola', p.idLocal).catch(() => {});
+  APP.cola = APP.cola.filter((x) => x.idSolicitud !== item.idSolicitud);
   APP.cola.push(item);
   avisoGuardado('');
 
