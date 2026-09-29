@@ -903,15 +903,21 @@ function visitasCercanas(lat, lon, metros) {
   const y = parseFloat(lat), x = parseFloat(lon);
   if (isNaN(y) || isNaN(x)) return [];
   const limite = metros || CONFIG.METROS_ALERTA_CERCANIA;
+  const propia = String((APP.solicitudActual || {}).idSolicitud);
 
-  return APP.historial
-    .filter((h) => h.latitud !== '' && h.longitud !== '')
-    .map((h) => Object.assign({}, h, {
-      distancia: distanciaMetros(y, x, parseFloat(h.latitud), parseFloat(h.longitud))
-    }))
-    .filter((h) => h.distancia <= limite &&
-                   String(h.idSolicitud) !== String((APP.solicitudActual || {}).idSolicitud))
-    .sort((a, b) => a.distancia - b.distancia);
+  // Se mide primero y se copia solo lo que queda cerca. Antes se copiaba la
+  // lista ENTERA de visitas por cada solicitud (500 x 230 copias por pasada):
+  // con la lista de 500 solicitudes eso eran 1-2 segundos en un celular.
+  const cerca = [];
+  APP.historial.forEach((h) => {
+    if (h.latitud === '' || h.longitud === '') return;
+    const hy = parseFloat(h.latitud);
+    // Un grado de latitud son ~111 km: si solo la latitud ya pasa el limite, no hace falta la trigonometria.
+    if (Math.abs(y - hy) * 111000 > limite) return;
+    const d = distanciaMetros(y, x, hy, parseFloat(h.longitud));
+    if (d <= limite && String(h.idSolicitud) !== propia) cerca.push(Object.assign({}, h, { distancia: d }));
+  });
+  return cerca.sort((a, b) => a.distancia - b.distancia);
 }
 
 const ORDEN_PRIORIDAD = { 'CRÍTICA': 0, 'CRITICA': 0, 'ALTA': 1, 'MEDIA': 2, 'BAJA': 3, '': 4 };
@@ -1139,7 +1145,10 @@ async function iniciar() {
   registrarSW();
   window.addEventListener('online', () => { pintarConexion(); sincronizar(true); });
   window.addEventListener('offline', pintarConexion);
-  setInterval(() => { if (navigator.onLine) sincronizar(true); }, CONFIG.MINUTOS_AUTOSYNC * 60000);
+  // Cada celular con su propia demora (hasta 45 s): si todos piden el catálogo
+  // en el mismo segundo, Apps Script los atiende en fila y se atrasan unos a otros.
+  setInterval(() => { if (navigator.onLine) setTimeout(() => sincronizar(true), Math.random() * 45000); },
+    CONFIG.MINUTOS_AUTOSYNC * 60000);
 
   // Al volver a la app se refresca. Es el momento en que alguien acaba de
   // corregir algo en la hoja y entra a comprobarlo: esperar hasta diez
@@ -2262,6 +2271,37 @@ function pintarConexion() {
 // ---------------------------------------------------------------- SINCRONIZACIÓN
 $('#btn-sync').addEventListener('click', () => sincronizar());
 
+function esperar(ms) { return new Promise((ok) => setTimeout(ok, ms)); }
+
+/**
+ * Baja el catálogo aguantando a Google cuando está lento.
+ *
+ * Medido el 29/09/2026 con 506 solicitudes: cuando Google responde bien el
+ * catálogo llega en ~5 s, pero a ratos la llamada se queda 30-55 s y termina
+ * en la página de error de Drive ("No se pudo abrir el archivo"), incluso en
+ * pedidos livianos. Antes eso salía como "revisa que la app web esté
+ * publicada", que mandaba a buscar el problema donde no está, y no se
+ * reintentaba: el geólogo se quedaba mirando datos viejos sin saber por qué.
+ *
+ * Un reintento a los 4 s recupera casi todos esos tropiezos. Si el servidor
+ * SÍ contestó (código inválido, error propio) no se reintenta: repetirlo no
+ * lo arregla.
+ */
+async function bajarCatalogo() {
+  try {
+    return await api('catalogo', {}, 60000);
+  } catch (e) {
+    if (e.delServidor) throw e;
+    await esperar(4000);
+    try {
+      return await api('catalogo', {}, 60000);
+    } catch (e2) {
+      if (e2.delServidor) throw e2;
+      throw new Error('Google está tardando en responder. Tus datos siguen guardados en el celular; se volverá a intentar solo.');
+    }
+  }
+}
+
 async function sincronizar(silencioso = false) {
   if (APP.sincronizando) return;
   if (!navigator.onLine) {
@@ -2287,7 +2327,7 @@ async function sincronizar(silencioso = false) {
     // los días -corregir coordenadas, reasignar solicitudes, borrar pruebas-
     // y esos cambios tienen que verse. Si algún día vuelve a intentarse,
     // tendrá que ser con una señal que sí refleje las ediciones manuales.
-    const r = await api('catalogo');
+    const r = await bajarCatalogo();
 
     // La configuración de la entidad puede haber cambiado desde que se
     // ingresó (que es cuando se consultaba por única vez). Pasó de verdad:
@@ -2455,6 +2495,10 @@ function idsAtendidos() {
   return set;
 }
 
+// Un solo comparador para todos los ordenamientos por número de solicitud: crear la
+// configuración de idioma en cada comparación era lo más lento de armar la lista.
+const ORDEN_NUMERICO = new Intl.Collator('es', { numeric: true });
+
 function pendientes() {
   const hechos = idsAtendidos();
   return APP.solicitudes
@@ -2463,7 +2507,7 @@ function pendientes() {
     const pa = ORDEN_PRIORIDAD[(a.prioridad || '').toUpperCase()] ?? 4;
     const pb = ORDEN_PRIORIDAD[(b.prioridad || '').toUpperCase()] ?? 4;
     if (pa !== pb) return pa - pb;
-    return String(a.idSolicitud).localeCompare(String(b.idSolicitud), 'es', { numeric: true });
+    return ORDEN_NUMERICO.compare(String(a.idSolicitud), String(b.idSolicitud));
   });
 }
 
@@ -2616,10 +2660,12 @@ $$('#orden-lista .orden-op').forEach((b) => {
  * Estado de una solicitud desde el punto de vista del geólogo.
  * Se calcula en el celular para que también funcione sin señal.
  */
-function estadoSolicitud(s) {
-  const visita = APP.historial.find((h) => String(h.idSolicitud) === String(s.idSolicitud));
+function estadoSolicitud(s, indice) {
+  const id = String(s.idSolicitud);
+  // Con `indice` (armado una vez por pasada) la busqueda es directa; sin el, se recorre la lista como siempre.
+  const visita = indice ? indice.visitas.get(id) : APP.historial.find((h) => String(h.idSolicitud) === id);
   if (visita) return { clave: 'realizada', texto: 'REALIZADA', visita: visita };
-  if (APP.cola.some((c) => String(c.idSolicitud) === String(s.idSolicitud))) {
+  if (indice ? indice.cola.has(id) : APP.cola.some((c) => String(c.idSolicitud) === id)) {
     return { clave: 'por-enviar', texto: 'POR ENVIAR' };
   }
   if (String(s.estado).toUpperCase() === 'ATENDIDA') return { clave: 'realizada', texto: 'REALIZADA' };
@@ -2658,9 +2704,13 @@ function coordenadasRepetidas() {
 /** Solicitudes con su estado resuelto, lo que falta primero. */
 function solicitudesConEstado() {
   const comodines = coordenadasRepetidas();
+  // Una visita por solicitud (la primera, como antes) y las de la cola, buscadas de una vez.
+  const indice = { visitas: new Map(), cola: new Set() };
+  APP.historial.forEach((h) => { const k = String(h.idSolicitud); if (!indice.visitas.has(k)) indice.visitas.set(k, h); });
+  APP.cola.forEach((c) => indice.cola.add(String(c.idSolicitud)));
   return APP.solicitudes
     .map((s) => {
-      const con = Object.assign({}, s, { _estado: estadoSolicitud(s) });
+      const con = Object.assign({}, s, { _estado: estadoSolicitud(s, indice) });
 
       // Se avisa en la tarjeta: la dirección manda sobre el GPS aquí.
       if (s.latitud !== '' && s.longitud !== '') {
@@ -2711,7 +2761,7 @@ function solicitudesConEstado() {
         const pb = ORDEN_PRIORIDAD[(b.prioridad || '').toUpperCase()] ?? 4;
         if (pa !== pb) return pa - pb;
       }
-      return String(a.idSolicitud).localeCompare(String(b.idSolicitud), 'es', { numeric: true });
+      return ORDEN_NUMERICO.compare(String(a.idSolicitud), String(b.idSolicitud));
     });
 }
 
@@ -2722,8 +2772,10 @@ function solicitudesConEstado() {
  * trae la propia visita.
  */
 function visitadasConDatos() {
+  const porId = new Map();
+  APP.solicitudes.forEach((x) => { const k = String(x.idSolicitud); if (!porId.has(k)) porId.set(k, x); });
   return APP.historial.map((v) => {
-    const s = APP.solicitudes.find((x) => String(x.idSolicitud) === String(v.idSolicitud)) || {};
+    const s = porId.get(String(v.idSolicitud)) || {};
     return Object.assign({}, s, {
       idSolicitud: v.idSolicitud,
       barrio: s.barrio || v.barrio || '',
