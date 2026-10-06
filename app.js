@@ -1153,8 +1153,10 @@ async function iniciar() {
   // Al volver a la app se refresca. Es el momento en que alguien acaba de
   // corregir algo en la hoja y entra a comprobarlo: esperar hasta diez
   // minutos a la sincronización automática se siente como que no funcionó.
-  // Se pone un mínimo de un minuto entre refrescos para que cambiar de
-  // pestaña varias veces seguidas no dispare una descarga cada vez.
+  // Se pone un mínimo de tres minutos entre refrescos (antes uno) para que
+  // cambiar de pestaña varias veces seguidas no dispare una descarga cada vez:
+  // con Google lento cada descarga de más es carga de más. Quien corrigió algo
+  // en la hoja y quiere verlo ya tiene el botón de sincronizar.
   document.addEventListener('visibilitychange', async () => {
     // Al mandar la app a segundo plano se guarda YA lo que esté escrito.
     // Es el último momento seguro: Android puede descartar la pestaña sin
@@ -1166,7 +1168,7 @@ async function iniciar() {
     }
     if (!navigator.onLine || !APP.perfil) return;
     const ultima = await DB.leerKV('ultimaSync');
-    if (ultima && Date.now() - new Date(ultima).getTime() < 60000) return;
+    if (ultima && Date.now() - new Date(ultima).getTime() < 180000) return;
     sincronizar(true);
   });
 }
@@ -2243,7 +2245,7 @@ function actualizarConteoFiltros() {
  * Fecha y hora absolutas, con el mismo formato del tablero: no se
  * desactualizan en pantalla y no hace falta un reloj que las refresque.
  */
-function estadoDeConexion(enLinea, fichasEnCola, ultimaSync) {
+function estadoDeConexion(enLinea, fichasEnCola, ultimaSync, googleLento) {
   const cuando = ultimaSync
     ? 'Última sincronización: ' + fechaBonita(ultimaSync)
     : 'Este celular aún no se ha sincronizado';
@@ -2252,18 +2254,22 @@ function estadoDeConexion(enLinea, fichasEnCola, ultimaSync) {
     return { clase: 'estado-linea sin-conexion',
              texto: 'Sin conexión · las fichas se guardan en el celular · ' + enMinuscula };
   }
+  // Cuando la última sincronización falló porque Google no respondió, se dice aquí
+  // —y se queda— en vez de un aviso que desaparece: el geólogo sabe que lo que ve
+  // puede estar atrasado y que la app lo sigue intentando sola.
+  const aviso = googleLento ? ' · Google está lento, se reintenta solo' : '';
   if (fichasEnCola) {
     return { clase: 'estado-linea',
              texto: fichasEnCola + (fichasEnCola === 1 ? ' ficha esperando envío' : ' fichas esperando envío') +
-                    ' · ' + enMinuscula };
+                    ' · ' + enMinuscula + aviso };
   }
-  return { clase: 'estado-linea', texto: cuando };
+  return { clase: 'estado-linea', texto: cuando + aviso };
 }
 
 function pintarConexion() {
   const el = $('#estado-conexion');
   if (!el) return;
-  const e = estadoDeConexion(navigator.onLine, APP.cola.length, APP.ultimaSync);
+  const e = estadoDeConexion(navigator.onLine, APP.cola.length, APP.ultimaSync, APP.syncFallando);
   el.className = e.clase;
   el.textContent = e.texto;
 }
@@ -2283,23 +2289,62 @@ function esperar(ms) { return new Promise((ok) => setTimeout(ok, ms)); }
  * publicada", que mandaba a buscar el problema donde no está, y no se
  * reintentaba: el geólogo se quedaba mirando datos viejos sin saber por qué.
  *
- * Un reintento a los 4 s recupera casi todos esos tropiezos. Si el servidor
- * SÍ contestó (código inválido, error propio) no se reintenta: repetirlo no
- * lo arregla.
+ * Un intento sano llega en 3-6 s; uno que se va a perder tarda 15-55 s en
+ * morir. Esperar a que muera para reintentar (la versión anterior: 2 intentos
+ * seguidos) dejaba sin datos al 29 % de las sincronizaciones y a las demás
+ * hasta 51 s esperando. En cambio, cada 6 s sin respuesta SALE OTRO intento en
+ * paralelo (máximo 5) y gana el primero que llegue bien: con los 26 intentos
+ * medidos el 29/09 baja a ~5 % sin datos y a ~27 s en el peor de cada diez.
+ *
+ * Es solo lectura, así que repetirla no puede duplicar nada. Con enviar
+ * fichas o fotos NO se hace esto: ahí sí se duplicaría.
+ *
+ * Si el servidor SÍ contestó (código inválido, error propio) se corta ahí:
+ * repetirlo no lo arregla. Un fallo inmediato (error de red) tampoco dispara
+ * los cinco de golpe: cada intento espera su turno de 6 s.
  */
-async function bajarCatalogo() {
-  try {
-    return await api('catalogo', {}, 60000);
-  } catch (e) {
-    if (e.delServidor) throw e;
-    await esperar(4000);
-    try {
-      return await api('catalogo', {}, 60000);
-    } catch (e2) {
-      if (e2.delServidor) throw e2;
-      throw new Error('Google está tardando en responder. Tus datos siguen guardados en el celular; se volverá a intentar solo.');
-    }
-  }
+function bajarCatalogo() {
+  const INTENTOS = 5, CADA_MS = 6000, MARGEN_MS = 45000;
+  return new Promise((resolver, rechazar) => {
+    let lanzados = 0, fallidos = 0, cerrado = false;
+    const cerrar = (cual, valor) => { if (!cerrado) { cerrado = true; cual(valor); } };
+    const lanzar = () => {
+      if (cerrado || lanzados >= INTENTOS) return;
+      lanzados++;
+      api('catalogo', {}, MARGEN_MS).then((r) => cerrar(resolver, r), (e) => {
+        if (e.delServidor) return cerrar(rechazar, e);
+        if (++fallidos >= INTENTOS) {
+          cerrar(rechazar, new Error('Google está tardando en responder. Tus datos siguen guardados en el celular; se volverá a intentar solo.'));
+        }
+      });
+      if (lanzados < INTENTOS) esperar(CADA_MS).then(lanzar);
+    };
+    lanzar();
+  });
+}
+
+/**
+ * Cuánto esperar para volver a intentar la sincronización después de N
+ * fallos seguidos: 1 min, 2, 4 y de ahí tope de 5. Sin tope, o sin ir
+ * espaciando, veinte celulares reintentando cada minuto mientras Google está
+ * mal serían justo la carga que lo mantiene mal.
+ */
+function esperaDeReintento(fallos) {
+  return Math.min(300000, 60000 * Math.pow(2, Math.max(0, fallos - 1)));
+}
+
+/**
+ * Antes, si la sincronización automática fallaba, el celular se quedaba con
+ * datos viejos hasta el siguiente ciclo de 10 minutos. Ahora vuelve a
+ * intentarlo solo. Hay a lo sumo UN reintento pendiente (no se apilan) y un
+ * poco de demora al azar para que los celulares no coincidan.
+ */
+function programarReintentoDeSync() {
+  if (APP.reintentoSync) return;
+  APP.reintentoSync = setTimeout(() => {
+    APP.reintentoSync = null;
+    if (navigator.onLine && APP.perfil) sincronizar(true);
+  }, esperaDeReintento(APP.fallosSync) + Math.random() * 15000);
 }
 
 async function sincronizar(silencioso = false) {
@@ -2368,11 +2413,22 @@ async function sincronizar(silencioso = false) {
     await DB.guardarKV('historial', APP.historial);
     APP.ultimaSync = new Date().toISOString();
     await DB.guardarKV('ultimaSync', APP.ultimaSync);
+    // Llegó bien: se acaba la cuenta de fallos y el reintento que hubiera pendiente ya no hace falta.
+    APP.fallosSync = 0;
+    APP.syncFallando = false;
+    if (APP.reintentoSync) { clearTimeout(APP.reintentoSync); APP.reintentoSync = null; }
     pintarTodo();
     if (!silencioso) toast('Actualizado: ' + pendientes().length + ' pendientes', 'ok');
   } catch (e) {
     // Un código inválido se avisa siempre, aunque la sincronización sea automática.
     if (!silencioso || e.codigoInvalido) toast(e.message, 'error');
+    // Si el servidor SÍ contestó (código inválido, error propio) repetir no lo arregla.
+    // Si no contestó —Google lento o caído— se vuelve a intentar solo, cada vez más espaciado.
+    if (!e.delServidor) {
+      APP.fallosSync = (APP.fallosSync || 0) + 1;
+      APP.syncFallando = true;
+      programarReintentoDeSync();
+    }
   } finally {
     APP.sincronizando = false;
     $('#sync-icon').classList.remove('girando');
