@@ -4762,9 +4762,16 @@ function registrarSW() {
     location.reload();
   });
 
+  // Se aplica sola cuando la app se va a segundo plano (ver actualizarSolaSiSePuede).
+  document.addEventListener('visibilitychange', () => { if (document.hidden) actualizarSolaSiSePuede(); });
+
   navigator.serviceWorker.register('sw.js').then((reg) => {
-    // Puede haber quedado una versión esperando desde la vez pasada.
-    if (reg.waiting && navigator.serviceWorker.controller) avisarVersionNueva(reg.waiting);
+    // Puede haber quedado una versión esperando desde la vez pasada: la app recién se abrió y
+    // nadie está escribiendo todavía, así que se aplica ya.
+    if (reg.waiting && navigator.serviceWorker.controller) {
+      avisarVersionNueva(reg.waiting);
+      actualizarSolaSiSePuede();
+    }
 
     reg.addEventListener('updatefound', () => {
       const nuevo = reg.installing;
@@ -4786,7 +4793,27 @@ function registrarSW() {
   });
 }
 
+/**
+ * La versión nueva se aplica SOLA, sin esperar a que alguien toque "Actualizar": en campo casi
+ * nadie lo tocaba y los celulares se quedaban semanas con la versión vieja.
+ *
+ * Pero nunca con una ficha abierta. Abrir la cámara manda la app a segundo plano: recargar ahí
+ * perdería la foto que se está tomando y sacaría al geólogo de la ficha. Por eso solo se aplica
+ * con la ficha cerrada, al abrir la app o al mandarla a segundo plano (no se nota). Si hay una
+ * ficha abierta, espera a la próxima vez; el botón "Actualizar" sigue para quien quiera ya.
+ */
+function actualizarSolaSiSePuede() {
+  const w = APP.versionEsperando;
+  // Tampoco a mitad de una sincronización o un envío: no se pierde nada (la cola guarda cada paso),
+  // pero repetirlo es datos y tiempo de más.
+  if (!w || APP.actualizando || APP.sincronizando || !$('#vista-ficha').hidden) return false;
+  APP.actualizando = true;
+  w.postMessage('SALTAR_ESPERA');
+  return true;
+}
+
 function avisarVersionNueva(worker) {
+  APP.versionEsperando = worker;
   const barra = $('#aviso-version');
   const btn = $('#btn-actualizar');
   if (!barra || !btn) return;
@@ -4807,6 +4834,7 @@ function avisarVersionNueva(worker) {
     btn.textContent = 'Actualizando…';
     // Se guarda lo que esté escrito para que la recarga no se lleve nada.
     if (!$('#vista-ficha').hidden) await guardarBorrador(true);
+    APP.actualizando = true;
     worker.postMessage('SALTAR_ESPERA');
   };
 }
