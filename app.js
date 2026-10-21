@@ -172,6 +172,8 @@ function ahoraLocal() {
  * datos.
  */
 function enlaceFoto(url, ancho) {
+  // Una foto recién enviada espera unos minutos en Cloudflare antes de pasar a Drive: esa va tal cual.
+  if (!/drive\.google\.com|googleusercontent\.com/.test(String(url || ''))) return url;
   const m = String(url || '').match(/[-\w]{25,}/);
   if (!m) return url;
   return 'https://drive.google.com/thumbnail?id=' + m[0] + '&sz=w' + (ancho || 1200);
@@ -975,6 +977,51 @@ async function api(accion, carga = {}, msTimeout = 45000) {
 }
 
 /**
+ * Habla con el servidor de Cloudflare: una copia de la hoja que responde en menos de un segundo,
+ * mientras que Google a ratos tarda 30-55 s o pierde la respuesta.
+ *
+ * Devuelve null cuando hay que ir a Google, y quien llama va a Google como siempre: sin
+ * URL_NUBE, sin red hacia Cloudflare, error de Cloudflare, o Cloudflare dice "usa Google"
+ * (su copia no está al día, la recepción está apagada, o no conoce el código: Google es el
+ * dueño de los códigos y decide). Un error de la ficha misma (solicitud ajena, ya visitada) sí
+ * se lanza, marcado delServidor, igual que api().
+ *
+ * estricto: para un envío que ya empezó por Cloudflare. Ahí NUNCA se va a Google a mitad de
+ * camino (quedaría partido en dos): sin red se lanza y la ficha espera en la cola.
+ * Va como text/plain para que el navegador no pregunte antes con OPTIONS.
+ */
+async function nube(ruta, carga = {}, msTimeout = 15000, estricto = false) {
+  if (!CONFIG.URL_NUBE) return null;
+  const control = new AbortController();
+  const temp = setTimeout(() => control.abort(), msTimeout);
+  let res, json = null;
+  try {
+    res = await fetch(CONFIG.URL_NUBE + ruta, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(Object.assign({ codigo: APP.perfil ? APP.perfil.codigo : '' }, carga)),
+      signal: control.signal
+    });
+    try { json = await res.json(); } catch (e) { json = null; }
+  } catch (e) {
+    if (estricto) throw new Error('No hay conexión con el servidor. La ficha sigue guardada y se envía sola cuando vuelva la señal.');
+    return null;
+  } finally {
+    clearTimeout(temp);
+  }
+  if (!json || json.usarGoogle || res.status >= 500) {
+    if (!estricto) return null;
+    throw new Error((json && (json.error || json.motivo)) || 'El servidor no respondió bien. Se reintenta solo.');
+  }
+  if (!json.ok) {
+    const err = new Error(json.error || 'Error del servidor');
+    err.delServidor = true;
+    throw err;
+  }
+  return json;
+}
+
+/**
  * Devuelve al geólogo a la pantalla de ingreso porque su código dejó de
  * servir. Lo que tenga guardado en el celular NO se toca: los borradores y
  * las fichas por enviar siguen ahí y se suben apenas ingrese con el nuevo.
@@ -1131,6 +1178,8 @@ async function iniciar() {
   // Cuándo sincronizó este celular por última vez. Se lee al abrir para que
   // la línea de estado lo diga de una, aunque no haya señal.
   APP.ultimaSync = (await DB.leerKV('ultimaSync')) || '';
+  // Versión de la copia de Cloudflare que tiene este celular: si no cambió, no se baja nada.
+  APP.versionNube = (await DB.leerKV('versionNube')) || '';
   // Cómo dejó el filtro del mapa la última vez. Si viniera algo raro
   // guardado, se cae a 'todas' en vez de dejar el mapa en blanco.
   const vistaMapa = await DB.leerKV('verEnMapa');
@@ -1145,10 +1194,11 @@ async function iniciar() {
   registrarSW();
   window.addEventListener('online', () => { pintarConexion(); sincronizar(true); });
   window.addEventListener('offline', pintarConexion);
-  // Cada celular con su propia demora (hasta 45 s): si todos piden el catálogo
-  // en el mismo segundo, Apps Script los atiende en fila y se atrasan unos a otros.
-  setInterval(() => { if (navigator.onLine) setTimeout(() => sincronizar(true), Math.random() * 45000); },
-    CONFIG.MINUTOS_AUTOSYNC * 60000);
+  // Cada minuto se mira si ya toca (ver tocaSincronizar). Cada celular con su propia demora
+  // (hasta 45 s): si todos piden el catálogo en el mismo segundo, Google los atiende en fila.
+  setInterval(() => {
+    if (navigator.onLine && tocaSincronizar()) setTimeout(() => sincronizar(true), Math.random() * 45000);
+  }, 60000);
 
   // Al volver a la app se refresca. Es el momento en que alguien acaba de
   // corregir algo en la hoja y entra a comprobarlo: esperar hasta diez
@@ -1193,7 +1243,10 @@ $('#btn-ingresar').addEventListener('click', async () => {
 
   cargando(true, 'Verificando código…');
   try {
-    const r = await api('verificar', {});
+    const r = (await nube('/verificar')) || await api('verificar', {});
+    // Otro código puede ser otra entidad: el catálogo se vuelve a bajar entero, no "sin cambios".
+    APP.versionNube = '';
+    await DB.guardarKV('versionNube', '');
     APP.perfil.entidad = r.entidad || CONFIG.ENTIDAD;
     // Si el servidor todavía no informa este dato, se asume que sí ve
     // solicitudes: así una versión vieja del servidor no deja a la DIGER
@@ -1231,6 +1284,9 @@ $('#btn-salir').addEventListener('click', async () => {
     if (!confirm('Tienes ' + APP.cola.length + ' ficha(s) sin enviar. Si sales se quedan guardadas en este celular, pero solo tú podrás enviarlas. ¿Continuar?')) return;
   }
   localStorage.removeItem(CLAVE_PERFIL);
+  // Quien entre después baja el catálogo entero (no "sin cambios" sobre datos que ya no están).
+  APP.versionNube = '';
+  await DB.guardarKV('versionNube', '').catch(() => {});
   // Sin fichas pendientes no queda nada de esta entidad en el celular: nombres, telefonos y
   // fichas descargadas se quedaban a la vista de quien entrara despues (o sin señal, para siempre).
   if (!APP.cola.length) {
@@ -2257,7 +2313,9 @@ function estadoDeConexion(enLinea, fichasEnCola, ultimaSync, googleLento) {
   // Cuando la última sincronización falló porque Google no respondió, se dice aquí
   // —y se queda— en vez de un aviso que desaparece: el geólogo sabe que lo que ve
   // puede estar atrasado y que la app lo sigue intentando sola.
-  const aviso = googleLento ? ' · Google está lento, se reintenta solo' : '';
+  // `googleLento` es true cuando falló la descarga y 'local' cuando los datos llegaron pero no se pudieron guardar.
+  const aviso = googleLento === 'local' ? ' · No se pudo guardar lo descargado en el celular, se reintenta solo'
+              : googleLento ? ' · Google está lento, se reintenta solo' : '';
   if (fichasEnCola) {
     return { clase: 'estado-linea',
              texto: fichasEnCola + (fichasEnCola === 1 ? ' ficha esperando envío' : ' fichas esperando envío') +
@@ -2347,6 +2405,29 @@ function programarReintentoDeSync() {
   }, esperaDeReintento(APP.fallosSync) + Math.random() * 15000);
 }
 
+/**
+ * ¿Ya toca la sincronización automática? Cada MINUTOS_AUTOSYNC_NUBE (3) si la última vino de
+ * Cloudflare, donde "sin cambios" no cuesta casi nada y ver pronto las visitas de los demás evita
+ * repetir una; cada MINUTOS_AUTOSYNC (10) si vino de Google, que es lento y se satura. Cuenta
+ * desde el último INTENTO, no solo desde el último éxito: un fallo no la vuelve cada minuto.
+ */
+function tocaSincronizar() {
+  if (!APP.perfil || APP.reintentoSync) return false;
+  const cada = (APP.viaNube ? CONFIG.MINUTOS_AUTOSYNC_NUBE : CONFIG.MINUTOS_AUTOSYNC) * 60000;
+  const ultima = Math.max(APP.ultimaSync ? new Date(APP.ultimaSync).getTime() : 0, APP.ultimoIntentoSync || 0);
+  return Date.now() - ultima >= cada;
+}
+
+/**
+ * El catálogo: primero Cloudflare (menos de un segundo, y "sin cambios" si la versión que tiene
+ * el celular sigue al día); si no puede, Google con sus intentos escalonados (bajarCatalogo).
+ */
+async function bajarCatalogoRapido() {
+  const r = await nube('/catalogo', { version: APP.versionNube || '' });
+  if (r) return r;
+  return bajarCatalogo();
+}
+
 async function sincronizar(silencioso = false) {
   if (APP.sincronizando) return;
   if (!navigator.onLine) {
@@ -2354,7 +2435,11 @@ async function sincronizar(silencioso = false) {
     return;
   }
   APP.sincronizando = true;
+  APP.ultimoIntentoSync = Date.now();
   $('#sync-icon').classList.add('girando');
+  // 'red' hasta que llega el catálogo; 'local' después (guardarlo y pintarlo en el celular).
+  // Sirve para no culpar a Google de lo que falló aquí adentro.
+  let fase = 'red';
 
   try {
     // 1) Primero sube lo que está pendiente, para no perder trabajo.
@@ -2372,7 +2457,8 @@ async function sincronizar(silencioso = false) {
     // los días -corregir coordenadas, reasignar solicitudes, borrar pruebas-
     // y esos cambios tienen que verse. Si algún día vuelve a intentarse,
     // tendrá que ser con una señal que sí refleje las ediciones manuales.
-    const r = await bajarCatalogo();
+    const r = await bajarCatalogoRapido();
+    fase = 'local';
 
     // La configuración de la entidad puede haber cambiado desde que se
     // ingresó (que es cuando se consultaba por única vez). Pasó de verdad:
@@ -2398,36 +2484,56 @@ async function sincronizar(silencioso = false) {
     // —con señal— para verlas. En campo eso significaba no poder consultar
     // lo que ya se había abierto. Ahora se vuelven a pegar al historial
     // nuevo y quedan guardadas: lo consultado una vez sirve sin señal.
-    const fichasGuardadas = {};
-    APP.historial.forEach((h) => { if (h.ficha) fichasGuardadas[h.idVisita] = h.ficha; });
+    // "Sin cambios" (Cloudflare): la hoja no cambió desde la última vez, se queda lo que hay.
+    if (!r.sinCambios) {
+      const fichasGuardadas = {};
+      APP.historial.forEach((h) => { if (h.ficha) fichasGuardadas[h.idVisita] = h.ficha; });
 
-    APP.solicitudes = r.solicitudes || [];
-    APP.historial = (r.historial || []).map((h) =>
-      fichasGuardadas[h.idVisita] ? Object.assign(h, { ficha: fichasGuardadas[h.idVisita] }) : h);
+      APP.solicitudes = r.solicitudes || [];
+      APP.historial = (r.historial || []).map((h) =>
+        fichasGuardadas[h.idVisita] ? Object.assign(h, { ficha: fichasGuardadas[h.idVisita] }) : h);
 
-    // Se guarda el catálogo TAL COMO vino del servidor, antes de sumarle
-    // las fichas empezadas: lo local no tiene por qué acabar en la copia
-    // del catálogo, se vuelve a rescatar de los borradores cada vez.
-    await DB.guardarKV('solicitudes', APP.solicitudes);
-    await recuperarBorradores();
-    await DB.guardarKV('historial', APP.historial);
+      // Se guarda el catálogo TAL COMO vino del servidor, antes de sumarle
+      // las fichas empezadas: lo local no tiene por qué acabar en la copia
+      // del catálogo, se vuelve a rescatar de los borradores cada vez.
+      await DB.guardarKV('solicitudes', APP.solicitudes);
+      await recuperarBorradores();
+      await DB.guardarKV('historial', APP.historial);
+    }
+    // Solo Cloudflare trae versión; lo de Google deja la próxima vez sin "sin cambios".
+    APP.versionNube = r.version || '';
+    APP.viaNube = !!r.version;
+    await DB.guardarKV('versionNube', APP.versionNube);
     APP.ultimaSync = new Date().toISOString();
     await DB.guardarKV('ultimaSync', APP.ultimaSync);
     // Llegó bien: se acaba la cuenta de fallos y el reintento que hubiera pendiente ya no hace falta.
     APP.fallosSync = 0;
     APP.syncFallando = false;
+    APP.errorLocalSync = '';
     if (APP.reintentoSync) { clearTimeout(APP.reintentoSync); APP.reintentoSync = null; }
     pintarTodo();
     if (!silencioso) toast('Actualizado: ' + pendientes().length + ' pendientes', 'ok');
   } catch (e) {
-    // Un código inválido se avisa siempre, aunque la sincronización sea automática.
-    if (!silencioso || e.codigoInvalido) toast(e.message, 'error');
-    // Si el servidor SÍ contestó (código inválido, error propio) repetir no lo arregla.
-    // Si no contestó —Google lento o caído— se vuelve a intentar solo, cada vez más espaciado.
-    if (!e.delServidor) {
+    if (fase === 'local') {
+      // Los datos SÍ llegaron: lo que falló fue guardarlos o pintarlos aquí. No es Google,
+      // y decir que lo es esconde la causa real. Se avisa siempre (aunque sea automática)
+      // con el motivo, y se guarda para poder consultarlo.
+      const motivo = (e && e.message) ? e.message : String(e);
+      APP.errorLocalSync = motivo;
+      APP.syncFallando = 'local';
       APP.fallosSync = (APP.fallosSync || 0) + 1;
-      APP.syncFallando = true;
+      toast('No se pudo guardar la actualización en el celular: ' + motivo, 'error');
       programarReintentoDeSync();
+    } else {
+      // Un código inválido se avisa siempre, aunque la sincronización sea automática.
+      if (!silencioso || e.codigoInvalido) toast(e.message, 'error');
+      // Si el servidor SÍ contestó (código inválido, error propio) repetir no lo arregla.
+      // Si no contestó —Google lento o caído— se vuelve a intentar solo, cada vez más espaciado.
+      if (!e.delServidor) {
+        APP.fallosSync = (APP.fallosSync || 0) + 1;
+        APP.syncFallando = true;
+        programarReintentoDeSync();
+      }
     }
   } finally {
     APP.sincronizando = false;
@@ -2453,33 +2559,94 @@ function fichaSinFotos(datos) {
   return ficha;
 }
 
+/** Una foto a Cloudflare, como archivo JPG (25 % menos que en base64). El código va en una cabecera, nunca en la dirección. */
+async function subirFotoANube(idVisita, nombre, dataUrl) {
+  const control = new AbortController();
+  const temp = setTimeout(() => control.abort(), 90000);
+  let res;
+  try {
+    res = await fetch(CONFIG.URL_NUBE + '/envio/foto/' + encodeURIComponent(idVisita) + '/' + nombre, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'image/jpeg', 'X-Codigo': APP.perfil ? APP.perfil.codigo : '' },
+      body: new Blob([base64ABytes(String(dataUrl).split(',').pop())], { type: 'image/jpeg' }),
+      signal: control.signal
+    });
+  } catch (e) {
+    throw new Error('Se cortó la señal subiendo las fotos. La ficha sigue guardada y se envía sola cuando vuelva.');
+  } finally {
+    clearTimeout(temp);
+  }
+  let json = null;
+  try { json = await res.json(); } catch (e) { json = null; }
+  if (!res.ok || !json || !json.ok) {
+    const err = new Error((json && json.error) || 'El servidor no recibió la foto. Se reintenta sola.');
+    if (res.status < 500 && json) err.delServidor = true;
+    throw err;
+  }
+}
+
+/**
+ * Fotos y cierre de una ficha que empezó por Cloudflare. Sigue donde quedó (fotosSubidas) y
+ * nunca pasa a Google a mitad de camino. Si al cerrar falta alguna foto, sube solo esas.
+ */
+async function enviarPorNube(item, silencioso) {
+  const fotos = recolectarFotos(item.datos);
+  const nombres = fotos.map((f) => f.campo + '-' + f.indice + '.jpg');
+  while ((item.fotosSubidas || 0) < fotos.length) {
+    const i = item.fotosSubidas || 0;
+    if (!silencioso) cargando(true, 'Subiendo foto ' + (i + 1) + ' de ' + fotos.length + '…');
+    await subirFotoANube(item.idServidor, nombres[i], fotos[i].dataUrl);
+    item.fotosSubidas = i + 1;
+    await DB.guardar('cola', item);
+  }
+  if (!silencioso) cargando(true, 'Cerrando la visita…');
+  let z = await nube('/envio/cerrar', { idVisita: item.idServidor, fotos: nombres }, 30000, true);
+  if (z.faltan && z.faltan.length) {
+    for (const n of z.faltan) await subirFotoANube(item.idServidor, n, fotos[nombres.indexOf(n)].dataUrl);
+    z = await nube('/envio/cerrar', { idVisita: item.idServidor, fotos: nombres }, 30000, true);
+    if (z.faltan && z.faltan.length) throw new Error('El servidor no recibió ' + z.faltan.length + ' foto(s). Se reintenta sola.');
+  }
+}
+
+/** Fotos y cierre por Google, como siempre (una ficha que empezó por Google). */
+async function enviarPorGoogle(item, silencioso) {
+  const fotos = recolectarFotos(item.datos);
+  while (item.fotosSubidas < fotos.length) {
+    const f = fotos[item.fotosSubidas];
+    if (!silencioso) cargando(true, 'Subiendo foto ' + (item.fotosSubidas + 1) + ' de ' + fotos.length + '…');
+    await api('subir_foto', {
+      idVisita: item.idServidor, campo: f.campo, indice: f.indice,
+      nombre: f.nombre, contenido: f.dataUrl, miniatura: f.mini
+    }, 90000);
+    item.fotosSubidas++;
+    await DB.guardar('cola', item);
+  }
+
+  if (!silencioso) cargando(true, 'Cerrando la visita…');
+  await api('finalizar_visita', { idVisita: item.idServidor }, 90000);
+}
+
 async function enviarCola(silencioso) {
   for (const item of APP.cola.slice()) {
     // Repetida: otra persona ya registro esa solicitud. Se queda a la vista, sin reintentar.
     if (item.duplicada) continue;
     try {
+      // El camino se decide UNA vez por ficha, al crearla, y se respeta hasta el final: una ficha
+      // partida entre Cloudflare y Google quedaría con dos números. Una que ya tiene número sin
+      // camino empezó con la app anterior: va por Google.
+      if (!item.via && item.idServidor) item.via = 'google';
       if (!item.idServidor) {
-        const r = await api('crear_visita', { ficha: fichaSinFotos(item.datos), idSolicitud: item.idSolicitud,
-          perfil: APP.perfil, noProgramada: !!item.noProgramada });
+        const datosCrear = { ficha: fichaSinFotos(item.datos), idSolicitud: item.idSolicitud, noProgramada: !!item.noProgramada };
+        const rn = await nube('/envio/crear', Object.assign({ perfil: { nombre: APP.perfil.nombre, tp: APP.perfil.tp } }, datosCrear), 30000);
+        const r = rn || await api('crear_visita', Object.assign({ perfil: APP.perfil }, datosCrear));
+        item.via = rn ? 'nube' : 'google';
         item.idServidor = r.idVisita;
         item.fotosSubidas = 0;
         await DB.guardar('cola', item);
       }
 
-      const fotos = recolectarFotos(item.datos);
-      while (item.fotosSubidas < fotos.length) {
-        const f = fotos[item.fotosSubidas];
-        if (!silencioso) cargando(true, 'Subiendo foto ' + (item.fotosSubidas + 1) + ' de ' + fotos.length + '…');
-        await api('subir_foto', {
-          idVisita: item.idServidor, campo: f.campo, indice: f.indice,
-          nombre: f.nombre, contenido: f.dataUrl, miniatura: f.mini
-        }, 90000);
-        item.fotosSubidas++;
-        await DB.guardar('cola', item);
-      }
-
-      if (!silencioso) cargando(true, 'Cerrando la visita…');
-      await api('finalizar_visita', { idVisita: item.idServidor }, 90000);
+      if (item.via === 'nube') await enviarPorNube(item, silencioso);
+      else await enviarPorGoogle(item, silencioso);
 
       await DB.borrar('cola', item.idLocal);
       APP.cola = APP.cola.filter((x) => x.idLocal !== item.idLocal);
@@ -4475,6 +4642,11 @@ async function descargarPdfVisita(h, boton) {
   }
 }
 
+/** La ficha completa de una visita: primero Cloudflare; si no puede, Google. */
+async function detalleDeVisita(idVisita) {
+  return (await nube('/detalle', { idVisita: idVisita })) || api('detalle_visita', { idVisita: idVisita });
+}
+
 async function abrirDetalle(idVisita) {
   const h = APP.historial.find((x) => String(x.idVisita) === String(idVisita));
   if (!h) return;
@@ -4500,10 +4672,14 @@ async function abrirDetalle(idVisita) {
       return;
     }
     try {
-      const r = await api('detalle_visita', { idVisita: idVisita });
+      const r = await detalleDeVisita(idVisita);
       ficha = r.ficha;
-      h.ficha = ficha;
-      await DB.guardarKV('historial', APP.historial);
+      // La de una visita recién enviada no se guarda: sus fotos están de paso en Cloudflare y en
+      // unos minutos se mudan a Drive. Guardada, quedaría con enlaces que ya no abren.
+      if (!r.provisional) {
+        h.ficha = ficha;
+        await DB.guardarKV('historial', APP.historial);
+      }
     } catch (e) {
       $('#detalle-cuerpo').innerHTML = '<div class="vacio">' + esc(e.message) + '</div>';
       return;

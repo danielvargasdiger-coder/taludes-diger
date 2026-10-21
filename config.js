@@ -45,8 +45,19 @@ const CONFIG = {
   ANCHO_MINIATURA: 700,
   CALIDAD_MINIATURA: 0.50,
 
-  /** Cada cuántos minutos intenta sincronizar sola la app. */
+  /**
+   * Servidor de Cloudflare: una copia de la hoja que responde en menos de un segundo
+   * (ver cloudflare/ y GUIA_CLOUDFLARE.md). Ingreso, catálogo, detalle y envío van
+   * primero allí; si no responde o dice "usa Google", la app va a Google sola, como antes.
+   * Vacío = todo por Google. NO copiar al gemelo de pruebas.
+   */
+  URL_NUBE: 'https://diger-taludes.danielvargas-diger.workers.dev',
+
+  /** Cada cuántos minutos intenta sincronizar sola la app (por Google, que es lento). */
   MINUTOS_AUTOSYNC: 10,
+
+  /** Lo mismo cuando la última sincronización vino de Cloudflare: "sin cambios" cuesta casi nada. */
+  MINUTOS_AUTOSYNC_NUBE: 3,
 
   /** Cada cuántos minutos revisa si hay una versión nueva de la app. */
   MINUTOS_BUSCAR_ACTUALIZACION: 15,
