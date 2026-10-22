@@ -3770,6 +3770,37 @@ function dibujarIndice() {
   });
 }
 
+/**
+ * Datos de quien reporta por SOS CARDER (pedido del 21/10/2026). A CARDER le llegan los casos por
+ * su línea SOS y los registra como hallazgo en campo: estos campos salen SOLO a CARDER y SOLO en
+ * hallazgos. No están en ficha-schema.js a propósito: ahí crearían columnas nuevas en VISITAS y
+ * habría que reacomodar la hoja. Viajan en la ficha y Nube.gs los escribe en la fila de
+ * SOLICITUDES que crea el hallazgo (PERSONA_CONTACTO, TELEFONO, CEDULA_CONTACTO, CORREO_CONTACTO,
+ * CODIGO_SOS_CARDER).
+ */
+const CAMPOS_SOS_CARDER = [
+  // Ninguno es obligatorio (Daniel, 21/10/2026): no siempre se tienen todos los datos.
+  { id: 'sos_codigo', etiqueta: 'Código SOS CARDER', tipo: 'texto', ancho: 'medio' },
+  { id: 'sos_nombre', etiqueta: 'Nombre de quien reporta', tipo: 'texto', ancho: 'medio' },
+  { id: 'sos_cedula', etiqueta: 'Cédula', tipo: 'texto', teclado: 'numeric', ancho: 'medio' },
+  { id: 'sos_telefono', etiqueta: 'Teléfono', tipo: 'texto', teclado: 'tel', ancho: 'medio' },
+  { id: 'sos_correo', etiqueta: 'Correo electrónico', tipo: 'texto', teclado: 'email', ancho: 'completo' }
+];
+
+function esHallazgoCarder() {
+  return !!(APP.solicitudActual && APP.solicitudActual.noProgramada && APP.perfil && /CARDER/i.test(APP.perfil.entidad || ''));
+}
+
+/** Las secciones del formulario que se está llenando: las del esquema, más los datos SOS si es un hallazgo de CARDER. */
+function seccionesFormulario() {
+  if (!esHallazgoCarder()) return FICHA_SCHEMA.secciones;
+  return FICHA_SCHEMA.secciones.map((sec) => {
+    if (sec.id !== 's1') return sec;
+    const i = sec.campos.findIndex((c) => c.id === 'hay_movimiento');
+    return Object.assign({}, sec, { campos: sec.campos.slice(0, i).concat(CAMPOS_SOS_CARDER, sec.campos.slice(i)) });
+  });
+}
+
 function dibujarFormulario() {
   const form = $('#form-ficha');
   form.innerHTML = '';
@@ -3778,7 +3809,7 @@ function dibujarFormulario() {
   const panel = panelSolicitud(APP.solicitudActual);
   if (panel) form.appendChild(panel);
 
-  FICHA_SCHEMA.secciones.forEach((sec, i) => {
+  seccionesFormulario().forEach((sec, i) => {
     const bloque = document.createElement('section');
     bloque.className = 'seccion' + (i > 0 ? ' cerrada' : '');
     bloque.dataset.seccion = sec.id;
@@ -3861,7 +3892,7 @@ function dibujarCampo(campo) {
 
       const tipoHtml = campo.tipo === 'fecha_hora' ? 'datetime-local' : 'text';
       div.innerHTML = etiqueta + '<input type="' + tipoHtml + '"' +
-        (campo.tipo === 'numero' ? ' inputmode="decimal"' : '') +
+        (campo.tipo === 'numero' ? ' inputmode="decimal"' : campo.teclado ? ' inputmode="' + campo.teclado + '"' : '') +
         ' value="' + esc(valor || '') + '">';
       div.querySelector('input').addEventListener('input', (e) => {
         if (campo.tipo === 'numero') {
@@ -4416,7 +4447,7 @@ function seleccionadas(campo) {
  */
 function camposPendientes() {
   const faltan = [];
-  FICHA_SCHEMA.secciones.forEach((sec) => {
+  seccionesFormulario().forEach((sec) => {
     if (seccionOmitida(sec)) return;
     sec.campos.forEach((campo) => {
       if (campo.requerido && !estaLleno(campo)) {
@@ -4438,7 +4469,7 @@ function camposPendientes() {
 /** Cuántos campos exige la ficha en total, según cómo esté llena ahora. */
 function totalRequeridos() {
   let n = 0;
-  FICHA_SCHEMA.secciones.forEach((sec) => {
+  seccionesFormulario().forEach((sec) => {
     if (seccionOmitida(sec)) return;
     sec.campos.forEach((campo) => {
       if (campo.requerido) n++;
@@ -4642,6 +4673,15 @@ async function descargarPdfVisita(h, boton) {
   }
 }
 
+/** Datos de quien reportó por SOS CARDER, en el detalle de la visita ('' si no es un caso SOS). */
+function bloqueSosDetalle(ficha) {
+  if (!ficha || !CAMPOS_SOS_CARDER.some((c) => String(ficha[c.id] || '').trim())) return '';
+  return '<div class="detalle-seccion"><h3>Datos de quien reporta (SOS CARDER)</h3><table class="detalle-tabla">' +
+    CAMPOS_SOS_CARDER.map((c) => (String(ficha[c.id] || '').trim()
+      ? '<tr><th>' + esc(c.etiqueta) + '</th><td>' + esc(ficha[c.id]) + '</td></tr>' : '')).join('') +
+    '</table></div>';
+}
+
 /** La ficha completa de una visita: primero Cloudflare; si no puede, Google. */
 async function detalleDeVisita(idVisita) {
   return (await nube('/detalle', { idVisita: idVisita })) || api('detalle_visita', { idVisita: idVisita });
@@ -4715,6 +4755,7 @@ async function abrirDetalle(idVisita) {
     const fotos = sec.campos.filter((c) => c.tipo === 'fotos')
       .flatMap((c) => (ficha['_urls_' + c.id] || []));
 
+    if (sec.id === 's2') html += bloqueSosDetalle(ficha);   // justo después de la sección 1
     if (!filas && !fotos.length) return;
     html += '<div class="detalle-seccion"><h3>' + sec.numero + '. ' + esc(sec.titulo) + '</h3>' +
       (filas ? '<table class="detalle-tabla">' + filas + '</table>' : '') +
