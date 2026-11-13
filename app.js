@@ -75,7 +75,9 @@ const ICONOS = {
   mapa: '<path d="M12 21s-6.5-5.8-6.5-11a6.5 6.5 0 0 1 13 0c0 5.2-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/>',
   tablero: '<path d="M6 20v-8M12 20V5M18 20v-5"/>',
   filtro: '<path d="M4 5h16l-6.2 7.4V18l-3.6 2v-7.6L4 5z"/>',
-  descargar: '<path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/>'
+  descargar: '<path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/>',
+  agrandar: '<path d="M15 4h5v5M9 20H4v-5M20 4l-6 6M4 20l6-6"/>',
+  cerrar: '<path d="M6 6l12 12M18 6L6 18"/>'
 };
 
 function icono(nombre) {
@@ -757,7 +759,11 @@ async function pintarTablero() {
   const conCoord = vis.filter((v) => v.latitud !== '' && v.latitud != null &&
                                      v.longitud !== '' && v.longitud != null);
   html += '<div class="t-bloque"><h3>Dónde están</h3>' +
-    '<div id="mapa-tablero" class="mapa-tablero"></div>' +
+    '<div id="caja-mapa-tablero" class="mapa-tablero-caja">' +
+      '<div id="mapa-tablero" class="mapa-tablero"></div>' +
+      '<button type="button" id="btn-agrandar-mapa" class="btn-agrandar-mapa">' +
+        icono('agrandar') + '<span>Agrandar</span></button>' +
+    '</div>' +
     '<div class="t-leyenda">' +
       ['CRÍTICA', 'ALTA', 'MEDIA', 'BAJA', 'SIN PRIORIDAD'].map((p) =>
         '<span><i style="background:' + colorPrioridad(p) + '"></i>' + esc(p) + '</span>').join('') +
@@ -817,6 +823,9 @@ async function pintarTablero() {
       pintarTablero();
     });
   });
+  document.body.classList.remove('mapa-grande');   // el mapa se acaba de recrear: arranca en su recuadro
+  $('#btn-agrandar-mapa').addEventListener('click', () =>
+    agrandarMapaTablero(!$('#caja-mapa-tablero').classList.contains('grande')));
   pintarMapaTablero(conCoord);
 
   let corte = '';
@@ -826,6 +835,28 @@ async function pintarTablero() {
   } catch (e) { /* sin dato de corte, no es grave */ }
   $('#tablero-corte').textContent = corte || 'Sincroniza para actualizar';
 }
+
+/**
+ * El mapa del tablero a pantalla completa y de vuelta (Daniel, 13/11/2026: en
+ * el recuadro no se veía bien). Es CSS, no la API de pantalla completa: esa no
+ * existe para un elemento en iPhone. Agrandado, la rueda del ratón hace zoom.
+ */
+function agrandarMapaTablero(si) {
+  const caja = $('#caja-mapa-tablero');
+  document.body.classList.toggle('mapa-grande', !!si && !!caja);
+  if (!caja) return;
+  caja.classList.toggle('grande', !!si);
+  const btn = $('#btn-agrandar-mapa');
+  btn.innerHTML = si ? icono('cerrar') + '<span>Cerrar</span>' : icono('agrandar') + '<span>Agrandar</span>';
+  btn.setAttribute('aria-label', si ? 'Volver el mapa a su tamaño' : 'Ver el mapa en pantalla completa');
+  if (APP.mapaT) {
+    APP.mapaT.scrollWheelZoom[si ? 'enable' : 'disable']();
+    setTimeout(() => APP.mapaT && APP.mapaT.invalidateSize(), 60);
+  }
+}
+document.addEventListener('keydown', (ev) => {
+  if (ev.key === 'Escape' && document.body.classList.contains('mapa-grande')) agrandarMapaTablero(false);
+});
 
 /**
  * Mapa del tablero. Es OTRO mapa, aparte del de la pestaña principal.
@@ -889,6 +920,7 @@ async function pintarMapaTablero(visitas) {
     const btn = ev.popup.getElement().querySelector('[data-visita]');
     if (btn) btn.addEventListener('click', () => {
       APP.mapaT.closePopup();
+      agrandarMapaTablero(false);   // si no, el mapa agrandado tapa la ficha
       abrirDetalle(btn.dataset.visita);
     });
   });

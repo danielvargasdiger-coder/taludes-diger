@@ -445,10 +445,25 @@ select { appearance: none; -webkit-appearance: none;
    los paneles internos de Leaflet (que llegan a z-index 800) se montan
    sobre la barra azul de arriba al bajar por el tablero. */
 .mapa-tablero {
-  height: 300px; border-radius: var(--radio); overflow: hidden;
+  height: clamp(340px, 55vh, 560px); border-radius: var(--radio); overflow: hidden;
   border: 1px solid var(--borde); background: var(--fondo);
   position: relative; z-index: 0;
 }
+/* Agrandar: el botón va arriba a la derecha (el zoom de Leaflet está a la
+   izquierda). Agrandado, la sección sube por encima de la barra (40) y de la
+   barra de iconos del celular (45): si no, la sección (z-index 30) lo atrapa. */
+.mapa-tablero-caja { position: relative; }
+.btn-agrandar-mapa {
+  position: absolute; top: 10px; right: 10px; z-index: 1;
+  display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 12px;
+  background: #fff; color: var(--texto); border: 1px solid var(--borde); border-radius: 8px;
+  font: inherit; font-size: .8rem; font-weight: 700; box-shadow: var(--sombra); cursor: pointer;
+}
+.btn-agrandar-mapa .ico { width: 16px; height: 16px; }
+body.mapa-grande #vista-tablero { z-index: 95; overflow: hidden; }
+.mapa-tablero-caja.grande { position: fixed; inset: 0; z-index: 50; background: var(--fondo); }   /* 50: encima de la cabecera de la sección (20) */
+.mapa-tablero-caja.grande .mapa-tablero { height: 100%; border: 0; border-radius: 0; }
+.mapa-tablero-caja.grande .btn-agrandar-mapa { top: calc(env(safe-area-inset-top) + 10px); }
 .mapa-sin-red-chico {
   display: grid; place-items: center; height: 100%; padding: 20px;
   text-align: center; font-size: .82rem; color: var(--texto-suave); line-height: 1.5;
