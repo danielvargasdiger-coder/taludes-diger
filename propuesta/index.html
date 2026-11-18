@@ -6,245 +6,69 @@
 <meta name="robots" content="noindex">
 <title>Propuesta ficha 2.0 · Taludes DIGER</title>
 <link rel="icon" href="../icon-192.png">
-<!-- DEMO de la propuesta de ficha 2.0. NO está conectada a nada: no lee ni escribe la base, no usa config.js,
-     no registra service worker. Fuente de la ficha y del cálculo: ficha2-schema.js (misma carpeta).
-     El service worker de la app NO guarda esta carpeta (sw.js, igual que eficiencia/). -->
+<!-- DEMO de la propuesta de ficha 2.0. NO está conectada a nada: no lee ni escribe la base, no usa config.js, no registra
+     service worker. Usa la MISMA hoja de estilos y el mismo marcado del formulario de la app (app.js: dibujarFormulario /
+     dibujarCampo) para que se vea igual. Ficha y cálculo: ficha2-schema.js. El service worker de la app no guarda esta carpeta. -->
+<link rel="stylesheet" href="../styles.css">
 <style>
-/* Layout: tres vistas (llenar / documento / preguntas). Llenar = formulario de lectura (máx. 780 px) + panel de criticidad fijo a la derecha;
-   en celular el panel queda debajo y una barra inferior muestra la prioridad. Colores tomados de la app (app/styles.css). */
-:root {
-  --azul: #0b4f6c; --azul-claro: #e7f1f6; --texto: #16202a; --suave: #4a5b6a; --borde: #cdd8e0; --fondo: #f4f7f9; --tarjeta: #ffffff;
-  --aviso: #fff4d6; --aviso-borde: #e6c46a; --papel: #ffffff; --tinta: #111a22;
-  --baja: #2e7d32; --media: #b86a00; --alta: #d84315; --critica: #a3000d; --sin: #5f6f7c; --error: #c62828;
-  --mono: ui-monospace, "Cascadia Mono", Consolas, monospace; --radio: 10px;
-}
-/* Igual que la app: solo tema claro, barra azul con la franja institucional. */
-:root { --azul-oscuro: #063a50; --inst-rojo: #d93933; --inst-verde: #3f8c54; --inst-amarillo: #f4bc42; color-scheme: light }
-* { box-sizing: border-box }
-[hidden] { display: none !important }
-html, body { margin: 0 }
-body { background: var(--fondo); color: var(--texto); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; padding-bottom: 110px }
-.contenido { padding: 14px max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px)) }
-.topbar { background: linear-gradient(135deg, var(--azul) 0%, var(--azul-oscuro) 100%); color: #fff; box-shadow: 0 2px 12px rgba(6, 58, 80, .28);
-  border-bottom: 3px solid transparent; border-image: linear-gradient(90deg, var(--inst-rojo) 0 33.3%, var(--inst-amarillo) 33.3% 66.6%, var(--inst-verde) 66.6%) 1;
-  padding: calc(10px + env(safe-area-inset-top, 0px)) max(14px, env(safe-area-inset-right, 0px)) 10px max(14px, env(safe-area-inset-left, 0px)) }
-.topbar-in { max-width: 1180px; margin: 0 auto; display: flex; align-items: center; gap: 10px; flex-wrap: wrap }
-.topbar-logo { flex: none; display: inline-grid; place-items: center; width: 42px; height: 42px; border-radius: 50%; background: #fff;
-  box-shadow: 0 0 0 2px rgba(255,255,255,.35), 0 2px 6px rgba(0,0,0,.25) }
-.topbar-logo img { height: 30px; width: auto; display: block }
-.topbar-textos { min-width: 0; flex: 1 1 200px }
-.topbar-textos strong { display: block; font-size: 1.06rem }
-.topbar-textos span { display: block; font-size: .78rem; opacity: .85 }
-.sello { font-size: .72rem; font-weight: 800; letter-spacing: .08em; background: var(--inst-amarillo); color: #3a2a00; border-radius: 99px; padding: 3px 10px }
-.fb { display: grid; gap: 12px; max-width: 780px }
-.fb label { display: grid; gap: 4px; font-weight: 600; font-size: .9rem }
-.fb input[type=text] { max-width: 420px }
-.fb textarea { min-height: 140px }
-.fb .vista-previa { font: .82rem/1.45 var(--mono); white-space: pre-wrap; background: var(--tarjeta); border: 1px dashed var(--borde); border-radius: 8px; padding: 10px; max-height: 260px; overflow: auto }
-@media (max-width: 700px) { body .vistas { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin } body .vistas button { white-space: nowrap; flex: none } }
-a.boton { display: inline-block; text-decoration: none; border-radius: 8px; padding: 7px 12px; font-weight: 700; background: #1f8f4e; color: #fff }
-.ancho { max-width: 1180px; margin: 0 auto }
-header.cab { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; margin-bottom: 10px }
-h1 { font-size: 1.3rem; margin: 0; color: var(--azul); text-wrap: balance }
-.borrador { background: var(--aviso); border: 1px solid var(--aviso-borde); border-radius: var(--radio); padding: 8px 12px; font-size: .88rem; margin: 0 0 12px }
-.vistas { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 2px solid var(--borde); margin-bottom: 14px }
-.vistas button { border: 0; border-bottom: 3px solid transparent; border-radius: 0; margin-bottom: -2px; background: none; padding: 8px 12px; font-weight: 600; color: var(--suave) }
-.vistas button[aria-selected=true] { color: var(--azul); border-bottom-color: var(--azul) }
-button { font: inherit; cursor: pointer; border-radius: 8px; border: 1px solid var(--borde); background: var(--tarjeta); color: var(--texto); padding: 7px 12px }
-button.primario { background: var(--azul); border-color: var(--azul); color: var(--fondo); font-weight: 700 }
-button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid var(--azul); outline-offset: 2px }
-label.op:focus-within { outline: 3px solid var(--azul); outline-offset: 1px }
-.botones { display: flex; gap: 8px; flex-wrap: wrap }
-/* LLENAR */
-.llenar { display: grid; grid-template-columns: minmax(0, 780px) minmax(0, 360px); gap: 22px; justify-content: center }
-.form { display: grid; gap: 14px; min-width: 0 }
-.sec { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: var(--radio); padding: 14px 16px; display: grid; gap: 14px; min-width: 0 }
-.sec > h2 { margin: 0; font-size: 1rem; color: var(--azul); display: flex; gap: 10px; align-items: baseline }
-.sec > h2 .num { font-family: var(--mono); background: var(--azul); color: var(--fondo); border-radius: 6px; padding: 0 7px; font-size: .9rem }
-.sec > .ayuda { margin-top: -8px }
-.campo { display: grid; gap: 6px; min-width: 0 }
-.campo > .etq { font-weight: 600; font-size: .93rem; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline }
-.req { color: var(--error) }
-.tipo { font-size: .7rem; letter-spacing: .05em; text-transform: uppercase; color: var(--suave); border: 1px solid var(--borde); border-radius: 99px; padding: 0 7px; font-weight: 600 }
-.crit { font-size: .7rem; color: var(--azul); background: var(--azul-claro); border-radius: 99px; padding: 0 8px; font-weight: 600 }
-.ayuda { color: var(--suave); font-size: .84rem; margin: 0 }
-.ops { display: grid; gap: 6px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) }
-.ops.largas { grid-template-columns: 1fr }
-label.op { display: flex; gap: 9px; align-items: flex-start; border: 1px solid var(--borde); border-radius: 8px; padding: 7px 10px; cursor: pointer; min-width: 0; font-size: .92rem }
-label.op:has(input:checked) { border-color: var(--azul); background: var(--azul-claro) }
-label.op input { margin-top: 4px; flex: none; accent-color: var(--azul) }
-label.op small { display: block; color: var(--suave); font-size: .8rem; line-height: 1.35 }
-.detalle { display: grid; gap: 4px; font-size: .86rem; color: var(--suave); padding-left: 12px; border-left: 3px solid var(--azul) }
-input[type=number], input[type=text], input[type=datetime-local], select, textarea { font: inherit; color: var(--texto); background: var(--fondo); border: 1px solid var(--borde); border-radius: 8px; padding: 7px 9px; width: 100%; min-width: 0 }
-textarea { min-height: 84px; resize: vertical }
-.con-unidad { display: flex; align-items: center; gap: 8px; max-width: 260px }
-.con-unidad span { color: var(--suave); font-family: var(--mono); font-size: .9rem }
-.rejilla { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) }
-.rejilla label { display: grid; gap: 3px; font-size: .82rem; color: var(--suave) }
-.calc { font-family: var(--mono); font-size: .92rem; background: var(--fondo); border: 1px dashed var(--borde); border-radius: 8px; padding: 8px 10px; overflow-x: auto }
-.destacado { border: 2px solid var(--azul); border-radius: var(--radio); padding: 10px }
-.tabla-caja { overflow-x: auto }
-table.t { border-collapse: collapse; width: 100%; font-size: .86rem; font-variant-numeric: tabular-nums }
-table.t th, table.t td { border: 1px solid var(--borde); padding: 5px 7px; text-align: left; vertical-align: top }
-table.t th { background: var(--fondo); color: var(--suave); font-weight: 600 }
-.justif { border: 2px solid var(--media); border-radius: var(--radio); padding: 12px; display: grid; gap: 8px }
-.errores { color: var(--error); font-weight: 600; font-size: .9rem; margin: 0 }
-.ok { color: var(--baja); font-weight: 600; margin: 0 }
-/* panel */
-aside { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); align-self: start; display: grid; gap: 12px; min-width: 0; max-height: calc(100vh - 24px); overflow-y: auto }
-.panel { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: var(--radio); padding: 14px; display: grid; gap: 10px }
-.etq-p { font-size: .7rem; letter-spacing: .07em; text-transform: uppercase; color: var(--suave); font-weight: 700 }
-.chip { display: inline-block; font-weight: 800; letter-spacing: .04em; color: var(--fondo); border-radius: 8px; padding: 6px 14px; font-size: 1.15rem; background: var(--sin) }
-.c-BAJA { background: var(--baja) } .c-MEDIA { background: var(--media) } .c-ALTA { background: var(--alta) } .c-CRÍTICA { background: var(--critica) }
-dl.fac { display: grid; grid-template-columns: auto 1fr auto; gap: 3px 8px; margin: 0; font-size: .84rem; align-items: baseline }
-dl.fac dt { font-family: var(--mono); color: var(--azul); font-weight: 700 } dl.fac dd { margin: 0; color: var(--suave) } dl.fac .p { text-align: right; font-weight: 700; color: var(--texto); font-variant-numeric: tabular-nums }
-dl.fac .tot { border-top: 1px solid var(--borde); padding-top: 4px }
-ul.mini { margin: 0; padding-left: 18px; font-size: .84rem; color: var(--suave) }
-ul.adv { margin: 0; padding-left: 18px; font-size: .84rem; color: var(--media) }
-table.matriz { border-collapse: collapse; width: 100%; font-size: .7rem; font-variant-numeric: tabular-nums }
-.matriz th, .matriz td { border: 1px solid var(--borde); padding: 4px 2px; text-align: center }
-.matriz th { color: var(--suave); font-weight: 600 }
-.matriz .v-BAJA { color: var(--baja) } .matriz .v-MEDIA { color: var(--media) } .matriz .v-ALTA { color: var(--alta) } .matriz .v-CRÍTICA { color: var(--critica) }
-.matriz td.aqui { outline: 3px solid var(--texto); outline-offset: -3px; font-weight: 800 }
-.barra { display: none }
-@media (max-width: 920px) {
-  .llenar { grid-template-columns: minmax(0, 1fr) }
-  aside { position: static; max-height: none }
-  .barra { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; gap: 10px; align-items: center; justify-content: space-between; background: var(--tarjeta); border-top: 1px solid var(--borde);
-    padding: 10px max(16px, env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)) }
-  .barra .chip { font-size: .95rem; padding: 4px 10px } .barra span { font-size: .82rem; color: var(--suave) }
-}
-/* DOCUMENTO */
-.hoja { background: var(--papel); color: var(--tinta); border: 1px solid var(--borde); max-width: 860px; margin: 0 auto; padding: 22px; font-size: 12.5px; line-height: 1.4; box-shadow: 0 2px 10px rgba(0,0,0,.08) }
-.hoja table { border-collapse: collapse; width: 100% }
-.hoja td, .hoja th { border: 1px solid var(--tinta); padding: 4px 6px; vertical-align: top; text-align: left }
-.d-enc td { text-align: center; vertical-align: middle }
-.d-enc .ent { font-weight: 800; font-size: 13px } .d-enc .tit { font-weight: 800; font-size: 13.5px }
-.d-sec { background: var(--azul); color: var(--papel); font-weight: 800; letter-spacing: .03em; padding: 4px 6px; margin-top: 10px }
-.d-lbl { width: 32%; font-weight: 600; background: color-mix(in srgb, var(--azul) 7%, transparent) }
-.d-ops span { display: inline-block; margin-right: 10px; white-space: nowrap } .d-ops span.si { font-weight: 700 }
-.d-alc { font-size: 11px; font-style: italic; margin: 8px 0 }
-.d-prio { font-size: 16px; font-weight: 800 }
-.d-firmas td { height: 70px; vertical-align: bottom; text-align: center; width: 33% }
-.d-fotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px }
-.d-fotos img { width: 100%; aspect-ratio: 4/3; object-fit: cover; border: 1px solid var(--tinta) }
-.d-ref { font-size: 10.5px; margin-top: 10px }
-.hoja-caja { overflow-x: auto }
-/* PREGUNTAS */
-.spec { display: grid; gap: 18px }
-.spec > section, .spec > p { min-width: 0 }
-.spec h2 { font-size: 1rem; color: var(--azul); margin: 0 0 6px }
-.spec td.ops-col { font-size: .8rem; color: var(--suave); min-width: 220px }
-.spec td:first-child { font-family: var(--mono); white-space: nowrap }
-@media (prefers-reduced-motion: no-preference) { .chip { transition: background-color .25s } }
+  /* Solo lo nuevo de la 2.0 (la calificación); todo lo demás viene de styles.css */
+  .demo-aviso { background: #fff4d6; border: 1px solid #e6c46a; border-radius: var(--radio); padding: 10px 12px; font-size: .82rem; margin-bottom: 14px; }
+  .calif { border: 1.5px solid var(--borde); border-radius: var(--radio); background: #fbfdfe; padding: 12px; }
+  .calif table { width: 100%; border-collapse: collapse; font-size: .82rem; font-variant-numeric: tabular-nums; }
+  .calif td, .calif th { padding: 5px 4px; border-bottom: 1px solid var(--borde); text-align: left; vertical-align: top; }
+  .calif td:last-child, .calif th:last-child { text-align: right; white-space: nowrap; font-weight: 700; }
+  .calif .tot td { font-weight: 800; color: var(--azul); }
+  .calif-ind { font-size: .78rem; color: var(--texto-suave); margin: 8px 0 0; }
+  .calif-adv { background: #fff4d6; border-left: 4px solid #e6a100; border-radius: 6px; padding: 8px 10px; font-size: .8rem; margin-top: 10px; }
+  .calif-adv ul { margin: 4px 0 0; padding-left: 18px; }
+  .sugerida { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; font-size: .86rem; font-weight: 700; }
+  .sugerida .chip { font-size: .8rem; padding: 5px 12px; }
+  .ficha-topbar .chip { flex: none; }
+  .resultado { border: 2px solid var(--azul); border-radius: var(--radio); background: #fff; padding: 12px; margin-top: 12px; font-size: .86rem; }
+  .resultado textarea { min-height: 90px; }
+  .resultado .botones { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .resultado .botones a, .resultado .botones button { flex: 1 1 140px; text-align: center; text-decoration: none; }
 </style>
 </head>
 <body>
-<header class="topbar">
-  <div class="topbar-in">
-    <span class="topbar-logo"><img src="../logo-diger.png" width="87" height="134" alt="DIGER Pereira"></span>
-    <span class="topbar-logo"><img src="../logo-carder-compacto.png" width="158" height="224" alt="CARDER"></span>
-    <div class="topbar-textos"><strong>Evaluación de Taludes · Propuesta ficha 2.0</strong><span>DIGER · CARDER · Secretaría de Infraestructura</span></div>
-    <span class="sello">DEMO</span>
-  </div>
-</header>
-<div class="contenido">
-<div class="ancho">
-  <header class="cab">
-    <h1>Evaluación preliminar de taludes y laderas · versión 2.0</h1>
-    <div class="botones"><button type="button" id="b-ejemplo">Cargar ejemplo</button><button type="button" id="b-limpiar">Ficha en blanco</button></div>
-  </header>
-  <p class="borrador"><b>Demostración para revisión de las entidades.</b> No está conectada a la base: no guarda ni envía fichas, y los datos del ejemplo son ficticios. Llene la ficha como en una visita y observe cómo el sistema sugiere la prioridad. Al final, deje sus observaciones en la pestaña <b>Enviar comentarios</b>.</p>
-  <div class="vistas" role="tablist">
-    <button type="button" role="tab" id="v-llenar" aria-selected="true">Llenar la ficha</button>
-    <button type="button" role="tab" id="v-doc" aria-selected="false">Documento</button>
-    <button type="button" role="tab" id="v-spec" aria-selected="false">Preguntas y respuestas</button>
-    <button type="button" role="tab" id="v-comp" aria-selected="false">Comparación con la ficha actual</button>
-    <button type="button" role="tab" id="v-fb" aria-selected="false">Enviar comentarios</button>
-  </div>
-
-  <div id="vista-llenar" class="llenar">
-    <div class="form" id="form"></div>
-    <aside>
-      <div class="panel">
-        <span class="etq-p">Prioridad sugerida</span>
-        <span class="chip" id="chip">—</span>
-        <dl class="fac" id="factores"></dl>
-        <div id="caja-ind"><span class="etq-p">Indicios detectados (A3)</span><ul class="mini" id="indicios"></ul></div>
-        <div id="caja-adv" hidden><span class="etq-p">Revisar coherencia</span><ul class="adv" id="advertencias"></ul></div>
-        <span class="etq-p">Matriz amenaza × exposición</span>
-        <div class="tabla-caja"><table class="matriz" id="matriz"></table></div>
-      </div>
-    </aside>
-  </div>
-  <div id="vista-doc" hidden><div class="hoja-caja"><div class="hoja" id="hoja"></div></div></div>
-  <div id="vista-spec" class="spec" hidden></div>
-  <div id="vista-comp" class="spec" hidden>
-    <p class="ayuda">Ficha actual (versión 1.0, en la app desde el 20/08/2026) frente a la propuesta. Datos de la ficha actual: 160 visitas con movimiento en masa, corte 17/11/2026.</p>
-    <section><h2>Lo esencial</h2><div class="tabla-caja"><table class="t">
-      <tr><th>Aspecto</th><th>Ficha actual</th><th>Propuesta 2.0</th></tr>
-      <tr><td>Propósito</td><td>Inspección visual; el evaluador asigna la prioridad a criterio</td><td>Evaluación preliminar; el sistema sugiere la prioridad y el evaluador la confirma o la cambia justificando</td></tr>
-      <tr><td>Respuestas cuando hay movimiento</td><td>Unas 38</td><td>Unas 35, casi todas de marcar</td></tr>
-      <tr><td>Cómo sale la prioridad</td><td>Cuatro valoraciones Baja / Media / Alta a criterio (sección 6) y prioridad elegida a mano</td><td>Amenaza (A1 magnitud + A2 actividad + A3 indicios + A4 velocidad) × exposición, en una matriz; banderas rojas → CRÍTICA</td></tr>
-      <tr><td>Consistencia entre evaluadores</td><td>El 80 % de las visitas está en grupos con las mismas respuestas y distinta prioridad</td><td>Las mismas respuestas dan siempre la misma prioridad sugerida; todo cambio queda justificado</td></tr>
-      <tr><td>Casos graves con prioridad baja</td><td>11 de 40 movimientos activos quedaron BAJA o MEDIA</td><td>Un movimiento activo nunca sale BAJA (20.000 fichas simuladas)</td></tr>
-      <tr><td>Control de calidad</td><td>Solo campos obligatorios</td><td>Obligatorios + 8 advertencias de coherencia (p. ej., evidencias frescas con movimiento inactivo)</td></tr>
-      <tr><td>Sin movimiento en masa</td><td>Pasa al registro sin decir qué se encontró</td><td>Se registra el hallazgo y la entidad a la que se remite</td></tr>
-    </table></div></section>
-    <section><h2>Pregunta por pregunta</h2><div class="tabla-caja"><table class="t">
-      <tr><th>Tema</th><th>Ficha actual</th><th>Propuesta 2.0</th></tr>
-      <tr><td>Tipo de movimiento</td><td>Múltiple, 8 opciones sin definición</td><td>Única, 8 opciones con definición (Varnes; Cruden y Varnes); "complejo" para combinaciones</td></tr>
-      <tr><td>Estado de actividad</td><td>6 opciones sin definición (incluye "En evolución" y "Potencialmente inestable")</td><td>5 estados del WP/WLI con definición, respaldados por el aspecto de las evidencias (frescas, recientes, antiguas)</td></tr>
-      <tr><td>Movimiento previo, tendencia, cambios después del sismo</td><td>Tres preguntas; "sismo" = Sí en el 80 %</td><td>Quedan en el estado de actividad y en los detonantes</td></tr>
-      <tr><td>Material</td><td>Suelo / Roca / Relleno / Depósito / Otro</td><td>8 unidades, incluidas cenizas volcánicas, flujo de lodo de la Formación Pereira, coluvión y lleno</td></tr>
-      <tr><td>Pendiente</td><td>Número en % (llenado en el 78 %)</td><td>Baja / Media / Alta con guía práctica para elegir</td></tr>
-      <tr><td>Agua</td><td>Seco, húmedo, saturado, surgencias, filtraciones</td><td>Además: encharcamientos, escorrentía sin manejo, fugas de redes, cauce al pie</td></tr>
-      <tr><td>Obras existentes</td><td>No se preguntaban</td><td>No hay / funcionan / con daño</td></tr>
-      <tr><td>Evidencias</td><td>10 opciones</td><td>12 opciones, incluidas retrogresión y el reporte de la comunidad</td></tr>
-      <tr><td>Dimensiones</td><td>5 campos opcionales; el 46 % sin ninguna medida</td><td>Obligatorias: medidas aproximadas con volumen calculado, o rango de volumen con equivalencias en volquetas</td></tr>
-      <tr><td>Factores</td><td>7 factores observables, sin efecto en la prioridad</td><td>9 detonantes que alimentan los indicios de reactivación</td></tr>
-      <tr><td>Exposición</td><td>Lista de elementos y número de personas y viviendas (personas llenado en el 42 %)</td><td>Elementos dentro de una zona de alcance definida, viviendas habitadas obligatorias (0 si no hay) y distancia</td></tr>
-      <tr><td>Afectación</td><td>5 niveles sin criterio</td><td>5 niveles con criterio por fisuras; severa o colapso sube la exposición</td></tr>
-      <tr><td>Prioridad</td><td>BAJA a CRÍTICA, elegida</td><td>Sugerida + final; si difieren, motivo y justificación de 30 caracteres o más</td></tr>
-      <tr><td>Acciones, concepto, fotos, responsables</td><td>Igual</td><td>Igual (acciones agrupadas en 12)</td></tr>
-    </table></div></section>
-    <section><h2>Lo que se deja de registrar</h2><p class="ayuda">Escarpe (m), área (m²), tendencia, pendiente en %, personas expuestas como dato obligatorio y las observaciones de cada valoración de la sección 6. Las visitas ya hechas no se modifican.</p></section>
-    <section><h2>Efecto en la app</h2><p class="ayuda">La columna PRIORIDAD sigue siendo la prioridad final, así que el tablero, los filtros y el mapa no cambian. Se agregan al final de VISITAS: PRIORIDAD_SUGERIDA, PUNTAJE_AMENAZA, NIVEL_EXPOSICION, CAMBIO_PRIORIDAD y JUSTIFICACION_CAMBIO, más los campos nuevos. El cálculo corre en el celular, también sin señal.</p></section>
-  </div>
-  <div id="vista-fb" class="fb" hidden>
-    <p class="ayuda">Esta demo no guarda nada. Escriba sus observaciones, cópielas o envíelas por WhatsApp o correo al coordinador de la propuesta en la DIGER. Si marca la casilla, se adjunta un resumen del caso que llenó en <b>Llenar la ficha</b>.</p>
-    <label for="fb-nombre">Nombre (opcional)<input type="text" id="fb-nombre" autocomplete="name"></label>
-    <label for="fb-entidad">Entidad
-      <select id="fb-entidad" style="max-width:420px"><option>DIGER</option><option>CARDER</option><option>Secretaría de Infraestructura</option><option>Otra</option></select></label>
-    <label for="fb-texto">Observaciones: preguntas que sobran o faltan, opciones, prioridad sugerida que no le parezca, redacción…<textarea id="fb-texto"></textarea></label>
-    <label class="op" style="max-width:420px"><input type="checkbox" id="fb-caso" checked><span>Adjuntar el caso que llené y la prioridad que sugirió el sistema</span></label>
-    <span class="etq-p">Vista previa del mensaje</span>
-    <div class="vista-previa" id="fb-previa"></div>
-    <div class="botones">
-      <button type="button" class="primario" id="fb-copiar">Copiar mensaje</button>
-      <a class="boton" id="fb-wa" href="#" target="_blank" rel="noopener">Enviar por WhatsApp</a>
-      <a class="boton" id="fb-mail" href="#" style="background:var(--azul)">Enviar por correo</a>
+<section id="vista-ficha" class="vista pantalla-completa">
+  <div class="ficha-topbar">
+    <div class="ficha-topbar-titulo">
+      <strong>Ficha de evaluación 2.0 · DEMO</strong>
+      <span>Propuesta para revisión · no se guarda ni se envía</span>
     </div>
-    <p class="ok" id="fb-ok" hidden>Mensaje copiado.</p>
+    <span class="chip gris" id="chip-top" title="Prioridad sugerida por el sistema">—</span>
   </div>
-</div>
-</div>
-<div class="barra" id="barra" aria-hidden="true"><span id="barra-txt"></span><span class="chip" id="barra-chip">—</span></div>
+  <div id="barra-progreso"><div id="barra-progreso-relleno"></div></div>
+  <form id="form-ficha" autocomplete="off" onsubmit="return false">
+    <div class="demo-aviso"><b>Demostración de la ficha 2.0.</b> Llénela con un caso hipotético y observe cómo el sistema sugiere la prioridad
+      (arriba a la derecha y en las secciones 6 y 7). No está conectada a la base: nada se guarda ni se envía.</div>
+  </form>
+  <div class="ficha-pie">
+    <p id="msg-validacion" class="msg-error"></p>
+    <button type="button" id="btn-enviar-ficha" class="btn-principal">Finalizar (demostración)</button>
+    <div id="resultado" class="resultado" hidden></div>
+  </div>
+</section>
 
 <script src="ficha2-schema.js" charset="utf-8"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const TIPO_TXT = { unica: 'Única', multiple: 'Múltiple', numero: 'Numérica', texto: 'Texto', textarea: 'Texto largo', fecha_hora: 'Fecha y hora', municipio: 'Lista',
-  gps: 'GPS', fotos: 'Fotos', responsables: 'Responsables', calculado: 'Calculado', prioridad: 'Sugerida + final' };
+const D = {};               // respuestas
+let ultimaSug = null, fotos = {};
 const campos = []; FICHA2.secciones.forEach((s) => s.campos.forEach((c) => campos.push(Object.assign({ sec: s }, c))));
-let R = {}, fotos = {}, ultimaSug = null;
+const pad = (n) => String(n).padStart(2, '0');
+const ahora = new Date();
+D.fecha_hora_visita = ahora.getFullYear() + '-' + pad(ahora.getMonth() + 1) + '-' + pad(ahora.getDate()) + 'T' + pad(ahora.getHours()) + ':' + pad(ahora.getMinutes());
+D.codigo_evaluacion = 'DEMO-2.0';
 
-// ---------- visibilidad
 function cumple(cond) {
   if (!cond) return true;
   if (Array.isArray(cond)) return cond.every(cumple);
-  const v = R[cond.campo], arr = Array.isArray(v) ? v : (v ? [v] : []);
+  // Mientras no se responde la pregunta 1, la ficha se muestra completa (como si hubiera movimiento).
+  if (cond.campo === 'hay_movimiento' && !D.hay_movimiento) return cond.valor !== 'No';
+  const v = D[cond.campo], arr = Array.isArray(v) ? v : (v ? [v] : []);
   if (cond.valor !== undefined) return v === cond.valor;
   if (cond.valores) return cond.valores.includes(v);
   if (cond.distintoDe !== undefined) return arr.length > 0 && !arr.includes(cond.distintoDe);
@@ -253,299 +77,220 @@ function cumple(cond) {
 }
 const visible = (c) => cumple(c.sec.soloSi) && cumple(c.soloSi);
 
-// ---------- formulario
-function htmlCampo(c) {
-  const id = 'f-' + c.id;
-  const etq = `<div class="etq">${esc(c.etiqueta)}${c.requerido ? ' <span class="req" title="Obligatoria">*</span>' : ''}<span class="tipo">${TIPO_TXT[c.tipo]}</span>${c.criticidad ? `<span class="crit">${esc(c.criticidad)}</span>` : ''}</div>`;
-  const ay = c.ayuda ? `<p class="ayuda">${esc(c.ayuda)}</p>` : '';
-  let cuerpo = '';
-  if (c.tipo === 'unica' || c.tipo === 'multiple') {
-    const largas = c.descripciones || c.opciones.some((o) => o.length > 34);
-    cuerpo = `<div class="ops${largas ? ' largas' : ''}">` + c.opciones.map((o, i) => {
-      const d = c.descripciones && c.descripciones[o];
-      return `<label class="op"><input type="${c.tipo === 'unica' ? 'radio' : 'checkbox'}" name="${c.id}" id="${id}-${i}" value="${esc(o)}" data-campo="${c.id}"><span>${esc(o)}${d ? `<small>${esc(d)}</small>` : ''}</span></label>`;
-    }).join('') + '</div>' + Object.entries(c.detalles || {}).map(([o, d]) =>
-      `<label class="detalle" data-det="${c.id}" data-op="${esc(o)}" for="f-${d.id}" hidden>${esc(d.etiqueta)} <span class="req">*</span><input type="${d.tipo === 'numero' ? 'number' : 'text'}" id="f-${d.id}" data-campo="${d.id}"></label>`).join('');
-  } else if (c.tipo === 'numero') {
-    cuerpo = `<div class="con-unidad"><input type="number" id="${id}" data-campo="${c.id}" min="0" step="any" inputmode="decimal"><span>${esc(c.unidad || '')}</span></div>`;
-  } else if (c.tipo === 'texto') {
-    cuerpo = `<input type="text" id="${id}" data-campo="${c.id}"${c.soloLectura ? ' readonly' : ''}>`;
+// ---------------------------------------------------------------- dibujar (mismo marcado que la app)
+function dibujarCampo(c) {
+  const div = document.createElement('div');
+  div.className = 'campo ancho-completo';
+  div.dataset.campo = c.id;
+  const etq = '<label class="campo-etiqueta">' + esc(c.etiqueta) + (c.unidad ? ' (' + esc(c.unidad) + ')' : '') + (c.requerido ? ' <span class="req">*</span>' : '') + '</label>' +
+    (c.ayuda ? '<p class="campo-ayuda">' + esc(c.ayuda) + '</p>' : '');
+  if (c.tipo === 'texto' && c.soloLectura) {
+    div.innerHTML = etq + '<div class="valor-fijo">' + esc(D[c.id]) + '</div>';
+  } else if (c.tipo === 'texto' || c.tipo === 'numero' || c.tipo === 'fecha_hora') {
+    div.innerHTML = etq + '<input type="' + (c.tipo === 'fecha_hora' ? 'datetime-local' : 'text') + '"' + (c.tipo === 'numero' ? ' inputmode="decimal"' : '') + ' value="' + esc(D[c.id] || '') + '">';
+    div.querySelector('input').addEventListener('input', (e) => { let v = e.target.value; if (c.tipo === 'numero') { v = v.replace(',', '.').replace(/[^0-9.]/g, ''); e.target.value = v; } set(c.id, v); });
   } else if (c.tipo === 'textarea') {
-    cuerpo = `<textarea id="${id}" data-campo="${c.id}"></textarea>`;
-  } else if (c.tipo === 'fecha_hora') {
-    cuerpo = `<input type="datetime-local" id="${id}" data-campo="${c.id}" style="max-width:260px">`;
+    div.innerHTML = etq + '<textarea></textarea>';
+    div.querySelector('textarea').addEventListener('input', (e) => set(c.id, e.target.value));
   } else if (c.tipo === 'municipio') {
-    cuerpo = `<select id="${id}" data-campo="${c.id}" style="max-width:320px"><option value="">Elegir…</option>${c.opciones.map((o) => `<option>${esc(o)}</option>`).join('')}</select>`;
+    div.innerHTML = etq + '<select><option value="">Selecciona el municipio</option>' + c.opciones.map((m) => '<option>' + esc(m) + '</option>').join('') + '</select>';
+    div.querySelector('select').addEventListener('change', (e) => set(c.id, e.target.value));
+  } else if (c.tipo === 'unica' || c.tipo === 'multiple' || c.tipo === 'prioridad') {
+    const multiple = c.tipo === 'multiple';
+    const clase = c.destacado || c.descripciones ? 'opciones opciones-destacadas' : 'opciones';
+    let pre = '';
+    if (c.tipo === 'prioridad') pre = '<div class="sugerida">Prioridad sugerida por el sistema: <span class="chip gris" id="chip-sug">—</span></div>';
+    div.innerHTML = etq + pre + '<div class="' + clase + '">' + c.opciones.map((op) => {
+      const desc = c.descripciones && c.descripciones[op] ? '<em>' + esc(c.descripciones[op]) + '</em>' : '';
+      return '<label class="opcion"><input type="' + (multiple ? 'checkbox' : 'radio') + '" name="' + c.id + '" value="' + esc(op) + '"><span>' + esc(op) + desc + '</span></label>';
+    }).join('') + '</div><div class="detalles"></div>';
+    const caja = div.querySelector('.detalles');
+    const pintarDetalles = () => {
+      const activos = [...div.querySelectorAll('.opciones input:checked')].map((x) => x.value);
+      let h = Object.keys(c.detalles || {}).filter((op) => activos.includes(op)).map((op) => {
+        const d = c.detalles[op];
+        return '<div class="detalle" data-detalle="' + d.id + '"><label class="campo-etiqueta">' + esc(d.etiqueta) + ' <span class="req">*</span></label><input type="text" data-id="' + d.id + '" value="' + esc(D[d.id] || '') + '" placeholder="Escribe aquí"></div>';
+      }).join('');
+      if (c.tipo === 'prioridad' && FICHA_NIV.includes(D._sug) && D.prioridad && D.prioridad !== D._sug) {
+        const sube = FICHA_NIV.indexOf(D.prioridad) > FICHA_NIV.indexOf(D._sug);
+        h += '<div class="detalle" data-detalle="justificacion_motivo"><label class="campo-etiqueta">¿Por qué ' + (sube ? 'SUBE' : 'BAJA') + ' la prioridad de ' + D._sug + ' a ' + D.prioridad + '? <span class="req">*</span></label>' +
+          '<select data-id="justificacion_motivo"><option value="">Selecciona el motivo</option>' + c.justificacion.motivos.map((m) => '<option' + (D.justificacion_motivo === m ? ' selected' : '') + '>' + esc(m) + '</option>').join('') + '</select></div>' +
+          '<div class="detalle" data-detalle="justificacion_texto"><label class="campo-etiqueta">Justificación técnica (mínimo ' + c.justificacion.minimo + ' caracteres) <span class="req">*</span></label><textarea data-id="justificacion_texto">' + esc(D.justificacion_texto || '') + '</textarea></div>';
+      }
+      caja.innerHTML = h;
+      caja.querySelectorAll('[data-id]').forEach((el) => el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', () => set(el.dataset.id, el.value, true)));
+    };
+    div._pintarDetalles = pintarDetalles;
+    div.querySelectorAll('.opciones input').forEach((inp) => inp.addEventListener('change', () => {
+      if (multiple) {
+        let arr = [...div.querySelectorAll('.opciones input:checked')].map((x) => x.value);
+        const ex = c.exclusivas || [];
+        if (inp.checked && ex.includes(inp.value)) arr = [inp.value]; else if (inp.checked) arr = arr.filter((x) => !ex.includes(x));
+        div.querySelectorAll('.opciones input').forEach((x) => { x.checked = arr.includes(x.value); });
+        set(c.id, arr);
+      } else set(c.id, inp.value);
+      pintarDetalles();
+    }));
   } else if (c.tipo === 'gps') {
-    cuerpo = `<div class="rejilla">${[['lat', 'Latitud'], ['lon', 'Longitud'], ['alt', 'Altitud (m s. n. m.)'], ['prec', 'Precisión (m)']].map(([k, t]) =>
-      `<label for="${id}-${k}">${t}<input type="number" step="any" id="${id}-${k}" data-campo="${c.id}" data-k="${k}"></label>`).join('')}</div>
-      <div class="botones"><button type="button" id="b-gps">Capturar GPS (simulado)</button></div>`;
+    div.innerHTML = etq + '<div class="gps-caja"><button type="button" class="btn-secundario btn-gps">Capturar mi ubicación</button>' +
+      '<div class="gps-coords"><label>Latitud (Y)<input type="text" inputmode="decimal" class="gps-y" placeholder="4.8123456"></label>' +
+      '<label>Longitud (X)<input type="text" inputmode="decimal" class="gps-x" placeholder="-75.7012345"></label>' +
+      '<label>Altitud (Z m)<input type="text" inputmode="decimal" class="gps-z" placeholder="1487"></label></div><p class="gps-estado">Sin coordenadas todavía.</p></div>';
+    const lee = () => set(c.id, { y: div.querySelector('.gps-y').value, x: div.querySelector('.gps-x').value, z: div.querySelector('.gps-z').value });
+    div.querySelectorAll('.gps-coords input').forEach((i) => i.addEventListener('input', lee));
+    div.querySelector('.btn-gps').addEventListener('click', () => {
+      const est = div.querySelector('.gps-estado');
+      if (!navigator.geolocation) { est.textContent = 'Este navegador no da la ubicación: escríbala a mano.'; return; }
+      est.textContent = 'Buscando la ubicación…';
+      navigator.geolocation.getCurrentPosition((p) => {
+        div.querySelector('.gps-y').value = p.coords.latitude.toFixed(7); div.querySelector('.gps-x').value = p.coords.longitude.toFixed(7);
+        div.querySelector('.gps-z').value = p.coords.altitude ? Math.round(p.coords.altitude) : '';
+        est.textContent = 'Coordenadas registradas (precisión ' + Math.round(p.coords.accuracy) + ' m).'; est.className = 'gps-estado ok'; lee();
+      }, () => { est.textContent = 'No se pudo obtener la ubicación: escríbala a mano.'; }, { enableHighAccuracy: true, timeout: 15000 });
+    });
   } else if (c.tipo === 'fotos') {
-    cuerpo = `<input type="file" id="${id}" data-campo="${c.id}" accept="image/*" multiple><span class="ayuda" id="${id}-n"></span>`;
+    div.innerHTML = etq + '<div class="fotos-caja"><div class="fotos-acciones">' +
+      '<label class="fotos-btn">Tomar foto<input type="file" accept="image/*" capture="environment" hidden></label>' +
+      '<label class="fotos-btn alterno">Elegir de la galería<input type="file" accept="image/*" multiple hidden></label></div><p class="fotos-conteo"></p></div>';
+    div.querySelectorAll('input[type=file]').forEach((i) => i.addEventListener('change', () => {
+      fotos[c.id] = (fotos[c.id] || []).concat([...i.files]);
+      div.querySelector('.fotos-conteo').textContent = fotos[c.id].length + ' foto(s) (en la demo no se suben)';
+      set(c.id, fotos[c.id].length);
+    }));
   } else if (c.tipo === 'responsables') {
-    cuerpo = [0, 1, 2].map((i) => `<div class="rejilla">${[['nombre', 'Nombre'], ['tp', 'Tarjeta profesional'], ['entidad', 'Entidad']].map(([k, t]) =>
-      `<label for="${id}-${i}-${k}">${t} ${i + 1}${i === 0 && k !== 'entidad' ? ' <span class="req">*</span>' : ''}<input type="text" id="${id}-${i}-${k}" data-campo="${c.id}" data-i="${i}" data-k="${k}"></label>`).join('')}</div>`).join('');
+    div.innerHTML = etq + [0, 1, 2].map((i) => '<div class="responsable-caja" data-i="' + i + '"><h4>RESPONSABLE ' + (i + 1) + (i === 0 ? ' (obligatorio)' : ' (opcional)') + '</h4>' +
+      '<label>Nombre<input type="text" class="r-nombre"></label><label>Tarjeta profesional<input type="text" class="r-tp"></label><label>Entidad<input type="text" class="r-entidad"></label></div>').join('');
+    div.querySelectorAll('input').forEach((i) => i.addEventListener('input', () => set(c.id, [...div.querySelectorAll('.responsable-caja')].map((b) => ({
+      nombre: b.querySelector('.r-nombre').value.trim(), tp: b.querySelector('.r-tp').value.trim(), entidad: b.querySelector('.r-entidad').value.trim() })))));
   } else if (c.tipo === 'calculado') {
-    cuerpo = `<div class="calc" id="${id}"></div>`;
-  } else if (c.tipo === 'prioridad') {
-    cuerpo = `<div class="destacado"><p class="ayuda">Prioridad sugerida por el sistema: <b id="sug-txt">—</b>. Viene marcada; si la cambia, debe justificar.</p>
-      <div class="ops largas">${c.opciones.map((o, i) => `<label class="op"><input type="radio" name="prioridad" id="${id}-${i}" value="${o}" data-campo="prioridad"><span><b>${o}</b><small>${esc(c.descripciones[o])}</small></span></label>`).join('')}</div></div>
-      <div class="justif" id="justif" hidden><b id="justif-tit"></b>
-        <label for="f-just-motivo" class="etq-p">Motivo</label>
-        <select id="f-just-motivo" data-campo="justificacion_motivo"><option value="">Elegir…</option>${c.justificacion.motivos.map((m) => `<option>${esc(m)}</option>`).join('')}</select>
-        <label for="f-just-texto" class="etq-p">Justificación técnica (mínimo ${c.justificacion.minimo} caracteres)</label>
-        <textarea id="f-just-texto" data-campo="justificacion_texto"></textarea><span class="ayuda" id="just-cuenta"></span></div>`;
+    div.innerHTML = etq + '<div class="calif" id="calc-' + c.id + '"></div>';
   }
-  return `<div class="campo" id="c-${c.id}">${etq}${ay}${cuerpo}</div>`;
+  return div;
 }
 
-$('form').innerHTML = FICHA2.secciones.map((s) => `<section class="sec" id="s-${s.id}"><h2><span class="num">${s.numero}</span>${esc(s.titulo)}</h2>${s.ayuda ? `<p class="ayuda">${esc(s.ayuda)}</p>` : ''}${s.campos.map(htmlCampo).join('')}</section>`).join('')
-  + `<section class="sec"><div class="botones"><button type="button" class="primario" id="b-enviar">Revisar y enviar (simulado)</button></div><p class="errores" id="errores" role="alert"></p><p class="ok" id="enviado" hidden>La ficha está completa. Así quedaría: vea la pestaña Documento.</p></section>`;
-$('matriz').innerHTML = '<tr><th>Amenaza \\ Exp.</th>' + [0, 1, 2, 3, 4].map((e) => `<th>${e}</th>`).join('') + '</tr>' +
-  Object.keys(MATRIZ).map((a) => `<tr><th>${a}</th>` + MATRIZ[a].map((v, e) => `<td class="v-${v}" data-a="${a}" data-e="${e}">${v === 'CRÍTICA' ? 'CRÍT.' : v}</td>`).join('') + '</tr>').join('');
-
-// ---------- leer y escribir respuestas
-function leer(ev) {
-  const el = ev.target, id = el.dataset.campo;
-  if (!id) return;
-  const c = campos.find((x) => x.id === id);
-  if (el.type === 'checkbox') {
-    let arr = [...document.querySelectorAll(`input[name="${id}"]:checked`)].map((x) => x.value);
-    const ex = (c && c.exclusivas) || [];
-    if (el.checked && ex.includes(el.value)) arr = [el.value];
-    else if (el.checked) arr = arr.filter((x) => !ex.includes(x));
-    document.querySelectorAll(`input[name="${id}"]`).forEach((x) => { x.checked = arr.includes(x.value); });
-    R[id] = arr;
-  } else if (el.type === 'radio') R[id] = el.value;
-  else if (el.type === 'file') { fotos[id] = [...el.files]; $(el.id + '-n').textContent = el.files.length + ' foto(s)'; }
-  else if (c && c.tipo === 'gps') { R[id] = Object.assign({}, R[id], { [el.dataset.k]: el.value }); }
-  else if (c && c.tipo === 'responsables') { const r = R[id] = R[id] || [{}, {}, {}]; r[+el.dataset.i][el.dataset.k] = el.value; }
-  else R[id] = el.value;
-  pintar();
-}
-function escribir() {
-  document.querySelectorAll('[data-campo]').forEach((el) => {
-    const id = el.dataset.campo, v = R[id], c = campos.find((x) => x.id === id);
-    if (el.type === 'checkbox') el.checked = Array.isArray(v) && v.includes(el.value);
-    else if (el.type === 'radio') el.checked = v === el.value;
-    else if (el.type === 'file') el.value = '';
-    else if (c && c.tipo === 'gps') el.value = (v || {})[el.dataset.k] || '';
-    else if (c && c.tipo === 'responsables') el.value = ((v || [])[+el.dataset.i] || {})[el.dataset.k] || '';
-    else el.value = v == null ? '' : v;
+const form = $('form-ficha');
+FICHA2.secciones.forEach((sec, i) => {
+  const b = document.createElement('section');
+  b.className = 'seccion' + (i > 0 ? ' cerrada' : '');
+  b.dataset.seccion = sec.id;
+  b.innerHTML = '<div class="seccion-cabeza"><span class="seccion-num">' + sec.numero + '</span><span class="seccion-titulo">' + esc(sec.titulo) + '</span>' +
+    '<span class="seccion-faltan"></span><span class="seccion-flecha">&#9662;</span></div>' +
+    '<div class="seccion-cuerpo">' + (sec.ayuda ? '<p class="seccion-ayuda">' + esc(sec.ayuda) + '</p>' : '') +
+    '<div class="rejilla"></div><button type="button" class="btn-siguiente">Siguiente sección &rarr;</button></div>';
+  b.querySelector('.seccion-cabeza').addEventListener('click', () => b.classList.toggle('cerrada'));
+  const rej = b.querySelector('.rejilla');
+  sec.campos.forEach((c) => rej.appendChild(dibujarCampo(Object.assign({ sec }, c))));
+  b.querySelector('.btn-siguiente').addEventListener('click', () => {
+    b.classList.add('cerrada');
+    const sig = FICHA2.secciones.slice(i + 1).find((x) => cumple(x.soloSi));
+    if (sig) { const s = form.querySelector('[data-seccion="' + sig.id + '"]'); s.classList.remove('cerrada'); s.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    else $('btn-enviar-ficha').scrollIntoView({ behavior: 'smooth', block: 'center' });
   });
-  document.querySelectorAll('[id$="-n"]').forEach((x) => { x.textContent = ''; });
-}
+  form.appendChild(b);
+});
 
-// ---------- pintar
-function pintar() {
-  FICHA2.secciones.forEach((s) => { $('s-' + s.id).hidden = !cumple(s.soloSi); });
-  campos.forEach((c) => { $('c-' + c.id).hidden = !visible(c); });
-  document.querySelectorAll('[data-det]').forEach((d) => { const v = R[d.dataset.det]; d.hidden = !(Array.isArray(v) ? v.includes(d.dataset.op) : v === d.dataset.op); });
-  const k = calcularCriticidad(R);
-  // volumen y valoración
-  $('f-volumen_m3').textContent = k.volumen ? `V ≈ π/6 × ${R.dim_longitud_m} × ${R.dim_ancho_m} × ${R.dim_profundidad_m} ≈ ${Math.round(k.volumen).toLocaleString('es-CO')} m³ (aproximado)` : 'Escriba L, W y D.';
-  const F = k.factores || {};
-  $('f-valoracion').innerHTML = R.hay_movimiento === 'No' ? '' : `<table class="t"><tr><th>Factor</th><th>Base</th><th>Pts</th></tr>` +
-    [['A1 Magnitud', F.A1], ['A2 Actividad', F.A2], ['A3 Indicios de reactivación o avance', F.A3], ['A4 Velocidad esperada', F.A4]].map(([n, f]) => `<tr><td>${n}</td><td>${esc(f ? f.porque : '')}</td><td>${f ? f.pts : 0}</td></tr>`).join('') +
-    `<tr><th>Amenaza</th><th>${k.amenaza || ''}</th><th>${k.puntos || 0}</th></tr><tr><td>Exposición</td><td>${esc(k.porqueExposicion || '')}</td><td>${k.exposicion || 0}</td></tr></table>`;
-  // panel
-  const sug = k.sugerida || '—';
-  for (const c of [$('chip'), $('barra-chip')]) { c.textContent = sug; c.className = 'chip' + (k.sugerida && k.sugerida !== 'SIN PRIORIDAD' ? ' c-' + sug : ''); }
-  $('sug-txt').textContent = sug;
-  $('factores').innerHTML = R.hay_movimiento === 'No' ? '<dt>—</dt><dd>No hay movimiento en masa ni inestabilidad</dd><dd class="p"></dd>' :
-    ['A1', 'A2', 'A3', 'A4'].map((x) => `<dt>${x}</dt><dd>${esc(F[x] ? F[x].porque : '')}</dd><dd class="p">${F[x] ? F[x].pts : 0}</dd>`).join('') +
-    `<dt class="tot">Σ</dt><dd class="tot">Amenaza ${k.amenaza || ''}</dd><dd class="p tot">${k.puntos || 0}</dd><dt>E</dt><dd>${esc(k.porqueExposicion || '')}</dd><dd class="p">${k.exposicion || 0}</dd>` +
-    ((k.banderas || []).length ? `<dt style="color:var(--critica)">!</dt><dd style="color:var(--critica)">Bandera roja</dd><dd class="p">${k.banderas.length}</dd>` : '');
-  $('indicios').innerHTML = (k.indicios || []).map((i) => `<li>${esc(i)}</li>`).join('') || '<li>Ninguno</li>';
-  $('caja-ind').hidden = R.hay_movimiento === 'No';
-  $('advertencias').innerHTML = (k.advertencias || []).map((a) => `<li>${esc(a)}</li>`).join('');
-  $('caja-adv').hidden = !(k.advertencias || []).length;
-  document.querySelectorAll('.matriz td').forEach((td) => td.classList.toggle('aqui', !!k.sugerida && !(k.banderas || []).length && k.sugerida !== 'SIN PRIORIDAD' && td.dataset.a === k.amenaza && +td.dataset.e === k.exposicion));
-  $('barra-txt').textContent = R.hay_movimiento === 'No' ? 'Sin movimiento en masa' : `Amenaza ${k.puntos || 0} (${k.amenaza || '—'}) · Exposición ${k.exposicion || 0}`;
-  // la prioridad final sigue a la sugerida mientras el evaluador no la haya cambiado
-  if (FICHA_NIV.includes(k.sugerida) && k.sugerida !== ultimaSug) {
-    if (!R.prioridad || R.prioridad === ultimaSug) { R.prioridad = k.sugerida; document.querySelectorAll('input[name=prioridad]').forEach((x) => { x.checked = x.value === k.sugerida; }); }
-    ultimaSug = k.sugerida;
-  }
-  const dif = FICHA_NIV.includes(k.sugerida) && R.prioridad ? FICHA_NIV.indexOf(R.prioridad) - FICHA_NIV.indexOf(k.sugerida) : 0;
-  $('justif').hidden = dif === 0;
-  if (dif) $('justif-tit').textContent = `La prioridad final ${dif > 0 ? 'SUBE' : 'BAJA'} de ${k.sugerida} a ${R.prioridad}. Justifique.`;
-  $('just-cuenta').textContent = `${(R.justificacion_texto || '').trim().length} / 30 caracteres`;
-  R._k = k; R._dif = dif;
-}
+// ---------------------------------------------------------------- estado
 const FICHA_NIV = NIVELES;
-
-// ---------- validar
+function set(id, v, sinRedibujarDetalles) { D[id] = v; pintar(sinRedibujarDetalles); }
 function vacio(c) {
-  const v = R[c.id];
-  if (c.tipo === 'fotos') return !(fotos[c.id] || []).length;
-  if (c.tipo === 'gps') return !(v && v.lat && v.lon);
+  const v = D[c.id];
+  if (c.tipo === 'gps') return !(v && v.y && v.x);
   if (c.tipo === 'responsables') return !(v && v[0] && v[0].nombre && v[0].tp);
-  if (c.tipo === 'prioridad') return !v;
+  if (c.tipo === 'fotos') return !v;
   return v == null || v === '' || (Array.isArray(v) && !v.length);
 }
-function validar() {
-  pintar();
-  const falta = [];
-  campos.forEach((c) => {
-    if (!visible(c) || c.soloLectura || c.tipo === 'calculado') return;
-    if (c.requerido && vacio(c)) falta.push(`${c.sec.numero}. ${c.etiqueta}`);
-    Object.entries(c.detalles || {}).forEach(([o, d]) => {
-      const v = R[c.id]; const marcado = Array.isArray(v) ? v.includes(o) : v === o;
-      if (marcado && !(R[d.id] || '').trim()) falta.push(`${c.sec.numero}. ${c.etiqueta}: ${d.etiqueta}`);
-    });
-  });
-  if (R._dif && !R.justificacion_motivo) falta.push('7. Motivo del cambio de prioridad');
-  if (R._dif && (R.justificacion_texto || '').trim().length < 30) falta.push('7. Justificación de al menos 30 caracteres');
-  $('errores').textContent = falta.length ? `Faltan ${falta.length} respuesta(s): ` + falta.join(' · ') : '';
-  $('enviado').hidden = !!falta.length;
-}
-
-// ---------- documento
-function valorDoc(c) {
-  const v = R[c.id];
-  if (c.tipo === 'unica' || c.tipo === 'multiple') {
-    const arr = Array.isArray(v) ? v : (v ? [v] : []);
-    let h = '<div class="d-ops">' + c.opciones.map((o) => `<span class="${arr.includes(o) ? 'si' : ''}">${arr.includes(o) ? '☒' : '☐'} ${esc(o)}</span>`).join('') + '</div>';
-    Object.entries(c.detalles || {}).forEach(([o, d]) => { if (arr.includes(o) && R[d.id]) h += `<div>${esc(d.etiqueta)} ${esc(R[d.id])}</div>`; });
-    return h;
+function faltantes(c) {
+  const f = [];
+  if (!visible(c) || c.soloLectura || c.tipo === 'calculado') return f;
+  if (c.requerido && vacio(c)) f.push(c.id);
+  Object.entries(c.detalles || {}).forEach(([o, d]) => { const v = D[c.id]; if ((Array.isArray(v) ? v.includes(o) : v === o) && !(D[d.id] || '').trim()) f.push(d.id); });
+  if (c.tipo === 'prioridad' && D._dif) {
+    if (!D.justificacion_motivo) f.push('justificacion_motivo');
+    if ((D.justificacion_texto || '').trim().length < c.justificacion.minimo) f.push('justificacion_texto');
   }
-  if (c.tipo === 'gps') { const g = v || {}; return `Lat ${esc(g.lat || '')} · Lon ${esc(g.lon || '')} · Alt ${esc(g.alt || '')} m · Precisión ${esc(g.prec || '')} m`; }
-  if (c.tipo === 'numero') return v === undefined || v === '' ? '' : esc(v) + ' ' + esc(c.unidad || '');
-  if (c.tipo === 'fecha_hora') return esc((v || '').replace('T', ' '));
-  if (c.tipo === 'calculado' && c.id === 'volumen_m3') return R._k && R._k.volumen ? R._k.volumen.toLocaleString('es-CO', { maximumFractionDigits: 1 }) + ' m³ aproximados (π/6 · L · W · D)' : '';
-  return esc(v || '').replace(/\n/g, '<br>');
+  return f;
 }
-function documento() {
-  pintar();
-  const k = R._k || {}, F = k.factores || {};
-  let h = `<table class="d-enc"><tr><td style="width:24%"><div class="ent">ALCALDÍA DE PEREIRA</div>DIGER · Gestión del Riesgo</td>
-    <td><div class="tit">${esc(FICHA2.titulo)}</div></td><td style="width:24%">Versión ${esc(FICHA2.version)}<br>Código: ${esc(R.codigo_evaluacion || '—')}</td></tr></table>
-    <p class="d-alc"><b>Alcance:</b> ${esc(FICHA2.alcance)}</p>`;
+function pintar(sinRedibujarDetalles) {
+  // visibilidad de campos y secciones (como la app: la sección que no aplica queda "omitida")
+  campos.forEach((c) => { form.querySelector('[data-campo="' + c.id + '"]').hidden = !visible(c); });
+  let tot = 0, listos = 0;
   FICHA2.secciones.forEach((s) => {
-    if (!cumple(s.soloSi)) return;
-    h += `<div class="d-sec">${s.numero}. ${esc(s.titulo)}</div>`;
-    if (s.id === 's6') {
-      h += `<table><tr><th>Factor</th><th>Base de la calificación</th><th style="width:60px">Puntos</th></tr>` +
-        [['A1. Magnitud', F.A1], ['A2. Actividad', F.A2], ['A3. Indicios de reactivación o avance', F.A3], ['A4. Velocidad esperada', F.A4]].map(([n, f]) => `<tr><td>${n}</td><td>${esc(f ? f.porque : '')}${n.startsWith('A3') && (k.indicios || []).length ? ': ' + esc(k.indicios.join('; ')) : ''}</td><td>${f ? f.pts : ''}</td></tr>`).join('') +
-        `<tr><th>Nivel de amenaza</th><th>${esc(k.amenaza || '')}</th><th>${k.puntos || ''}</th></tr><tr><td>Exposición</td><td>${esc(k.porqueExposicion || '')}</td><td>${k.exposicion || 0}</td></tr>
-        <tr><td>Bandera roja</td><td colspan="2">${esc((k.banderas || []).join('; ') || 'Ninguna')}</td></tr></table>`;
-      return;
-    }
-    if (s.id === 's7') {
-      h += `<table><tr><td class="d-lbl">Prioridad sugerida (calificación)</td><td class="d-prio">${esc(k.sugerida || '')}</td></tr>
-        <tr><td class="d-lbl">Prioridad final (evaluador)</td><td class="d-prio">${esc(R.prioridad || '')}</td></tr>
-        ${R._dif ? `<tr><td class="d-lbl">Justificación del cambio (${R._dif > 0 ? 'sube' : 'baja'} ${Math.abs(R._dif)})</td><td>${esc(R.justificacion_motivo || '')}: ${esc(R.justificacion_texto || '')}</td></tr>` : ''}</table>`;
-      return;
-    }
-    h += '<table>' + s.campos.filter((c) => cumple(c.soloSi) && c.tipo !== 'fotos' && c.tipo !== 'responsables').map((c) => `<tr><td class="d-lbl">${esc(c.etiqueta)}</td><td>${valorDoc(c)}</td></tr>`).join('') + '</table>';
-    if (s.id === 's9') {
-      const imgs = [...(fotos.fotos || []), ...(fotos.croquis || [])];
-      h += `<div style="margin-top:6px"><b>Registro fotográfico</b> (${imgs.length})</div><div class="d-fotos" id="d-fotos">${imgs.length ? '' : '<em>Sin fotos cargadas en el borrador.</em>'}</div>`;
-      const rs = (R.responsables || []).filter((x) => x && x.nombre);
-      h += `<table class="d-firmas" style="margin-top:10px"><tr>${[0, 1, 2].map((i) => { const x = rs[i] || {}; return `<td>${esc(x.nombre || '')}<br>T. P. ${esc(x.tp || '')}<br>${esc(x.entidad || '')}</td>`; }).join('')}</tr></table>`;
-    }
+    const b = form.querySelector('[data-seccion="' + s.id + '"]');
+    const om = !cumple(s.soloSi), sinDecidir = s.soloSi && !D.hay_movimiento;
+    b.classList.toggle('omitida', om && !sinDecidir);
+    let n = 0;
+    s.campos.forEach((c) => { const cc = Object.assign({ sec: s }, c); if (!visible(cc) || !c.requerido || c.tipo === 'calculado' || c.soloLectura) return; tot++; if (faltantes(cc).length) n++; else listos++; });
+    const t = b.querySelector('.seccion-faltan');
+    t.className = 'seccion-faltan ' + (sinDecidir ? 'espera' : om ? 'omitida' : n ? 'pendiente' : 'lista');
+    t.textContent = sinDecidir ? 'Según la sección 1' : om ? 'No aplica' : n ? 'Faltan ' + n : 'Completa';
   });
-  h += `<div class="d-ref"><b>Referencias técnicas:</b> ${FICHA2.referencias.map(esc).join(' · ')}</div>`;
-  $('hoja').innerHTML = h;
-  const caja = $('d-fotos');
-  [...(fotos.fotos || []), ...(fotos.croquis || [])].forEach((f) => { const img = new Image(); img.alt = f.name; img.src = URL.createObjectURL(f); caja.appendChild(img); });
+  $('barra-progreso-relleno').style.width = (tot ? Math.round(100 * listos / tot) : 0) + '%';
+  // calificación
+  const k = calcularCriticidad(D);
+  D._sug = k.sugerida;
+  const sug = k.sugerida || '—';
+  [$('chip-top'), $('chip-sug')].forEach((ch) => { ch.textContent = sug; ch.className = 'chip ' + (FICHA_NIV.includes(sug) ? sug : 'gris'); });
+  const F = k.factores || {};
+  $('calc-valoracion').innerHTML = D.hay_movimiento === 'No' ? '' :
+    '<table><tr><th>Factor</th><th>Base</th><th>Pts</th></tr>' +
+    [['A1 Magnitud', F.A1], ['A2 Actividad', F.A2], ['A3 Indicios de reactivación', F.A3], ['A4 Velocidad esperada', F.A4]]
+      .map(([n, f]) => '<tr><td>' + n + '</td><td>' + esc(f ? f.porque : '') + '</td><td>' + (f ? f.pts : 0) + '</td></tr>').join('') +
+    '<tr class="tot"><td>Amenaza</td><td>' + esc(k.amenaza || '') + '</td><td>' + (k.puntos || 0) + '</td></tr>' +
+    '<tr class="tot"><td>Exposición</td><td>' + esc(k.porqueExposicion || '') + '</td><td>' + (k.exposicion || 0) + ' / 4</td></tr></table>' +
+    '<p class="calif-ind"><b>Indicios detectados:</b> ' + esc((k.indicios || []).join('; ') || 'ninguno') + '</p>' +
+    ((k.advertencias || []).length ? '<div class="calif-adv"><b>Revise la coherencia:</b><ul>' + k.advertencias.map((a) => '<li>' + esc(a) + '</li>').join('') + '</ul></div>' : '');
+  // la prioridad final sigue a la sugerida mientras el evaluador no la cambie
+  if (FICHA_NIV.includes(k.sugerida) && k.sugerida !== ultimaSug) {
+    if (!D.prioridad || D.prioridad === ultimaSug) { D.prioridad = k.sugerida; form.querySelectorAll('input[name=prioridad]').forEach((x) => { x.checked = x.value === k.sugerida; }); }
+    ultimaSug = k.sugerida;
+  }
+  D._dif = FICHA_NIV.includes(k.sugerida) && D.prioridad ? FICHA_NIV.indexOf(D.prioridad) - FICHA_NIV.indexOf(k.sugerida) : 0;
+  if (!sinRedibujarDetalles) { const p = form.querySelector('[data-campo="prioridad"]'); p._pintarDetalles(); }
+  $('resultado').hidden = true;
+  D._k = k;
 }
 
-// ---------- preguntas y respuestas
-function especificacion() {
-  let h = `<p class="ayuda">${campos.length} preguntas en 9 secciones. <span class="req">*</span> = obligatoria. "Única": se marca una sola opción; "Múltiple": se pueden marcar varias; si una opción como "Ninguna" es excluyente, se indica. "Otro" abre un campo para escribir cuál.</p>`;
-  FICHA2.secciones.forEach((s) => {
-    h += `<section><h2>${s.numero}. ${esc(s.titulo)}${s.soloSi ? ' <span class="tipo">solo si hay movimiento o inestabilidad</span>' : ''}</h2><div class="tabla-caja"><table class="t"><tr><th>Nº</th><th>Pregunta</th><th>Respuesta</th><th>Opciones</th><th>Uso en la criticidad</th></tr>` +
-      s.campos.map((c, i) => {
-        let ops = c.opciones ? c.opciones.map((o) => esc(o) + (c.detalles && c.detalles[o] ? ' → <i>' + esc(c.detalles[o].etiqueta) + '</i>' : '') + ((c.exclusivas || []).includes(o) ? ' <i>(excluyente)</i>' : '')).join(' · ') : (c.unidad ? 'Unidad: ' + esc(c.unidad) : '');
-        if (c.tipo === 'prioridad') ops += ' · Si difiere de la sugerida: motivo (' + c.justificacion.motivos.map(esc).join(' / ') + ') + justificación ≥ ' + c.justificacion.minimo + ' caracteres';
-        const txtCond = (x) => `${esc(x.campo)} ${x.valor ? '= ' + esc(x.valor) : x.distintoDe ? '≠ ' + esc(x.distintoDe) : 'incluye ' + esc((x.contiene || x.valores || []).join(' o '))}`;
-        const cond = c.soloSi ? `<br><small class="ayuda">Solo si ${[].concat(c.soloSi).map(txtCond).join(' y ')}</small>` : '';
-        return `<tr><td>${s.numero}.${i + 1}</td><td>${esc(c.etiqueta)}${c.requerido ? ' <span class="req">*</span>' : ''}${cond}</td><td>${TIPO_TXT[c.tipo]}</td><td class="ops-col">${ops}</td><td>${esc(c.criticidad || '')}</td></tr>`;
-      }).join('') + '</table></div></section>';
-  });
-  h += `<section><h2>Regla de calificación</h2><div class="tabla-caja"><table class="t">
-    <tr><th>Factor</th><th>1 punto</th><th>2 puntos</th><th>3 puntos</th><th>4 puntos</th></tr>
-    <tr><td>A1 Magnitud (mayor entre volumen y altura)</td><td>&lt; 10 m³ o &lt; 3 m</td><td>10–100 m³ o 3–6 m</td><td>100–1.000 m³ o 6–15 m</td><td>&gt; 1.000 m³ o &gt; 15 m</td></tr>
-    <tr><td>A2 Actividad (WP/WLI)</td><td>Inactivo (estabilizado, abandonado, relicto)</td><td>Latente</td><td>Suspendido</td><td>Activo, reactivado</td></tr>
-    <tr><td>A3 Indicios (9 posibles, salen de las respuestas: grietas en la corona, retrogresión, agua en el talud, aguas sin manejo, corte o socavación al pie, sobrecarga, bloques o árboles, inclinación alta sin cobertura, obras con daño)</td><td>Ninguno</td><td>1</td><td>2 o 3</td><td>4 o más</td></tr>
-    <tr><td>A4 Velocidad esperada (según el mecanismo; no se pregunta)</td><td>Reptación</td><td>Rotacional</td><td>Traslacional, complejo, no determinado</td><td>Caída, volcamiento, flujo</td></tr>
-    <tr><td>Nivel de amenaza (A1+A2+A3+A4)</td><td colspan="4">4–8 Baja · 9–11 Media · 12–13 Alta · 14–16 Muy alta</td></tr>
-    <tr><td>Exposición (nivel más alto)</td><td colspan="4">0 Ninguno · 1 peatonal, cauce, cultivos · 2 vía secundaria, puente, redes domiciliarias, viviendas deshabitadas · 3 viviendas habitadas (1–2), vía principal o única, redes principales · 4 tres o más viviendas habitadas, edificaciones esenciales o de concentración de público</td></tr>
-    <tr><td>Banderas rojas</td><td colspan="4">Cualquiera → CRÍTICA</td></tr></table></div>
-    <div class="tabla-caja" style="margin-top:10px"><table class="t matriz">${$('matriz').innerHTML}</table></div></section>`;
-  $('vista-spec').innerHTML = h;
-}
-
-// ---------- vistas y ejemplo
-function vista(n) {
-  if (n === 'fb') mensaje();
-  ['llenar', 'doc', 'spec', 'comp', 'fb'].forEach((v) => { $('v-' + v).setAttribute('aria-selected', v === n); $('vista-' + v).hidden = v !== n; });
-  $('barra').hidden = n !== 'llenar';
-  if (n === 'doc') documento();
-  if (n === 'spec') especificacion();
-}
-const EJEMPLO = {
-  codigo_evaluacion: 'DIGER-EJEMPLO-001', fecha_hora_visita: '2026-11-17T09:30', municipio: 'Pereira', zona: 'Urbana',
-  comuna_corregimiento: 'Comuna de ejemplo', barrio_vereda: 'Barrio de ejemplo', direccion_referencia: 'Calle 0 # 0-00, talud posterior', coordenadas: { lat: '4.8', lon: '-75.7', alt: '1420', prec: '4' },
-  evaluadores: 'Evaluador de ejemplo',
-  hay_movimiento: 'Sí, movimiento en masa ocurrido', tipo_talud: 'Talud de corte',
-  material: ['Cenizas volcánicas', 'Flujo de lodo volcánico (Formación Pereira)'], altura_talud_m: '8', pendiente: 'Alta', cobertura: 'Pastos o cultivos',
-  agua: ['Húmedo', 'Escorrentía concentrada sin manejo', 'Fuga de redes de acueducto o alcantarillado'], obras: 'No hay',
-  evidencias: ['Grietas de tensión en la corona', 'Escarpe', 'Retrogresión: el escarpe avanza hacia viviendas o vías', 'Abombamiento o material acumulado al pie', 'La comunidad reporta movimiento reciente'],
-  antiguedad_evidencias: 'Frescas',
-  mecanismo: 'Deslizamiento traslacional', estado_actividad: 'Activo',
-  detonantes: ['Lluvias', 'Agua de redes o aguas mal dispuestas', 'Sobrecarga en la corona (relleno, construcción)'],
-  forma_magnitud: 'Medidas aproximadas en campo', dim_longitud_m: '15', dim_ancho_m: '10', dim_profundidad_m: '1.5',
-  expuestos: ['Viviendas habitadas', 'Vía secundaria', 'Redes de servicios públicos'], distancia_minima_m: '3',
-  viviendas_n: '2', afectacion: 'Moderada',
-  banderas: ['Ninguna'],
-  acciones: ['Manejo de aguas', 'Reparación de redes de servicio', 'Retiro de sobrecarga o material suelto', 'Testigos de grietas o instrumentación', 'Evacuación preventiva', 'Estudio geotécnico'],
-  concepto_campo: 'Deslizamiento traslacional activo y retrogresivo en cenizas volcánicas sobre flujo de lodo, detonado por la infiltración de una fuga de acueducto y la escorrentía concentrada de la vía, con sobrecarga de un relleno en la corona. El escarpe está a unos 3 m de dos viviendas habitadas.',
-  responsables: [{ nombre: 'Evaluador de ejemplo', tp: '00000-EJ', entidad: 'DIGER' }, {}, {}]
-};
-function cargar(datos) { R = JSON.parse(JSON.stringify(datos)); fotos = {}; ultimaSug = null; escribir(); pintar(); $('errores').textContent = ''; $('enviado').hidden = true; if (!$('vista-doc').hidden) documento(); }
-document.addEventListener('input', leer);
-document.addEventListener('change', (e) => { if (e.target.type === 'radio' || e.target.type === 'checkbox' || e.target.type === 'file' || e.target.tagName === 'SELECT') leer(e); });
-$('b-ejemplo').onclick = () => cargar(EJEMPLO);
-$('b-limpiar').onclick = () => cargar({ codigo_evaluacion: 'DIGER-NUEVA' });
-$('b-enviar').onclick = validar;
-$('b-gps').onclick = () => { R.coordenadas = { lat: '4.81', lon: '-75.69', alt: '1405', prec: '5' }; escribir(); pintar(); };
-$('v-llenar').onclick = () => vista('llenar'); $('v-doc').onclick = () => vista('doc'); $('v-spec').onclick = () => vista('spec'); $('v-comp').onclick = () => vista('comp'); $('v-fb').onclick = () => vista('fb');
-
-// ---------- comentarios (solo arma el texto; no se envía nada desde la página)
-function resumenCaso() {
+// ---------------------------------------------------------------- finalizar (simulado) y comentarios
+$('btn-enviar-ficha').addEventListener('click', () => {
   pintar();
-  const k = R._k || {}, F = k.factores || {};
-  if (R.hay_movimiento === 'No') return 'Caso: sin movimiento en masa (' + (R.hallazgo_sin_movimiento || 'hallazgo sin indicar') + ') → SIN PRIORIDAD';
-  const l = ['Caso llenado:', '- Tipo: ' + (R.mecanismo || '—') + ' · Estado: ' + (R.estado_actividad || '—') + ' · Altura: ' + (R.altura_talud_m || '—') + ' m',
-    '- Expuestos: ' + ((R.expuestos || []).join(', ') || '—') + ' · Viviendas: ' + (R.viviendas_n || 0) + ' · Afectación: ' + (R.afectacion || '—'),
-    '- Calificación: A1 ' + (F.A1 ? F.A1.pts : 0) + ' + A2 ' + (F.A2 ? F.A2.pts : 0) + ' + A3 ' + (F.A3 ? F.A3.pts : 0) + ' + A4 ' + (F.A4 ? F.A4.pts : 0) +
-      ' = ' + (k.puntos || 0) + ' (' + (k.amenaza || '—') + ') · Exposición ' + (k.exposicion || 0),
-    '- Prioridad sugerida: ' + (k.sugerida || '—') + ' · Prioridad que yo daría: ' + (R.prioridad || '—')];
-  if (R._dif) l.push('- Justificación: ' + (R.justificacion_motivo || '') + ': ' + (R.justificacion_texto || ''));
-  return l.join('\n');
-}
-function mensaje() {
-  const t = ['Comentarios a la propuesta de ficha de taludes 2.0', 'De: ' + ($('fb-nombre').value.trim() || 'sin nombre') + ' (' + $('fb-entidad').value + ')', '',
-    $('fb-texto').value.trim() || '(sin observaciones escritas)'];
-  if ($('fb-caso').checked) t.push('', resumenCaso());
-  const txt = t.join('\n');
-  $('fb-previa').textContent = txt;
-  $('fb-wa').href = 'https://wa.me/?text=' + encodeURIComponent(txt);
-  $('fb-mail').href = 'mailto:?subject=' + encodeURIComponent('Comentarios ficha de taludes 2.0') + '&body=' + encodeURIComponent(txt);
-  return txt;
-}
-['fb-nombre', 'fb-entidad', 'fb-texto', 'fb-caso'].forEach((id) => { $(id).addEventListener('input', mensaje); $(id).addEventListener('change', mensaje); });
-$('fb-copiar').onclick = () => {
-  const txt = mensaje();
-  const listo = () => { $('fb-ok').hidden = false; setTimeout(() => { $('fb-ok').hidden = true; }, 2500); };
-  if (navigator.clipboard) navigator.clipboard.writeText(txt).then(listo, () => { seleccionar(); });
-  else seleccionar();
-  function seleccionar() { const s = document.getSelection(), rg = document.createRange(); rg.selectNodeContents($('fb-previa')); s.removeAllRanges(); s.addRange(rg); }
-};
-cargar(EJEMPLO);
+  form.querySelectorAll('.faltante').forEach((x) => x.classList.remove('faltante'));
+  const faltan = [];
+  campos.forEach((c) => faltantes(c).forEach((id) => {
+    faltan.push(c);
+    const el = form.querySelector('[data-campo="' + id + '"]') || form.querySelector('[data-detalle="' + id + '"]');
+    if (el) el.classList.add('faltante');
+  }));
+  if (faltan.length) {
+    const primera = faltan[0];
+    $('msg-validacion').textContent = 'Faltan ' + faltan.length + ' respuesta(s). La primera está en la sección ' + primera.sec.numero + '.';
+    const s = form.querySelector('[data-seccion="' + primera.sec.id + '"]'); s.classList.remove('cerrada');
+    form.querySelector('.faltante').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+  $('msg-validacion').textContent = '';
+  const k = D._k, r = $('resultado');
+  r.hidden = false;
+  r.innerHTML = '<b>Ficha completa (demostración).</b> En la versión real se enviaría con: prioridad sugerida <span class="chip ' + (k.sugerida || 'gris') + '">' + esc(k.sugerida) + '</span>' +
+    (D.prioridad && D.prioridad !== k.sugerida ? ' · prioridad final <span class="chip ' + D.prioridad + '">' + D.prioridad + '</span> (justificada)' : '') +
+    '<p style="margin:12px 0 4px"><b>¿Comentarios sobre la propuesta?</b> Escríbalos y envíelos al coordinador de la propuesta en la DIGER. Se adjunta el resumen de este caso.</p>' +
+    '<textarea id="fb-texto" placeholder="Preguntas que sobran o faltan, opciones, la prioridad sugerida…"></textarea>' +
+    '<div class="botones"><a class="btn-principal" id="fb-wa" target="_blank" rel="noopener" href="#">WhatsApp</a><a class="btn-secundario" id="fb-mail" href="#">Correo</a>' +
+    '<button type="button" class="btn-secundario" id="fb-copiar">Copiar</button></div>';
+  const msg = () => {
+    const F = k.factores || {};
+    const t = 'Comentarios a la propuesta de ficha de taludes 2.0\n\n' + ($('fb-texto').value.trim() || '(sin observaciones)') + '\n\nCaso de prueba: ' + (D.hay_movimiento || '') +
+      (F.A1 ? '\nA1 ' + F.A1.pts + ' + A2 ' + F.A2.pts + ' + A3 ' + F.A3.pts + ' + A4 ' + F.A4.pts + ' = ' + k.puntos + ' (' + k.amenaza + ') · Exposición ' + k.exposicion : '') +
+      '\nPrioridad sugerida: ' + k.sugerida + (D.prioridad ? ' · final: ' + D.prioridad : '') + (D._dif ? '\nJustificación: ' + D.justificacion_motivo + ': ' + D.justificacion_texto : '');
+    $('fb-wa').href = 'https://wa.me/?text=' + encodeURIComponent(t);
+    $('fb-mail').href = 'mailto:?subject=' + encodeURIComponent('Comentarios ficha de taludes 2.0') + '&body=' + encodeURIComponent(t);
+    return t;
+  };
+  $('fb-texto').addEventListener('input', msg); msg();
+  $('fb-copiar').addEventListener('click', () => { const t = msg(); if (navigator.clipboard) navigator.clipboard.writeText(t).then(() => { $('fb-copiar').textContent = 'Copiado'; }, () => {}); });
+  r.scrollIntoView({ behavior: 'smooth', block: 'center' });
+});
+form.querySelector('[data-campo="fecha_hora_visita"] input').value = D.fecha_hora_visita;
+pintar();
 </script>
 </body>
 </html>
