@@ -6,28 +6,71 @@
 <meta name="robots" content="noindex">
 <title>Propuesta ficha 2.0 · Taludes DIGER</title>
 <link rel="icon" href="../icon-192.png">
-<!-- DEMO de la propuesta de ficha 2.0. NO está conectada a nada: no lee ni escribe la base, no usa config.js, no registra
-     service worker. Usa la MISMA hoja de estilos y el mismo marcado del formulario de la app (app.js: dibujarFormulario /
-     dibujarCampo) para que se vea igual. Ficha y cálculo: ficha2-schema.js. El service worker de la app no guarda esta carpeta. -->
+<!-- DEMO de la propuesta de ficha 2.0 (guiada por pasos). NO está conectada a nada: no lee ni escribe la base, no usa
+     config.js, no registra service worker. Usa styles.css de la app (mismos colores, tarjetas, píldoras y botones).
+     Ficha, rutas y cálculo: ficha2-schema.js. El service worker de la app no guarda esta carpeta. -->
 <link rel="stylesheet" href="../styles.css">
 <style>
-  /* Solo lo nuevo de la 2.0 (la calificación); todo lo demás viene de styles.css */
-  .demo-aviso { background: #fff4d6; border: 1px solid #e6c46a; border-radius: var(--radio); padding: 10px 12px; font-size: .82rem; margin-bottom: 14px; }
-  .calif { border: 1.5px solid var(--borde); border-radius: var(--radio); background: #fbfdfe; padding: 12px; }
-  .calif table { width: 100%; border-collapse: collapse; font-size: .82rem; font-variant-numeric: tabular-nums; }
-  .calif td, .calif th { padding: 5px 4px; border-bottom: 1px solid var(--borde); text-align: left; vertical-align: top; }
-  .calif td:last-child, .calif th:last-child { text-align: right; white-space: nowrap; font-weight: 700; }
-  .calif .tot td { font-weight: 800; color: var(--azul); }
-  .calif-ind { font-size: .78rem; color: var(--texto-suave); margin: 8px 0 0; }
-  .calif-adv { background: #fff4d6; border-left: 4px solid #e6a100; border-radius: 6px; padding: 8px 10px; font-size: .8rem; margin-top: 10px; }
-  .calif-adv ul { margin: 4px 0 0; padding-left: 18px; }
-  .sugerida { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; font-size: .86rem; font-weight: 700; }
-  .sugerida .chip { font-size: .8rem; padding: 5px 12px; }
-  .ficha-topbar .chip { flex: none; }
-  .resultado { border: 2px solid var(--azul); border-radius: var(--radio); background: #fff; padding: 12px; margin-top: 12px; font-size: .86rem; }
-  .resultado textarea { min-height: 90px; }
-  .resultado .botones { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
-  .resultado .botones a, .resultado .botones button { flex: 1 1 140px; text-align: center; text-decoration: none; }
+  /* Lo nuevo de la 2.0. Todo lo demás (barra azul, tarjetas, píldoras, botones) viene de styles.css. */
+  #form-ficha { padding-bottom: 40px; }
+  .demo-aviso { background: #fff4d6; border: 1px solid #e6c46a; border-radius: var(--radio); padding: 9px 12px; font-size: .8rem; margin-bottom: 12px; }
+  /* pasos */
+  .pasos { display: flex; gap: 6px; overflow-x: auto; padding: 10px 14px 4px; scrollbar-width: none; max-width: calc(var(--ancho-lectura) + 28px); margin: 0 auto; }
+  .pasos::-webkit-scrollbar { display: none; }
+  .paso { flex: none; display: flex; align-items: center; gap: 6px; border: 1.5px solid var(--borde); background: #fff; border-radius: 999px;
+    padding: 5px 11px 5px 5px; font: 600 .78rem inherit; font-family: inherit; color: var(--texto-suave); cursor: pointer; }
+  .paso b { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--borde); color: #fff; font-size: .74rem; }
+  .paso.hecho b { background: var(--ok); }
+  .paso.pendiente b { background: #e6a100; }
+  .paso.actual { border-color: var(--azul); color: var(--azul); background: var(--azul-claro); }
+  .paso.actual b { background: var(--azul); }
+  .paso[hidden] { display: none; }
+  .paso-titulo { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 4px 2px 10px; }
+  .paso-titulo h2 { margin: 0; font-size: 1.15rem; color: var(--azul); }
+  .paso-titulo span { font-size: .78rem; color: var(--texto-suave); white-space: nowrap; }
+  .seccion.oculta { display: none; }
+  .seccion .seccion-cuerpo { padding: 16px 14px 6px; }
+  /* tarjetas con dibujo */
+  .tarjetas { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+  .tarjetas.ruta { grid-template-columns: 1fr; gap: 10px; }
+  @media (min-width: 720px) { .tarjetas.ruta { grid-template-columns: repeat(3, 1fr); } }
+  .tarjeta-op { position: relative; display: block; cursor: pointer; }
+  .tarjeta-op input { position: absolute; opacity: 0; pointer-events: none; }
+  .tarjeta-op > span { display: flex; flex-direction: column; gap: 4px; height: 100%; border: 1.5px solid var(--borde); border-radius: var(--radio); background: #fff; padding: 10px; transition: border-color .15s, background-color .15s; }
+  .tarjeta-op svg { width: 100%; height: 54px; color: var(--azul); }
+  .tarjeta-op strong { font-size: .86rem; }
+  .tarjeta-op em { font-style: normal; font-size: .74rem; color: var(--texto-suave); line-height: 1.3; }
+  .tarjeta-op input:checked + span { border-color: var(--azul); background: var(--azul-claro); box-shadow: inset 0 0 0 1px var(--azul); }
+  .tarjeta-op input:focus-visible + span { box-shadow: 0 0 0 3px var(--azul-claro); }
+  .ruta .tarjeta-op > span { padding: 14px; }
+  .ruta .tarjeta-op svg { height: 70px; }
+  .ruta .tarjeta-op strong { font-size: 1rem; }
+  .ruta .tarjeta-op em { font-size: .8rem; }
+  .masa { fill: var(--azul-claro); }
+  /* resultado */
+  .resultado-prio { border: 2px solid var(--azul); border-radius: var(--radio); background: #fff; padding: 14px; text-align: center; }
+  .resultado-prio .chip { font-size: 1.05rem; padding: 8px 18px; }
+  .resultado-prio p { margin: 10px 0 0; font-size: .88rem; }
+  .calc-detalle { margin-top: 10px; text-align: left; font-size: .8rem; }
+  .calc-detalle summary { cursor: pointer; color: var(--azul); font-weight: 700; }
+  .calc-detalle table { width: 100%; border-collapse: collapse; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .calc-detalle td { padding: 4px; border-bottom: 1px solid var(--borde); vertical-align: top; }
+  .calc-detalle td:last-child { text-align: right; font-weight: 700; white-space: nowrap; }
+  .avisos { background: #fff4d6; border-left: 4px solid #e6a100; border-radius: 6px; padding: 8px 10px; font-size: .8rem; margin-top: 10px; text-align: left; }
+  .avisos ul { margin: 4px 0 0; padding-left: 18px; }
+  /* barra inferior */
+  .nav-pasos { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; max-width: var(--ancho-lectura); margin: 0 auto; }
+  .nav-pasos .btn-principal, .nav-pasos .btn-secundario { width: auto; padding: 12px 16px; }
+  .medidor { display: grid; gap: 3px; font-size: .68rem; color: var(--texto-suave); min-width: 0; }
+  .medidor .fila { display: grid; grid-template-columns: 62px 1fr; align-items: center; gap: 6px; }
+  .medidor .barra { height: 6px; border-radius: 3px; background: var(--borde); overflow: hidden; }
+  .medidor .barra i { display: block; height: 100%; width: 0; background: var(--azul); transition: width .3s; }
+  .medidor .sug { display: flex; align-items: center; gap: 6px; font-weight: 700; }
+  .fin { border: 2px solid var(--ok); border-radius: var(--radio); background: #fff; padding: 14px; margin-top: 14px; font-size: .86rem; }
+  .fin textarea { min-height: 90px; }
+  .fin .botones { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .fin .botones > * { flex: 1 1 120px; width: auto; text-align: center; text-decoration: none; }
+  @media (prefers-reduced-motion: reduce) { .medidor .barra i, .tarjeta-op > span { transition: none; } }
 </style>
 </head>
 <body>
@@ -37,37 +80,64 @@
       <strong>Ficha de evaluación 2.0 · DEMO</strong>
       <span>Propuesta para revisión · no se guarda ni se envía</span>
     </div>
-    <span class="chip gris" id="chip-top" title="Prioridad sugerida por el sistema">—</span>
   </div>
   <div id="barra-progreso"><div id="barra-progreso-relleno"></div></div>
+  <nav class="pasos" id="pasos" aria-label="Pasos de la ficha"></nav>
   <form id="form-ficha" autocomplete="off" onsubmit="return false">
-    <div class="demo-aviso"><b>Demostración de la ficha 2.0.</b> Llénela con un caso hipotético y observe cómo el sistema sugiere la prioridad
-      (arriba a la derecha y en las secciones 6 y 7). No está conectada a la base: nada se guarda ni se envía.</div>
+    <div class="demo-aviso" id="demo-aviso"><b>Demostración.</b> Llene la ficha con un caso hipotético: verá cómo cambian las preguntas según lo que encuentre y cómo el sistema sugiere la prioridad. Nada se guarda ni se envía.</div>
+    <div class="paso-titulo"><h2 id="titulo-paso"></h2><span id="conteo-paso"></span></div>
   </form>
   <div class="ficha-pie">
     <p id="msg-validacion" class="msg-error"></p>
-    <button type="button" id="btn-enviar-ficha" class="btn-principal">Finalizar (demostración)</button>
-    <div id="resultado" class="resultado" hidden></div>
+    <div class="nav-pasos">
+      <button type="button" class="btn-secundario" id="btn-atras">&larr; Atrás</button>
+      <div class="medidor" id="medidor" aria-live="polite">
+        <div class="fila"><span>Amenaza</span><div class="barra"><i id="m-amenaza"></i></div></div>
+        <div class="fila"><span>Exposición</span><div class="barra"><i id="m-expo"></i></div></div>
+        <div class="sug">Sugerida <span class="chip gris" id="chip-sug">—</span></div>
+      </div>
+      <button type="button" class="btn-principal" id="btn-siguiente">Siguiente &rarr;</button>
+    </div>
   </div>
 </section>
 
-<script src="ficha2-schema.js" charset="utf-8"></script>
+<script src="ficha2-schema.js?v=20261118b" charset="utf-8"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const D = {};               // respuestas
-let ultimaSug = null, fotos = {};
-const campos = []; FICHA2.secciones.forEach((s) => s.campos.forEach((c) => campos.push(Object.assign({ sec: s }, c))));
+const D = {}, fotos = {};
+let ultimaSug = null, actual = 0;
 const pad = (n) => String(n).padStart(2, '0');
-const ahora = new Date();
-D.fecha_hora_visita = ahora.getFullYear() + '-' + pad(ahora.getMonth() + 1) + '-' + pad(ahora.getDate()) + 'T' + pad(ahora.getHours()) + ':' + pad(ahora.getMinutes());
+const t0 = new Date();
+D.fecha_hora_visita = t0.getFullYear() + '-' + pad(t0.getMonth() + 1) + '-' + pad(t0.getDate()) + 'T' + pad(t0.getHours()) + ':' + pad(t0.getMinutes());
 D.codigo_evaluacion = 'DEMO-2.0';
+const SECS = FICHA2.secciones;
+const campos = []; SECS.forEach((s) => s.campos.forEach((c) => campos.push(Object.assign({ sec: s }, c))));
 
+// ---------------------------------------------------------------- pictogramas (perfil del talud; la masa movida en azul claro)
+const P = (cuerpo) => '<svg viewBox="0 0 80 50" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + cuerpo + '</svg>';
+const LADERA = '<path d="M2 12H22L58 42H78"/>';
+const DIBUJOS = {
+  'caida': P('<path d="M2 10H32V44H78"/><rect class="masa" x="40" y="30" width="8" height="7" transform="rotate(20 44 33)"/><rect class="masa" x="52" y="38" width="6" height="5"/><path d="M33 14C42 16 44 22 43 28" stroke-dasharray="3 3"/>'),
+  'volcamiento': P('<path d="M2 10H30V44H78"/><path class="masa" d="M31 12L38 10L46 40L39 42Z"/><path d="M36 6C46 6 50 12 50 20" /><path d="M47 18L50 21L53 17"/>'),
+  'rotacional': P(LADERA + '<path class="masa" d="M24 14Q22 38 56 42L44 32Z" stroke-width="1.5"/><path d="M24 14Q22 40 58 42" stroke-dasharray="3 3"/><path d="M30 22Q30 30 40 34"/><path d="M37 35L41 34L39 31"/>'),
+  'traslacional': P(LADERA + '<path class="masa" d="M28 17L54 39L58 36L32 14Z" stroke-width="1.5"/><path d="M26 20L56 44" stroke-dasharray="3 3"/><path d="M36 22L48 32"/><path d="M45 32L49 33L48 29"/>'),
+  'flujo': P(LADERA + '<path class="masa" d="M26 15C32 22 36 26 42 33C50 40 62 40 74 44L46 44C40 40 34 30 26 15Z" stroke-width="1.5"/><path d="M34 26C38 30 40 34 46 38" stroke-dasharray="3 3"/>'),
+  'reptacion': P(LADERA + '<path d="M30 18L27 8M42 28L38 18M54 38L49 28"/><path d="M33 26L44 35M45 36L44 32L48 34" />'),
+  'complejo': P(LADERA + '<path class="masa" d="M24 14Q24 30 38 32C46 36 60 40 74 44L50 44C44 40 34 36 30 30Z" stroke-width="1.5"/>'),
+  'nd': P(LADERA + '<path d="M50 16C50 10 60 10 60 16C60 20 55 20 55 25"/><circle cx="55" cy="30" r="1" fill="currentColor"/>'),
+  'ruta-mov': P(LADERA + '<path class="masa" d="M24 14Q24 36 54 40L58 42H70L60 38Z" stroke-width="1.5"/><path d="M34 26L46 36M43 36L47 37L46 33"/>'),
+  'ruta-ine': P(LADERA + '<path d="M14 12L16 8L18 12L20 8" /><path d="M64 42V32H74V42"/><path d="M62 33L69 27L76 33"/><path d="M67 36L69 38L68 40"/>'),
+  'ruta-no': P('<path d="M2 44H78"/><path d="M26 44V24H54V44"/><path d="M22 26L40 12L58 26"/><path d="M38 30L42 34L40 38" /><circle cx="64" cy="18" r="7"/><path d="M61 18L63.5 20.5L67.5 15.5"/>'),
+  'pend-baja': P('<path d="M4 44H24L60 38H76"/>'),
+  'pend-media': P('<path d="M4 44H18L56 20H76"/>'),
+  'pend-alta': P('<path d="M4 44H26L38 8H76"/>')
+};
+
+// ---------------------------------------------------------------- visibilidad
 function cumple(cond) {
   if (!cond) return true;
   if (Array.isArray(cond)) return cond.every(cumple);
-  // Mientras no se responde la pregunta 1, la ficha se muestra completa (como si hubiera movimiento).
-  if (cond.campo === 'hay_movimiento' && !D.hay_movimiento) return cond.valor !== 'No';
   const v = D[cond.campo], arr = Array.isArray(v) ? v : (v ? [v] : []);
   if (cond.valor !== undefined) return v === cond.valor;
   if (cond.valores) return cond.valores.includes(v);
@@ -76,17 +146,18 @@ function cumple(cond) {
   return true;
 }
 const visible = (c) => cumple(c.sec.soloSi) && cumple(c.soloSi);
+const pasosVisibles = () => SECS.filter((s) => cumple(s.soloSi) && (s.id === 's1' || s.id === 's2' || D.hay_movimiento));
 
-// ---------------------------------------------------------------- dibujar (mismo marcado que la app)
+// ---------------------------------------------------------------- dibujar un campo (marcado de la app + tarjetas con dibujo)
 function dibujarCampo(c) {
   const div = document.createElement('div');
   div.className = 'campo ancho-completo';
   div.dataset.campo = c.id;
-  const etq = '<label class="campo-etiqueta">' + esc(c.etiqueta) + (c.unidad ? ' (' + esc(c.unidad) + ')' : '') + (c.requerido ? ' <span class="req">*</span>' : '') + '</label>' +
+  const etq = c.tipo === 'calculado' ? '' : '<label class="campo-etiqueta">' + esc(c.etiqueta) + (c.unidad ? ' (' + esc(c.unidad) + ')' : '') + (c.requerido ? ' <span class="req">*</span>' : '') + '</label>' +
     (c.ayuda ? '<p class="campo-ayuda">' + esc(c.ayuda) + '</p>' : '');
   if (c.tipo === 'texto' && c.soloLectura) {
     div.innerHTML = etq + '<div class="valor-fijo">' + esc(D[c.id]) + '</div>';
-  } else if (c.tipo === 'texto' || c.tipo === 'numero' || c.tipo === 'fecha_hora') {
+  } else if (['texto', 'numero', 'fecha_hora'].includes(c.tipo)) {
     div.innerHTML = etq + '<input type="' + (c.tipo === 'fecha_hora' ? 'datetime-local' : 'text') + '"' + (c.tipo === 'numero' ? ' inputmode="decimal"' : '') + ' value="' + esc(D[c.id] || '') + '">';
     div.querySelector('input').addEventListener('input', (e) => { let v = e.target.value; if (c.tipo === 'numero') { v = v.replace(',', '.').replace(/[^0-9.]/g, ''); e.target.value = v; } set(c.id, v); });
   } else if (c.tipo === 'textarea') {
@@ -95,47 +166,53 @@ function dibujarCampo(c) {
   } else if (c.tipo === 'municipio') {
     div.innerHTML = etq + '<select><option value="">Selecciona el municipio</option>' + c.opciones.map((m) => '<option>' + esc(m) + '</option>').join('') + '</select>';
     div.querySelector('select').addEventListener('change', (e) => set(c.id, e.target.value));
-  } else if (c.tipo === 'unica' || c.tipo === 'multiple' || c.tipo === 'prioridad') {
+  } else if (['unica', 'multiple', 'ruta', 'prioridad'].includes(c.tipo)) {
     const multiple = c.tipo === 'multiple';
-    const clase = c.destacado || c.descripciones ? 'opciones opciones-destacadas' : 'opciones';
-    let pre = '';
-    if (c.tipo === 'prioridad') pre = '<div class="sugerida">Prioridad sugerida por el sistema: <span class="chip gris" id="chip-sug">—</span></div>';
-    div.innerHTML = etq + pre + '<div class="' + clase + '">' + c.opciones.map((op) => {
-      const desc = c.descripciones && c.descripciones[op] ? '<em>' + esc(c.descripciones[op]) + '</em>' : '';
-      return '<label class="opcion"><input type="' + (multiple ? 'checkbox' : 'radio') + '" name="' + c.id + '" value="' + esc(op) + '"><span>' + esc(op) + desc + '</span></label>';
-    }).join('') + '</div><div class="detalles"></div>';
+    const conDibujo = !!c.dibujos;
+    let h = c.tipo === 'prioridad' ? '' : etq;
+    if (c.tipo === 'prioridad') h += '<div id="resultado-prio"></div><label class="campo-etiqueta" style="margin-top:14px">' + esc(c.etiqueta) + ' <span class="req">*</span></label><p class="campo-ayuda">Viene marcada con la sugerida. Si la cambia, debe justificar.</p>';
+    if (conDibujo) {
+      h += '<div class="tarjetas' + (c.tipo === 'ruta' ? ' ruta' : '') + '">' + c.opciones.map((op) =>
+        '<label class="tarjeta-op"><input type="' + (multiple ? 'checkbox' : 'radio') + '" name="' + c.id + '" value="' + esc(op) + '"><span>' +
+        (DIBUJOS[c.dibujos[op]] || '') + '<strong>' + esc(op) + '</strong>' + (c.descripciones && c.descripciones[op] ? '<em>' + esc(c.descripciones[op]) + '</em>' : '') + '</span></label>').join('') + '</div>';
+    } else {
+      const clase = c.descripciones ? 'opciones opciones-destacadas' : 'opciones';
+      h += '<div class="' + clase + '">' + c.opciones.map((op) => '<label class="opcion"><input type="' + (multiple ? 'checkbox' : 'radio') + '" name="' + c.id + '" value="' + esc(op) + '"><span>' + esc(op) +
+        (c.descripciones && c.descripciones[op] ? '<em>' + esc(c.descripciones[op]) + '</em>' : '') + '</span></label>').join('') + '</div>';
+    }
+    div.innerHTML = h + '<div class="detalles"></div>';
     const caja = div.querySelector('.detalles');
-    const pintarDetalles = () => {
-      const activos = [...div.querySelectorAll('.opciones input:checked')].map((x) => x.value);
-      let h = Object.keys(c.detalles || {}).filter((op) => activos.includes(op)).map((op) => {
-        const d = c.detalles[op];
-        return '<div class="detalle" data-detalle="' + d.id + '"><label class="campo-etiqueta">' + esc(d.etiqueta) + ' <span class="req">*</span></label><input type="text" data-id="' + d.id + '" value="' + esc(D[d.id] || '') + '" placeholder="Escribe aquí"></div>';
+    div._pintarDetalles = () => {
+      const activos = [...div.querySelectorAll('input[name="' + c.id + '"]:checked')].map((x) => x.value);
+      let d = Object.keys(c.detalles || {}).filter((op) => activos.includes(op)).map((op) => {
+        const x = c.detalles[op];
+        return '<div class="detalle" data-detalle="' + x.id + '"><label class="campo-etiqueta">' + esc(x.etiqueta) + ' <span class="req">*</span></label><input type="text" data-id="' + x.id + '" value="' + esc(D[x.id] || '') + '" placeholder="Escribe aquí"></div>';
       }).join('');
-      if (c.tipo === 'prioridad' && FICHA_NIV.includes(D._sug) && D.prioridad && D.prioridad !== D._sug) {
-        const sube = FICHA_NIV.indexOf(D.prioridad) > FICHA_NIV.indexOf(D._sug);
-        h += '<div class="detalle" data-detalle="justificacion_motivo"><label class="campo-etiqueta">¿Por qué ' + (sube ? 'SUBE' : 'BAJA') + ' la prioridad de ' + D._sug + ' a ' + D.prioridad + '? <span class="req">*</span></label>' +
+      if (c.tipo === 'prioridad' && NIVELES.includes(D._sug) && D.prioridad && D.prioridad !== D._sug) {
+        const sube = NIVELES.indexOf(D.prioridad) > NIVELES.indexOf(D._sug);
+        d += '<div class="detalle" data-detalle="justificacion_motivo"><label class="campo-etiqueta">¿Por qué la ' + (sube ? 'sube' : 'baja') + ' de ' + D._sug + ' a ' + D.prioridad + '? <span class="req">*</span></label>' +
           '<select data-id="justificacion_motivo"><option value="">Selecciona el motivo</option>' + c.justificacion.motivos.map((m) => '<option' + (D.justificacion_motivo === m ? ' selected' : '') + '>' + esc(m) + '</option>').join('') + '</select></div>' +
-          '<div class="detalle" data-detalle="justificacion_texto"><label class="campo-etiqueta">Justificación técnica (mínimo ' + c.justificacion.minimo + ' caracteres) <span class="req">*</span></label><textarea data-id="justificacion_texto">' + esc(D.justificacion_texto || '') + '</textarea></div>';
+          '<div class="detalle" data-detalle="justificacion_texto"><label class="campo-etiqueta">Explique (mínimo ' + c.justificacion.minimo + ' caracteres) <span class="req">*</span></label><textarea data-id="justificacion_texto">' + esc(D.justificacion_texto || '') + '</textarea></div>';
       }
-      caja.innerHTML = h;
+      caja.innerHTML = d;
       caja.querySelectorAll('[data-id]').forEach((el) => el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', () => set(el.dataset.id, el.value, true)));
     };
-    div._pintarDetalles = pintarDetalles;
-    div.querySelectorAll('.opciones input').forEach((inp) => inp.addEventListener('change', () => {
+    div.querySelectorAll('input[name="' + c.id + '"]').forEach((inp) => inp.addEventListener('change', () => {
       if (multiple) {
-        let arr = [...div.querySelectorAll('.opciones input:checked')].map((x) => x.value);
+        let arr = [...div.querySelectorAll('input[name="' + c.id + '"]:checked')].map((x) => x.value);
         const ex = c.exclusivas || [];
         if (inp.checked && ex.includes(inp.value)) arr = [inp.value]; else if (inp.checked) arr = arr.filter((x) => !ex.includes(x));
-        div.querySelectorAll('.opciones input').forEach((x) => { x.checked = arr.includes(x.value); });
+        div.querySelectorAll('input[name="' + c.id + '"]').forEach((x) => { x.checked = arr.includes(x.value); });
         set(c.id, arr);
       } else set(c.id, inp.value);
-      pintarDetalles();
+      div._pintarDetalles();
+      if (c.tipo === 'ruta') setTimeout(() => ir(pasosVisibles().findIndex((s) => s.id === 's2') + 1), 250);   // elegir la ruta lleva solo al paso siguiente
     }));
   } else if (c.tipo === 'gps') {
     div.innerHTML = etq + '<div class="gps-caja"><button type="button" class="btn-secundario btn-gps">Capturar mi ubicación</button>' +
       '<div class="gps-coords"><label>Latitud (Y)<input type="text" inputmode="decimal" class="gps-y" placeholder="4.8123456"></label>' +
       '<label>Longitud (X)<input type="text" inputmode="decimal" class="gps-x" placeholder="-75.7012345"></label>' +
-      '<label>Altitud (Z m)<input type="text" inputmode="decimal" class="gps-z" placeholder="1487"></label></div><p class="gps-estado">Sin coordenadas todavía.</p></div>';
+      '<label>Altitud (m)<input type="text" inputmode="decimal" class="gps-z" placeholder="1487"></label></div><p class="gps-estado">Sin coordenadas todavía.</p></div>';
     const lee = () => set(c.id, { y: div.querySelector('.gps-y').value, x: div.querySelector('.gps-x').value, z: div.querySelector('.gps-z').value });
     div.querySelectorAll('.gps-coords input').forEach((i) => i.addEventListener('input', lee));
     div.querySelector('.btn-gps').addEventListener('click', () => {
@@ -145,7 +222,7 @@ function dibujarCampo(c) {
       navigator.geolocation.getCurrentPosition((p) => {
         div.querySelector('.gps-y').value = p.coords.latitude.toFixed(7); div.querySelector('.gps-x').value = p.coords.longitude.toFixed(7);
         div.querySelector('.gps-z').value = p.coords.altitude ? Math.round(p.coords.altitude) : '';
-        est.textContent = 'Coordenadas registradas (precisión ' + Math.round(p.coords.accuracy) + ' m).'; est.className = 'gps-estado ok'; lee();
+        est.textContent = 'Ubicación registrada (precisión ' + Math.round(p.coords.accuracy) + ' m).'; est.className = 'gps-estado ok'; lee();
       }, () => { est.textContent = 'No se pudo obtener la ubicación: escríbala a mano.'; }, { enableHighAccuracy: true, timeout: 15000 });
     });
   } else if (c.tipo === 'fotos') {
@@ -154,44 +231,35 @@ function dibujarCampo(c) {
       '<label class="fotos-btn alterno">Elegir de la galería<input type="file" accept="image/*" multiple hidden></label></div><p class="fotos-conteo"></p></div>';
     div.querySelectorAll('input[type=file]').forEach((i) => i.addEventListener('change', () => {
       fotos[c.id] = (fotos[c.id] || []).concat([...i.files]);
-      div.querySelector('.fotos-conteo').textContent = fotos[c.id].length + ' foto(s) (en la demo no se suben)';
+      div.querySelector('.fotos-conteo').textContent = fotos[c.id].length + ' foto(s) — en la demo no se suben';
       set(c.id, fotos[c.id].length);
     }));
   } else if (c.tipo === 'responsables') {
-    div.innerHTML = etq + [0, 1, 2].map((i) => '<div class="responsable-caja" data-i="' + i + '"><h4>RESPONSABLE ' + (i + 1) + (i === 0 ? ' (obligatorio)' : ' (opcional)') + '</h4>' +
+    div.innerHTML = etq + [0, 1, 2].map((i) => '<div class="responsable-caja"><h4>RESPONSABLE ' + (i + 1) + (i === 0 ? ' (obligatorio)' : ' (opcional)') + '</h4>' +
       '<label>Nombre<input type="text" class="r-nombre"></label><label>Tarjeta profesional<input type="text" class="r-tp"></label><label>Entidad<input type="text" class="r-entidad"></label></div>').join('');
     div.querySelectorAll('input').forEach((i) => i.addEventListener('input', () => set(c.id, [...div.querySelectorAll('.responsable-caja')].map((b) => ({
       nombre: b.querySelector('.r-nombre').value.trim(), tp: b.querySelector('.r-tp').value.trim(), entidad: b.querySelector('.r-entidad').value.trim() })))));
   } else if (c.tipo === 'calculado') {
-    div.innerHTML = etq + '<div class="calif" id="calc-' + c.id + '"></div>';
+    div.innerHTML = '<div class="valor-fijo" id="calc-' + c.id + '"></div>';
+    if (c.id === 'valoracion') div.hidden = true;   // la calificación se muestra en el recuadro de la prioridad
   }
   return div;
 }
 
 const form = $('form-ficha');
-FICHA2.secciones.forEach((sec, i) => {
+SECS.forEach((sec) => {
   const b = document.createElement('section');
-  b.className = 'seccion' + (i > 0 ? ' cerrada' : '');
+  b.className = 'seccion oculta';
   b.dataset.seccion = sec.id;
-  b.innerHTML = '<div class="seccion-cabeza"><span class="seccion-num">' + sec.numero + '</span><span class="seccion-titulo">' + esc(sec.titulo) + '</span>' +
-    '<span class="seccion-faltan"></span><span class="seccion-flecha">&#9662;</span></div>' +
-    '<div class="seccion-cuerpo">' + (sec.ayuda ? '<p class="seccion-ayuda">' + esc(sec.ayuda) + '</p>' : '') +
-    '<div class="rejilla"></div><button type="button" class="btn-siguiente">Siguiente sección &rarr;</button></div>';
-  b.querySelector('.seccion-cabeza').addEventListener('click', () => b.classList.toggle('cerrada'));
+  b.innerHTML = '<div class="seccion-cuerpo">' + (sec.ayuda ? '<p class="seccion-ayuda">' + esc(sec.ayuda) + '</p>' : '') + '<div class="rejilla"></div></div>';
   const rej = b.querySelector('.rejilla');
   sec.campos.forEach((c) => rej.appendChild(dibujarCampo(Object.assign({ sec }, c))));
-  b.querySelector('.btn-siguiente').addEventListener('click', () => {
-    b.classList.add('cerrada');
-    const sig = FICHA2.secciones.slice(i + 1).find((x) => cumple(x.soloSi));
-    if (sig) { const s = form.querySelector('[data-seccion="' + sig.id + '"]'); s.classList.remove('cerrada'); s.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
-    else $('btn-enviar-ficha').scrollIntoView({ behavior: 'smooth', block: 'center' });
-  });
   form.appendChild(b);
 });
+form.querySelector('[data-campo="fecha_hora_visita"] input').value = D.fecha_hora_visita;
 
-// ---------------------------------------------------------------- estado
-const FICHA_NIV = NIVELES;
-function set(id, v, sinRedibujarDetalles) { D[id] = v; pintar(sinRedibujarDetalles); }
+// ---------------------------------------------------------------- estado y validación
+function set(id, v, sinDetalles) { D[id] = v; pintar(sinDetalles); }
 function vacio(c) {
   const v = D[c.id];
   if (c.tipo === 'gps') return !(v && v.y && v.x);
@@ -210,86 +278,104 @@ function faltantes(c) {
   }
   return f;
 }
-function pintar(sinRedibujarDetalles) {
-  // visibilidad de campos y secciones (como la app: la sección que no aplica queda "omitida")
-  campos.forEach((c) => { form.querySelector('[data-campo="' + c.id + '"]').hidden = !visible(c); });
-  let tot = 0, listos = 0;
-  FICHA2.secciones.forEach((s) => {
-    const b = form.querySelector('[data-seccion="' + s.id + '"]');
-    const om = !cumple(s.soloSi), sinDecidir = s.soloSi && !D.hay_movimiento;
-    b.classList.toggle('omitida', om && !sinDecidir);
-    let n = 0;
-    s.campos.forEach((c) => { const cc = Object.assign({ sec: s }, c); if (!visible(cc) || !c.requerido || c.tipo === 'calculado' || c.soloLectura) return; tot++; if (faltantes(cc).length) n++; else listos++; });
-    const t = b.querySelector('.seccion-faltan');
-    t.className = 'seccion-faltan ' + (sinDecidir ? 'espera' : om ? 'omitida' : n ? 'pendiente' : 'lista');
-    t.textContent = sinDecidir ? 'Según la sección 1' : om ? 'No aplica' : n ? 'Faltan ' + n : 'Completa';
-  });
-  $('barra-progreso-relleno').style.width = (tot ? Math.round(100 * listos / tot) : 0) + '%';
-  // calificación
+const faltanEn = (s) => campos.filter((c) => c.sec === s).reduce((n, c) => n + faltantes(c).length, 0);
+
+function pintar(sinDetalles) {
+  campos.forEach((c) => { if (c.id !== 'valoracion') form.querySelector('[data-campo="' + c.id + '"]').hidden = !visible(c); });
+  const vis = pasosVisibles();
+  if (actual >= vis.length) actual = vis.length - 1;
+  // pasos
+  $('pasos').innerHTML = vis.map((s, i) => '<button type="button" class="paso' + (i === actual ? ' actual' : faltanEn(s) ? (i < actual ? ' pendiente' : '') : ' hecho') + '" data-i="' + i + '"><b>' + (i + 1) + '</b>' + esc(s.corto) + '</button>').join('');
+  $('pasos').querySelectorAll('.paso').forEach((b) => b.addEventListener('click', () => ir(+b.dataset.i)));
+  SECS.forEach((s) => form.querySelector('[data-seccion="' + s.id + '"]').classList.toggle('oculta', s !== vis[actual]));
+  $('titulo-paso').textContent = vis[actual].titulo.toLowerCase().replace(/^(¿?)(.)/, (m, p, l) => p + l.toUpperCase());
+  $('conteo-paso').textContent = 'Paso ' + (actual + 1) + (D.hay_movimiento ? ' de ' + vis.length : '');
+  $('demo-aviso').hidden = actual > 0;
+  $('btn-atras').style.visibility = actual ? 'visible' : 'hidden';
+  $('btn-siguiente').innerHTML = actual === vis.length - 1 && D.hay_movimiento ? 'Finalizar' : 'Siguiente &rarr;';
+  let tot = 0, ok = 0;
+  campos.forEach((c) => { if (visible(c) && c.requerido && c.tipo !== 'calculado') { tot++; if (!faltantes(c).length) ok++; } });
+  $('barra-progreso-relleno').style.width = (tot ? Math.round(100 * ok / tot) : 0) + '%';
+  // calificación en vivo
   const k = calcularCriticidad(D);
-  D._sug = k.sugerida;
+  D._sug = k.sugerida; D._k = k;
   const sug = k.sugerida || '—';
-  [$('chip-top'), $('chip-sug')].forEach((ch) => { ch.textContent = sug; ch.className = 'chip ' + (FICHA_NIV.includes(sug) ? sug : 'gris'); });
-  const F = k.factores || {};
-  $('calc-valoracion').innerHTML = D.hay_movimiento === 'No' ? '' :
-    '<table><tr><th>Factor</th><th>Base</th><th>Pts</th></tr>' +
-    [['A1 Magnitud', F.A1], ['A2 Actividad', F.A2], ['A3 Indicios de reactivación', F.A3], ['A4 Velocidad esperada', F.A4]]
-      .map(([n, f]) => '<tr><td>' + n + '</td><td>' + esc(f ? f.porque : '') + '</td><td>' + (f ? f.pts : 0) + '</td></tr>').join('') +
-    '<tr class="tot"><td>Amenaza</td><td>' + esc(k.amenaza || '') + '</td><td>' + (k.puntos || 0) + '</td></tr>' +
-    '<tr class="tot"><td>Exposición</td><td>' + esc(k.porqueExposicion || '') + '</td><td>' + (k.exposicion || 0) + ' / 4</td></tr></table>' +
-    '<p class="calif-ind"><b>Indicios detectados:</b> ' + esc((k.indicios || []).join('; ') || 'ninguno') + '</p>' +
-    ((k.advertencias || []).length ? '<div class="calif-adv"><b>Revise la coherencia:</b><ul>' + k.advertencias.map((a) => '<li>' + esc(a) + '</li>').join('') + '</ul></div>' : '');
-  // la prioridad final sigue a la sugerida mientras el evaluador no la cambie
-  if (FICHA_NIV.includes(k.sugerida) && k.sugerida !== ultimaSug) {
+  $('chip-sug').textContent = sug; $('chip-sug').className = 'chip ' + (NIVELES.includes(sug) ? sug : 'gris');
+  $('m-amenaza').style.width = k.puntos ? Math.round(100 * (k.puntos - 3) / 13) + '%' : '0';
+  $('m-expo').style.width = Math.round(100 * (k.exposicion || 0) / 4) + '%';
+  $('medidor').style.visibility = D.hay_movimiento === FICHA2.rutas.ninguna ? 'hidden' : 'visible';
+  if (k.volumen !== undefined) $('calc-volumen_m3').textContent = k.volumen ? '≈ ' + Math.round(k.volumen).toLocaleString('es-CO') + ' m³ (aproximado)' : 'Escriba largo, ancho y profundidad';
+  const F = k.factores;
+  $('resultado-prio').innerHTML = !k.sugerida ? '<div class="resultado-prio"><p>Complete los pasos anteriores para ver la prioridad sugerida.</p></div>' :
+    '<div class="resultado-prio"><div class="campo-etiqueta">Prioridad sugerida por el sistema</div><span class="chip ' + k.sugerida + '">' + k.sugerida + '</span>' +
+    '<p>' + esc(explicar(k, D)) + '</p>' +
+    (k.factores.A1 ? '<details class="calc-detalle"><summary>Ver el cálculo</summary><table>' +
+      [['Magnitud', F.A1], ['Actividad', F.A2], ['Señales de reactivación', F.A3], ['Velocidad esperada', F.A4]].map(([n, f]) => '<tr><td>' + n + '</td><td>' + esc(f.porque) + '</td><td>' + f.pts + ' / 4</td></tr>').join('') +
+      '<tr><td><b>Amenaza</b></td><td>' + k.amenaza + '</td><td>' + k.puntos + ' / 16</td></tr><tr><td><b>Exposición</b></td><td>' + esc(k.porqueExposicion) + '</td><td>' + k.exposicion + ' / 4</td></tr></table></details>' : '') +
+    (k.advertencias.length ? '<div class="avisos"><b>Revise:</b><ul>' + k.advertencias.map((a) => '<li>' + esc(a) + '</li>').join('') + '</ul></div>' : '') + '</div>';
+  // la prioridad final acompaña a la sugerida mientras el evaluador no la cambie
+  if (NIVELES.includes(k.sugerida) && k.sugerida !== ultimaSug) {
     if (!D.prioridad || D.prioridad === ultimaSug) { D.prioridad = k.sugerida; form.querySelectorAll('input[name=prioridad]').forEach((x) => { x.checked = x.value === k.sugerida; }); }
     ultimaSug = k.sugerida;
   }
-  D._dif = FICHA_NIV.includes(k.sugerida) && D.prioridad ? FICHA_NIV.indexOf(D.prioridad) - FICHA_NIV.indexOf(k.sugerida) : 0;
-  if (!sinRedibujarDetalles) { const p = form.querySelector('[data-campo="prioridad"]'); p._pintarDetalles(); }
-  $('resultado').hidden = true;
-  D._k = k;
+  D._dif = NIVELES.includes(k.sugerida) && D.prioridad ? NIVELES.indexOf(D.prioridad) - NIVELES.indexOf(k.sugerida) : 0;
+  if (!sinDetalles) form.querySelector('[data-campo="prioridad"]')._pintarDetalles();
 }
 
-// ---------------------------------------------------------------- finalizar (simulado) y comentarios
-$('btn-enviar-ficha').addEventListener('click', () => {
-  pintar();
+function ir(i) {
+  const vis = pasosVisibles();
+  actual = Math.max(0, Math.min(i, vis.length - 1));
+  $('msg-validacion').textContent = '';
   form.querySelectorAll('.faltante').forEach((x) => x.classList.remove('faltante'));
-  const faltan = [];
-  campos.forEach((c) => faltantes(c).forEach((id) => {
-    faltan.push(c);
-    const el = form.querySelector('[data-campo="' + id + '"]') || form.querySelector('[data-detalle="' + id + '"]');
-    if (el) el.classList.add('faltante');
-  }));
-  if (faltan.length) {
-    const primera = faltan[0];
-    $('msg-validacion').textContent = 'Faltan ' + faltan.length + ' respuesta(s). La primera está en la sección ' + primera.sec.numero + '.';
-    const s = form.querySelector('[data-seccion="' + primera.sec.id + '"]'); s.classList.remove('cerrada');
-    form.querySelector('.faltante').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  pintar();
+  $('vista-ficha').scrollTo({ top: 0, behavior: 'smooth' });
+}
+function marcarFaltantes(lista) {
+  lista.forEach(({ id }) => { const el = form.querySelector('[data-campo="' + id + '"]') || form.querySelector('[data-detalle="' + id + '"]'); if (el) el.classList.add('faltante'); });
+}
+$('btn-atras').addEventListener('click', () => ir(actual - 1));
+$('btn-siguiente').addEventListener('click', () => {
+  const vis = pasosVisibles();
+  if (!D.hay_movimiento && actual === vis.length - 1) { $('msg-validacion').textContent = 'Elija qué encontró en el sitio para continuar.'; return; }
+  if (actual < vis.length - 1) {
+    // avanza siempre; lo que falte queda marcado en naranja en los pasos
+    return ir(actual + 1);
+  }
+  const falta = [];
+  campos.forEach((c) => faltantes(c).forEach((id) => falta.push({ id, sec: c.sec })));
+  if (falta.length) {
+    const i = vis.indexOf(falta[0].sec);
+    ir(i);
+    marcarFaltantes(falta.filter((f) => f.sec === falta[0].sec));
+    $('msg-validacion').textContent = 'Faltan ' + falta.length + ' respuesta(s). Las de este paso están en rojo; los pasos pendientes, en naranja.';
     return;
   }
-  $('msg-validacion').textContent = '';
-  const k = D._k, r = $('resultado');
-  r.hidden = false;
-  r.innerHTML = '<b>Ficha completa (demostración).</b> En la versión real se enviaría con: prioridad sugerida <span class="chip ' + (k.sugerida || 'gris') + '">' + esc(k.sugerida) + '</span>' +
-    (D.prioridad && D.prioridad !== k.sugerida ? ' · prioridad final <span class="chip ' + D.prioridad + '">' + D.prioridad + '</span> (justificada)' : '') +
-    '<p style="margin:12px 0 4px"><b>¿Comentarios sobre la propuesta?</b> Escríbalos y envíelos al coordinador de la propuesta en la DIGER. Se adjunta el resumen de este caso.</p>' +
-    '<textarea id="fb-texto" placeholder="Preguntas que sobran o faltan, opciones, la prioridad sugerida…"></textarea>' +
-    '<div class="botones"><a class="btn-principal" id="fb-wa" target="_blank" rel="noopener" href="#">WhatsApp</a><a class="btn-secundario" id="fb-mail" href="#">Correo</a>' +
-    '<button type="button" class="btn-secundario" id="fb-copiar">Copiar</button></div>';
+  terminar();
+});
+
+// ---------------------------------------------------------------- final y comentarios
+function terminar() {
+  const k = D._k;
+  let fin = $('fin');
+  if (!fin) { fin = document.createElement('div'); fin.id = 'fin'; fin.className = 'fin'; form.appendChild(fin); }
+  fin.innerHTML = '<b>Ficha completa.</b> En la versión real se enviaría con prioridad ' +
+    (k.sugerida === 'SIN PRIORIDAD' ? '<b>sin prioridad</b> (remisión).' : 'sugerida <span class="chip ' + k.sugerida + '">' + k.sugerida + '</span> y final <span class="chip ' + D.prioridad + '">' + D.prioridad + '</span>.') +
+    '<p style="margin:12px 0 4px"><b>¿Qué le pareció?</b> Escriba sus comentarios y envíelos al coordinador de la propuesta en la DIGER. Se adjunta el resumen de este caso.</p>' +
+    '<textarea id="fb-texto" placeholder="Qué sobra, qué falta, qué cambiaría…"></textarea>' +
+    '<div class="botones"><a class="btn-principal" id="fb-wa" target="_blank" rel="noopener" href="#">WhatsApp</a><a class="btn-secundario" id="fb-mail" href="#">Correo</a><button type="button" class="btn-secundario" id="fb-copiar">Copiar</button></div>';
   const msg = () => {
-    const F = k.factores || {};
-    const t = 'Comentarios a la propuesta de ficha de taludes 2.0\n\n' + ($('fb-texto').value.trim() || '(sin observaciones)') + '\n\nCaso de prueba: ' + (D.hay_movimiento || '') +
-      (F.A1 ? '\nA1 ' + F.A1.pts + ' + A2 ' + F.A2.pts + ' + A3 ' + F.A3.pts + ' + A4 ' + F.A4.pts + ' = ' + k.puntos + ' (' + k.amenaza + ') · Exposición ' + k.exposicion : '') +
-      '\nPrioridad sugerida: ' + k.sugerida + (D.prioridad ? ' · final: ' + D.prioridad : '') + (D._dif ? '\nJustificación: ' + D.justificacion_motivo + ': ' + D.justificacion_texto : '');
+    const F = k.factores;
+    const t = 'Comentarios a la propuesta de ficha de taludes 2.0\n\n' + ($('fb-texto').value.trim() || '(sin observaciones)') + '\n\nCaso de prueba: ' + D.hay_movimiento +
+      (F.A1 ? '\nMagnitud ' + F.A1.pts + ' + actividad ' + F.A2.pts + ' + señales ' + F.A3.pts + ' + velocidad ' + F.A4.pts + ' = ' + k.puntos + ' (' + k.amenaza + ') · exposición ' + k.exposicion : '') +
+      '\n' + explicar(k, D) + (D.prioridad && D._dif ? '\nPrioridad final: ' + D.prioridad + ' — ' + D.justificacion_motivo + ': ' + D.justificacion_texto : '');
     $('fb-wa').href = 'https://wa.me/?text=' + encodeURIComponent(t);
     $('fb-mail').href = 'mailto:?subject=' + encodeURIComponent('Comentarios ficha de taludes 2.0') + '&body=' + encodeURIComponent(t);
     return t;
   };
   $('fb-texto').addEventListener('input', msg); msg();
   $('fb-copiar').addEventListener('click', () => { const t = msg(); if (navigator.clipboard) navigator.clipboard.writeText(t).then(() => { $('fb-copiar').textContent = 'Copiado'; }, () => {}); });
-  r.scrollIntoView({ behavior: 'smooth', block: 'center' });
-});
-form.querySelector('[data-campo="fecha_hora_visita"] input').value = D.fecha_hora_visita;
+  fin.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
 pintar();
 </script>
 </body>
