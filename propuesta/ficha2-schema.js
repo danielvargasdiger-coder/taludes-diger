@@ -112,6 +112,10 @@
               'Latente': 'Quieto, pero las causas siguen y puede volver a moverse',
               'Inactivo': 'Estabilizado, con vegetación o con obras que funcionan'
             } },
+          { id: 'senales_avance', etiqueta: '¿Hay señales de que puede seguir moviéndose?', tipo: 'multiple', requerido: true, criticidad: 'A3',
+            opciones: ['Grietas arriba del movimiento', 'El borde de arriba avanza hacia casas o vías', 'Bloques o rocas sueltas', 'Árboles o postes inclinados',
+              'Sigue cayendo material', 'Ninguna'],
+            exclusivas: ['Ninguna'] },
           { id: 'forma_magnitud', etiqueta: 'Tamaño', tipo: 'unica', requerido: true, criticidad: 'A1',
             opciones: ['Medidas aproximadas en campo', 'Estimación visual'],
             descripciones: { 'Medidas aproximadas en campo': 'Cinta, distanciómetro o pasos', 'Estimación visual': 'Si no hay acceso o hay peligro' } },
@@ -146,41 +150,33 @@
         ] },
 
       // ------------------------------------------------------------------ 5
-      { id: 's5', numero: '5', titulo: 'EVIDENCIAS Y CAUSAS', corto: 'Causas', soloSi: EN_TERRENO,
+      { id: 's5', numero: '5', titulo: '¿QUÉ LO PROVOCA?', corto: 'Causas', soloSi: EN_TERRENO,
         campos: [
-          { id: 'evidencias', etiqueta: '¿Qué evidencias ve?', tipo: 'multiple', requerido: true, soloSi: SI_MOV, criticidad: 'A3',
-            opciones: ['Grietas arriba (corona)', 'Grietas en la masa', 'Escarpe', 'El escarpe avanza hacia casas o vías', 'Material acumulado al pie',
-              'Hundimiento', 'Árboles o postes inclinados', 'Bloques sueltos', 'Daños en casas, vías o redes', 'Erosión (surcos, cárcavas)', 'La comunidad reporta movimiento reciente', 'Otra'],
-            detalles: { 'Otra': { id: 'evidencias_otra', etiqueta: '¿Cuál evidencia?', tipo: 'texto', requerido: true } } },
-          { id: 'antiguedad_evidencias', etiqueta: '¿Cómo se ven?', tipo: 'unica', requerido: true, soloSi: SI_MOV,
-            opciones: ['Frescas', 'Recientes', 'Antiguas'],
-            descripciones: { 'Frescas': 'Bordes nítidos, raíces expuestas (< 1 mes)', 'Recientes': 'Bordes suavizados (< 1 año)', 'Antiguas': 'Con vegetación' } },
-          { id: 'detonantes', etiqueta: '¿Qué lo causa o lo empeora?', tipo: 'multiple', requerido: true, criticidad: 'A3',
-            opciones: ['Lluvias', 'Sismo', 'Agua de tuberías o mal dispuesta', 'Corte o excavación al pie', 'Relleno o construcción arriba', 'Quebrada que socava', 'Deforestación', 'No se identifica', 'Otro'],
+          { id: 'detonantes', etiqueta: '¿Qué está provocando o empeorando el problema?', tipo: 'multiple', requerido: true, criticidad: 'A3',
+            ayuda: 'Marque lo que vea en el sitio. Ej.: una tubería rota que moja el talud, o una casa construida en el borde.',
+            opciones: ['Lluvias', 'Agua de tuberías, alcantarillado o techos', 'Corte o excavación al pie del talud', 'Relleno, construcción o escombros en la parte de arriba',
+              'Quebrada que socava el pie', 'Tala o quema de vegetación', 'Sismo', 'No se identifica', 'Otro'],
             exclusivas: ['No se identifica'], detalles: OTRO('detonantes_otro') }
         ] },
-
       // ------------------------------------------------------------------ 6
       { id: 's6', numero: '6', titulo: '¿QUÉ ESTÁ EXPUESTO?', corto: 'Expuestos', soloSi: EN_TERRENO,
-        ayuda: 'Lo que está encima, en la corona (hasta una altura del talud) o al pie (hasta dos alturas).',
+        ayuda: 'Lo que está encima, en la parte de arriba (hasta una altura del talud) o al pie (hasta dos alturas).',
         campos: [
           { id: 'expuestos', etiqueta: 'Elementos expuestos', tipo: 'multiple', requerido: true, criticidad: 'Exposición',
             opciones: ['Ninguno', 'Viviendas habitadas', 'Escuela, centro de salud o similar', 'Vía principal o única vía', 'Vía secundaria', 'Vía o escalera peatonal',
               'Redes de servicios', 'Casas deshabitadas o lotes', 'Quebrada (posible represamiento)', 'Cultivos', 'Otro'],
             exclusivas: ['Ninguno'], detalles: OTRO('expuestos_otro') },
-          { id: 'viviendas_n', etiqueta: 'Viviendas habitadas', tipo: 'numero', unidad: 'No.', requerido: true, ayuda: '0 si no hay.' },
+          { id: 'viviendas_n', etiqueta: '¿Cuántas viviendas habitadas?', tipo: 'numero', unidad: 'No.', requerido: true, soloSi: { campo: 'expuestos', contiene: ['Viviendas habitadas'] } },
           { id: 'distancia_minima_m', etiqueta: 'Distancia a lo más cercano', tipo: 'numero', unidad: 'm', requerido: true, soloSi: { campo: 'expuestos', distintoDe: 'Ninguno' } },
-          { id: 'afectacion', etiqueta: 'Daño actual', tipo: 'unica', requerido: true,
+          { id: 'afectacion', etiqueta: 'Daño actual en viviendas, vías o redes', tipo: 'unica', requerido: true, soloSi: { campo: 'expuestos', distintoDe: 'Ninguno' },
             opciones: ['Ninguno', 'Leve', 'Moderado', 'Severo', 'Colapso'],
-            descripciones: { 'Leve': 'Fisuras < 1 mm', 'Moderado': 'Fisuras de 1 a 5 mm o redes dañadas', 'Severo': 'Grietas > 5 mm, desplomes; inhabitable', 'Colapso': 'Pérdida total o parcial' } },
-          { id: 'viviendas_evacuadas', etiqueta: 'Viviendas evacuadas', tipo: 'numero', unidad: 'No.', ayuda: 'Opcional.' }
+            descripciones: { 'Leve': 'Fisuras finas (< 1 mm)', 'Moderado': 'Fisuras de 1 a 5 mm o redes dañadas', 'Severo': 'Grietas > 5 mm o desplomes; inhabitable o intransitable', 'Colapso': 'Pérdida total o parcial' } }
         ] },
-
       // ------------------------------------------------------------------ 7
       { id: 's7', numero: '7', titulo: 'PRIORIDAD', corto: 'Prioridad', soloSi: EN_TERRENO,
         campos: [
-          { id: 'banderas', etiqueta: '¿Hay alguna de estas condiciones?', tipo: 'multiple', requerido: true,
-            ayuda: 'Cualquiera lleva la prioridad sugerida a CRÍTICA.',
+          { id: 'banderas', etiqueta: 'Condiciones de alerta inmediata', tipo: 'multiple', requerido: true,
+            ayuda: 'Si ve alguna, la prioridad sugerida pasa a CRÍTICA. Si no ve ninguna, marque "Ninguna".',
             opciones: ['Ninguna', BANDERA_VIVIENDA, 'Masa o bloque a punto de caer sobre casas, personas o una vía en uso', 'Quebrada obstruida (riesgo de represamiento)'],
             exclusivas: ['Ninguna'] },
           { id: 'valoracion', etiqueta: 'Calificación del sistema', tipo: 'calculado' },
@@ -253,15 +249,16 @@
       ['muro de contención agrietado o desplomado', tiene(r.senales, 'Muro de contención agrietado o desplomado') || r.obras === 'Hay pero dañadas'],
       ['árboles o postes inclinados', tiene(r.senales, 'Árboles, postes o cercas inclinados')]
     ] : [
-      ['grietas en la corona', tiene(r.evidencias, 'Grietas arriba (corona)')],
-      ['escarpe que avanza hacia casas o vías', tiene(r.evidencias, 'El escarpe avanza hacia casas o vías')],
-      ['bloques sueltos o árboles inclinados', tiene(r.evidencias, 'Bloques sueltos', 'Árboles o postes inclinados')],
+      ['grietas arriba del movimiento', tiene(r.senales_avance, 'Grietas arriba del movimiento')],
+      ['el borde de arriba avanza hacia casas o vías', tiene(r.senales_avance, 'El borde de arriba avanza hacia casas o vías')],
+      ['bloques sueltos o árboles inclinados', tiene(r.senales_avance, 'Bloques o rocas sueltas', 'Árboles o postes inclinados')],
+      ['sigue cayendo material', tiene(r.senales_avance, 'Sigue cayendo material')],
       ['obras dañadas', r.obras === 'Hay pero dañadas']
     ];
     ind.push(['agua en el talud', tiene(r.agua, 'Saturado', 'Surgencias o filtraciones', 'Encharcamientos arriba')]);
-    ind.push(['aguas sin manejo', tiene(r.agua, 'Escorrentía sin manejo', 'Fuga de tubería') || tiene(r.detonantes, 'Agua de tuberías o mal dispuesta')]);
-    ind.push(['corte o socavación al pie', tiene(r.detonantes, 'Corte o excavación al pie', 'Quebrada que socava')]);
-    ind.push(['sobrecarga arriba', tiene(r.detonantes, 'Relleno o construcción arriba')]);
+    ind.push(['aguas sin manejo', tiene(r.agua, 'Escorrentía sin manejo', 'Fuga de tubería') || tiene(r.detonantes, 'Agua de tuberías, alcantarillado o techos')]);
+    ind.push(['corte o socavación al pie', tiene(r.detonantes, 'Corte o excavación al pie del talud', 'Quebrada que socava el pie')]);
+    ind.push(['sobrecarga arriba', tiene(r.detonantes, 'Relleno, construcción o escombros en la parte de arriba')]);
     ind.push(['inclinación alta sin cobertura', r.pendiente === 'Alta' && r.cobertura === 'Suelo desnudo']);
     out.indicios = ind.filter((x) => x[1]).map((x) => x[0]);
     const k = out.indicios.length;
@@ -285,8 +282,7 @@
     const completo = a1 && a2 && a4 && lista(r.expuestos).length;
     out.sugerida = out.banderas.length ? 'CRÍTICA' : completo ? MATRIZ[out.amenaza][e] : null;
     // Coherencia (no bloquea)
-    if (!ine && r.antiguedad_evidencias === 'Frescas' && a2 && a2 <= 2) out.advertencias.push('Evidencias frescas con un movimiento quieto: ¿está activo?');
-    if (!ine && r.antiguedad_evidencias === 'Antiguas' && a2 === 4) out.advertencias.push('Movimiento activo con evidencias antiguas.');
+    if (!ine && a2 && a2 <= 2 && tiene(r.senales_avance, 'Sigue cayendo material')) out.advertencias.push('Sigue cayendo material, pero el movimiento está marcado como quieto: ¿está activo?');
     if (!ine && a2 === 1 && k >= 3) out.advertencias.push('Movimiento inactivo con ' + k + ' señales de reactivación: ¿es latente?');
     if (ine && r.grieta_abertura === 'No hay grietas' && tiene(r.senales, 'Grietas en el terreno', 'Grietas o fisuras en viviendas', 'Grietas en vías o andenes')) out.advertencias.push('Marcó grietas en las señales pero "No hay grietas" en la abertura.');
     if (tiene(r.expuestos, 'Viviendas habitadas') && r.viviendas_n !== undefined && r.viviendas_n !== '' && +r.viviendas_n === 0) out.advertencias.push('Marcó viviendas habitadas pero escribió 0.');
