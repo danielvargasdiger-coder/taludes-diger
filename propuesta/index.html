@@ -243,6 +243,7 @@ let R = {}, fotos = {}, ultimaSug = null;
 // ---------- visibilidad
 function cumple(cond) {
   if (!cond) return true;
+  if (Array.isArray(cond)) return cond.every(cumple);
   const v = R[cond.campo], arr = Array.isArray(v) ? v : (v ? [v] : []);
   if (cond.valor !== undefined) return v === cond.valor;
   if (cond.valores) return cond.valores.includes(v);
@@ -459,7 +460,8 @@ function especificacion() {
       s.campos.map((c, i) => {
         let ops = c.opciones ? c.opciones.map((o) => esc(o) + (c.detalles && c.detalles[o] ? ' → <i>' + esc(c.detalles[o].etiqueta) + '</i>' : '') + ((c.exclusivas || []).includes(o) ? ' <i>(excluyente)</i>' : '')).join(' · ') : (c.unidad ? 'Unidad: ' + esc(c.unidad) : '');
         if (c.tipo === 'prioridad') ops += ' · Si difiere de la sugerida: motivo (' + c.justificacion.motivos.map(esc).join(' / ') + ') + justificación ≥ ' + c.justificacion.minimo + ' caracteres';
-        const cond = c.soloSi ? `<br><small class="ayuda">Solo si ${esc(c.soloSi.campo)} ${c.soloSi.valor ? '= ' + esc(c.soloSi.valor) : c.soloSi.distintoDe ? '≠ ' + esc(c.soloSi.distintoDe) : 'incluye ' + esc((c.soloSi.contiene || c.soloSi.valores || []).join(' o '))}</small>` : '';
+        const txtCond = (x) => `${esc(x.campo)} ${x.valor ? '= ' + esc(x.valor) : x.distintoDe ? '≠ ' + esc(x.distintoDe) : 'incluye ' + esc((x.contiene || x.valores || []).join(' o '))}`;
+        const cond = c.soloSi ? `<br><small class="ayuda">Solo si ${[].concat(c.soloSi).map(txtCond).join(' y ')}</small>` : '';
         return `<tr><td>${s.numero}.${i + 1}</td><td>${esc(c.etiqueta)}${c.requerido ? ' <span class="req">*</span>' : ''}${cond}</td><td>${TIPO_TXT[c.tipo]}</td><td class="ops-col">${ops}</td><td>${esc(c.criticidad || '')}</td></tr>`;
       }).join('') + '</table></div></section>';
   });

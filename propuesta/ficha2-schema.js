@@ -16,7 +16,10 @@
 (function (raiz) {
   const OTRO = (id, etq) => ({ 'Otro': { id: id, etiqueta: etq || '¿Cuál?', tipo: 'texto', requerido: true } });
   const MOV = { campo: 'hay_movimiento', valores: ['Sí, movimiento en masa ocurrido', 'Sí, inestabilidad incipiente'] };
-  const MEDIDO = { campo: 'forma_magnitud', valor: 'Medidas aproximadas en campo' };
+  // Tipo de movimiento y dimensiones solo si el movimiento YA ocurrió: en una inestabilidad incipiente no hay
+  // masa desplazada que medir ni tipo que definir (no se obliga al evaluador a adivinar). soloSi en lista = todas se cumplen.
+  const OCURRIDO = { campo: 'hay_movimiento', valor: 'Sí, movimiento en masa ocurrido' };
+  const MEDIDO = [OCURRIDO, { campo: 'forma_magnitud', valor: 'Medidas aproximadas en campo' }];
   const BANDERA_VIVIENDA = 'Vivienda habitada con daño estructural severo o grietas que avanzan por el movimiento';
 
   const FICHA2 = {
@@ -54,7 +57,7 @@
             opciones: ['Sí, movimiento en masa ocurrido', 'Sí, inestabilidad incipiente', 'No'],
             descripciones: {
               'Sí, movimiento en masa ocurrido': 'Hay masa desplazada (deslizamiento, caída, flujo).',
-              'Sí, inestabilidad incipiente': 'Sin masa desplazada todavía, pero con evidencias (grietas, deformación, abombamiento).',
+              'Sí, inestabilidad incipiente': 'Todavía no se ha movido masa, pero hay evidencias (grietas, deformación, abombamiento). No se pregunta tipo de movimiento ni dimensiones.',
               'No': 'Sin movimiento ni evidencias de inestabilidad del terreno: se registra el hallazgo y se pasa al registro fotográfico.'
             } },
           { id: 'hallazgo_sin_movimiento', etiqueta: 'Hallazgo', tipo: 'unica', requerido: true, soloSi: { campo: 'hay_movimiento', valor: 'No' },
@@ -127,7 +130,7 @@
         id: 's4', numero: '4', titulo: 'CARACTERIZACIÓN DEL MOVIMIENTO', soloSi: MOV,
         ayuda: 'Tipo según Varnes (1978) y Cruden y Varnes (1996); estado de actividad según WP/WLI (1993). Dimensiones y volumen son aproximados.',
         campos: [
-          { id: 'mecanismo', etiqueta: 'Tipo de movimiento', tipo: 'unica', requerido: true,
+          { id: 'mecanismo', etiqueta: 'Tipo de movimiento', tipo: 'unica', requerido: true, soloSi: OCURRIDO,
             opciones: ['Caída', 'Volcamiento', 'Deslizamiento rotacional', 'Deslizamiento traslacional', 'Flujo', 'Reptación', 'Movimiento complejo', 'No determinado'],
             descripciones: {
               'Caída': 'Desprendimiento y descenso por el aire, rebote o rodadura.',
@@ -154,7 +157,7 @@
               'Socavación por cauce', 'Deforestación', 'No determinado', 'Otro'],
             exclusivas: ['No determinado'], detalles: OTRO('detonantes_otro'),
             criticidad: 'A3 · indicios "corte o socavación al pie" y "sobrecarga"' },
-          { id: 'forma_magnitud', etiqueta: 'Dimensiones', tipo: 'unica', requerido: true,
+          { id: 'forma_magnitud', etiqueta: 'Dimensiones', tipo: 'unica', requerido: true, soloSi: OCURRIDO,
             opciones: ['Medidas aproximadas en campo', 'Estimación visual'],
             descripciones: {
               'Medidas aproximadas en campo': 'Con cinta, distanciómetro o a pasos. Valores aproximados: la geometría es irregular y la profundidad casi nunca se ve.',
@@ -167,7 +170,7 @@
             ayuda: 'Inferida de la altura del escarpe o del material expuesto.' },
           { id: 'volumen_m3', etiqueta: 'Volumen aproximado V ≈ π/6 · L · W · D', tipo: 'calculado', unidad: 'm³', soloSi: MEDIDO,
             ayuda: 'Lo calcula el sistema (forma elipsoidal, Cruden y Varnes 1996). Es un orden de magnitud.', criticidad: 'A1 · magnitud (clase por volumen)' },
-          { id: 'volumen_clase', etiqueta: 'Volumen estimado', tipo: 'unica', requerido: true, soloSi: { campo: 'forma_magnitud', valor: 'Estimación visual' },
+          { id: 'volumen_clase', etiqueta: 'Volumen estimado', tipo: 'unica', requerido: true, soloSi: [OCURRIDO, { campo: 'forma_magnitud', valor: 'Estimación visual' }],
             opciones: ['Menor de 10 m³', '10 a 100 m³', '100 a 1.000 m³', 'Mayor de 1.000 m³'],
             descripciones: {
               'Menor de 10 m³': 'Hasta una volqueta sencilla (unos 7 m³). Ej.: tapa un andén o una escalera.',
@@ -295,9 +298,12 @@
     if (r.hay_movimiento === 'No') return Object.assign(out, { sugerida: 'SIN PRIORIDAD' });
     // A1 magnitud: la mayor entre la clase de volumen y la de altura
     const h = num(r.altura_talud_m);
+    const incipiente = r.hay_movimiento === 'Sí, inestabilidad incipiente';
     let a1 = 0;
     const porque = [];
-    if (r.forma_magnitud === 'Medidas aproximadas en campo') {
+    if (incipiente) {
+      // sin masa desplazada: la magnitud sale solo de la altura del talud
+    } else if (r.forma_magnitud === 'Medidas aproximadas en campo') {
       const L = num(r.dim_longitud_m), W = num(r.dim_ancho_m), D = num(r.dim_profundidad_m);
       out.volumen = L && W && D ? Math.PI / 6 * L * W * D : null;
       if (out.volumen) { a1 = clase(out.volumen, [10, 100, 1000]); porque.push('volumen ≈ ' + Math.round(out.volumen) + ' m³ → ' + a1); }
@@ -325,9 +331,9 @@
     const k = out.indicios.length;
     const a3 = k === 0 ? 1 : k === 1 ? 2 : k <= 3 ? 3 : 4;
     out.factores.A3 = { pts: a3, porque: k + ' indicio(s)' };
-    // A4 velocidad esperada según el tipo de movimiento
-    const a4 = VEL_MECANISMO[r.mecanismo] || 0;
-    out.factores.A4 = { pts: a4, porque: r.mecanismo || '' };
+    // A4 velocidad esperada según el tipo de movimiento; incipiente = valor neutro (3, como "no determinado")
+    const a4 = incipiente ? 3 : (VEL_MECANISMO[r.mecanismo] || 0);
+    out.factores.A4 = { pts: a4, porque: incipiente ? 'Inestabilidad incipiente: sin tipo definido (valor neutro)' : (r.mecanismo || '') };
     out.puntos = a1 + a2 + a3 + a4;
     out.amenaza = out.puntos <= 8 ? 'Baja' : out.puntos <= 11 ? 'Media' : out.puntos <= 13 ? 'Alta' : 'Muy alta';
     // Exposición: el nivel más alto; 3 o más viviendas habitadas = 4
