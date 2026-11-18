@@ -11,7 +11,7 @@
  * service worker borra solo las cachés de SU prefijo.
  */
 const PREFIJO = 'taludes';        // en el gemelo de pruebas: 'pruebas'
-const VERSION = PREFIJO + '-v82';
+const VERSION = PREFIJO + '-v83';
 
 /**
  * Caché del mapa: Leaflet y los cuadritos del mapa ya vistos.
@@ -175,6 +175,8 @@ self.addEventListener('fetch', (ev) => {
   // El tablero de eficiencia (carpeta eficiencia/) es otra pagina: no se guarda
   // en la cache de la app, asi siempre se ve su version mas reciente.
   if (url.pathname.indexOf('/eficiencia/') !== -1) return;
+  // La demo de la propuesta de ficha 2.0 (carpeta propuesta/, v83) tampoco: se actualiza sola.
+  if (url.pathname.indexOf('/propuesta/') !== -1) return;
 
   /**
    * Todo sale de la caché de ESTA versión, y esa caché NO se toca.
