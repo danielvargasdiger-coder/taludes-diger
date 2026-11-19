@@ -61,11 +61,21 @@
   /* barra inferior */
   .nav-pasos { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; max-width: var(--ancho-lectura); margin: 0 auto; }
   .nav-pasos .btn-principal, .nav-pasos .btn-secundario { width: auto; padding: 12px 16px; }
-  .medidor { display: grid; gap: 3px; font-size: .68rem; color: var(--texto-suave); min-width: 0; }
-  .medidor .fila { display: grid; grid-template-columns: 62px 1fr; align-items: center; gap: 6px; }
+  .medidor { display: grid; grid-template-columns: max-content minmax(24px, 1fr); align-items: center; gap: 3px 6px; font-size: .68rem; color: var(--texto-suave); min-width: 0; }
+  .medidor .fila { display: contents; }
   .medidor .barra { height: 6px; border-radius: 3px; background: var(--borde); overflow: hidden; }
   .medidor .barra i { display: block; height: 100%; width: 0; background: var(--azul); transition: width .3s; }
-  .medidor .sug { display: flex; align-items: center; gap: 6px; font-weight: 700; }
+  .medidor .sug { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; font-weight: 700; }
+  /* Celular: el medidor arriba a lo ancho y los botones abajo, para que nada se encime
+     aunque el teléfono tenga la letra grande. */
+  @media (max-width: 599px) {
+    .nav-pasos { grid-template-columns: auto 1fr; gap: 8px; }
+    .nav-pasos > button { grid-row: 2; }
+    .medidor { grid-row: 1; grid-column: 1 / -1; grid-template-columns: max-content minmax(24px, 1fr) max-content minmax(24px, 1fr); }
+    .medidor .sug { justify-content: center; }
+    .nav-pasos .btn-principal { width: 100%; }
+    #vista-ficha { padding-bottom: calc(190px + env(safe-area-inset-bottom)); }
+  }
   .fin { border: 2px solid var(--ok); border-radius: var(--radio); background: #fff; padding: 14px; margin-top: 14px; font-size: .86rem; }
   .fin textarea { min-height: 90px; }
   .fin .botones { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
@@ -101,8 +111,12 @@
   </div>
 </section>
 
-<script src="ficha2-schema.js?v=20261118c" charset="utf-8"></script>
+<script src="ficha2-schema.js?v=20261118d" charset="utf-8"></script>
 <script>
+// En un celular con la app instalada en una versión anterior a la v83, el service worker de la app
+// guarda esta demo y la sigue mostrando vieja. Se borra esa copia para que la próxima vez llegue la actual.
+if (window.caches) caches.keys().then((ks) => ks.forEach((k) => caches.open(k).then((c) => c.keys().then((rs) =>
+  rs.forEach((r) => { if (r.url.indexOf('/propuesta/') !== -1) c.delete(r); }))))).catch(() => null);
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const D = {}, fotos = {};
@@ -287,6 +301,9 @@ function pintar(sinDetalles) {
   // pasos
   $('pasos').innerHTML = vis.map((s, i) => '<button type="button" class="paso' + (i === actual ? ' actual' : faltanEn(s) ? (i < actual ? ' pendiente' : '') : ' hecho') + '" data-i="' + i + '"><b>' + (i + 1) + '</b>' + esc(s.corto) + '</button>').join('');
   $('pasos').querySelectorAll('.paso').forEach((b) => b.addEventListener('click', () => ir(+b.dataset.i)));
+  // en celular la fila de pasos no cabe: se corre sola para que el paso actual quede a la vista
+  const fila = $('pasos'), act = fila.querySelector('.actual');
+  fila.scrollLeft += act.getBoundingClientRect().left - fila.getBoundingClientRect().left - (fila.clientWidth - act.offsetWidth) / 2;
   SECS.forEach((s) => form.querySelector('[data-seccion="' + s.id + '"]').classList.toggle('oculta', s !== vis[actual]));
   $('titulo-paso').textContent = vis[actual].titulo.toLowerCase().replace(/^(¿?)(.)/, (m, p, l) => p + l.toUpperCase());
   $('conteo-paso').textContent = 'Paso ' + (actual + 1) + (D.hay_movimiento ? ' de ' + vis.length : '');
